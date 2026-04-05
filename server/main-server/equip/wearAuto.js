@@ -99,12 +99,13 @@
  * Config files loaded from /resource/json/:
  *   equip.json            — Equipment definitions (abilities, version, belongToSuit)
  *   equipSuit.json        — Suit set bonuses
- *   hero.json             — Hero definitions (heroType, talent, speed, balance values)
+ *   hero.json             — Hero definitions (heroType, talent, speed, balance values, passive skills)
  *   heroLevelAttr.json    — Base stats per level
  *   heroTypeParam.json    — Hero type multipliers
  *   heroEvolve.json       — Evolve flat bonuses
  *   heroLevelUpMul.json   — Evolve multipliers
  *   heroPower.json        — Combat power weights
+ *   skillOutBattle.json   — Passive skill percentage bonuses (hpPercent, attackPercent, etc.)
  *
  * Author: Local SDK Bridge
  * Version: 1.0.0 - Based on HAR real server data (5 entries analyzed)
@@ -152,7 +153,8 @@
         heroEvolve: null,
         heroPower: null,
         equip: null,
-        equipSuit: null
+        equipSuit: null,
+        skillOutBattle: null
     };
 
     // ========================================================
@@ -182,7 +184,7 @@
     }
 
     function loadAllConfigs(onReady) {
-        var mainConfigs = ['hero', 'heroLevelAttr', 'heroTypeParam', 'heroLevelUpMul', 'heroEvolve', 'heroPower', 'equip', 'equipSuit'];
+        var mainConfigs = ['hero', 'heroLevelAttr', 'heroTypeParam', 'heroLevelUpMul', 'heroEvolve', 'heroPower', 'equip', 'equipSuit', 'skillOutBattle'];
         var mainLoaded = 0;
         var mainTotal = mainConfigs.length;
 
@@ -546,7 +548,46 @@
     }
 
     // ========================================================
-    // 11. BUILD _totalAttr WITH EQUIP BONUSES (42 entries: IDs 0-41)
+    // 11. GATHER HERO PASSIVE SKILL PERCENTAGE BONUSES
+    // ========================================================
+
+    /**
+     * Reads hero passive skills and sums percentage bonuses from skillOutBattle.json.
+     * Hero config has skillPassive1, skillPassive2, skillPassive3, redPassive1, redPassive2, redPassive3
+     * fields pointing to skill IDs. Each skill ID maps to an entry in skillOutBattle.json
+     * that may have hpPercent, attackPercent, armorPercent, speedPercent values.
+     *
+     * @param {object} heroConfig - Hero definition from hero.json
+     * @returns {object} { hpPercent, attackPercent, armorPercent, speedPercent }
+     */
+    function getPassiveSkillPercentages(heroConfig) {
+        var result = { hpPercent: 0, attackPercent: 0, armorPercent: 0, speedPercent: 0 };
+        if (!heroConfig || !CONFIGS.skillOutBattle) return result;
+
+        // Collect all passive skill IDs from hero config
+        var passiveFields = ['skillPassive1', 'skillPassive2', 'skillPassive3',
+                             'redPassive1', 'redPassive2', 'redPassive3'];
+        var skillIds = [];
+        for (var i = 0; i < passiveFields.length; i++) {
+            var sid = parseInt(heroConfig[passiveFields[i]]);
+            if (sid && !isNaN(sid)) skillIds.push(sid);
+        }
+
+        // Look up each skill in skillOutBattle.json and sum percentage bonuses
+        for (var s = 0; s < skillIds.length; s++) {
+            var skillEntry = CONFIGS.skillOutBattle[String(skillIds[s])];
+            if (!skillEntry) continue;
+            result.hpPercent += parseFloat(skillEntry.hpPercent) || 0;
+            result.attackPercent += parseFloat(skillEntry.attackPercent) || 0;
+            result.armorPercent += parseFloat(skillEntry.armorPercent) || 0;
+            result.speedPercent += parseFloat(skillEntry.speedPercent) || 0;
+        }
+
+        return result;
+    }
+
+    // ========================================================
+    // 12. BUILD _totalAttr WITH EQUIP BONUSES (42 entries: IDs 0-41)
     // ========================================================
 
     /**
@@ -557,22 +598,31 @@
      * @param {number} power - Computed combat power
      * @returns {object} _items object with 42 entries (IDs 0-41)
      */
-    function buildTotalAttrWithEquips(baseStats, equipSumMap, power) {
+    function buildTotalAttrWithEquips(baseStats, equipSumMap, passivePcts, power) {
         var items = {};
 
-        // ID 0: hero base HP + sum of all equip hp abilities (abilityID 0)
-        var totalHp = baseStats.hp + (equipSumMap[0] || 0);
+        // Total percentages = passive skill percentages + equip percentage bonuses
+        var totalHpPct = (passivePcts.hpPercent || 0) + (equipSumMap[17] || 0);
+        var totalArmorPct = (passivePcts.armorPercent || 0) + (equipSumMap[18] || 0);
+        var totalAtkPct = (passivePcts.attackPercent || 0) + (equipSumMap[19] || 0);
+        var totalSpdPct = (passivePcts.speedPercent || 0) + (equipSumMap[20] || 0);
+
+        // ID 0: hero base HP × (1 + hpPercent) + flat HP from equips
+        var totalHp = baseStats.hp * (1 + totalHpPct) + (equipSumMap[0] || 0);
         items['0'] = { _id: 0, _num: totalHp };
 
-        // ID 1: hero base ATK + sum of all equip attack abilities (abilityID 1)
-        var totalAtk = baseStats.atk + (equipSumMap[1] || 0);
+        // ID 1: hero base ATK × (1 + attackPercent) + flat ATK from equips
+        var totalAtk = baseStats.atk * (1 + totalAtkPct) + (equipSumMap[1] || 0);
         items['1'] = { _id: 1, _num: totalAtk };
 
-        // ID 2: hero base DEF (armor from hero stats, equips don't add to this directly)
-        items['2'] = { _id: 2, _num: baseStats.def };
+        // ID 2: hero base DEF × (1 + armorPercent) + flat DEF from equips/suits
+        // BUG FIX: was missing equipSumMap[2] (flat armor from equips and suit bonuses)
+        var totalDef = baseStats.def * (1 + totalArmorPct) + (equipSumMap[2] || 0);
+        items['2'] = { _id: 2, _num: totalDef };
 
-        // ID 3: hero base speed
-        items['3'] = { _id: 3, _num: baseStats.speed };
+        // ID 3: hero base speed × (1 + speedPercent)
+        var totalSpd = baseStats.speed * (1 + totalSpdPct);
+        items['3'] = { _id: 3, _num: totalSpd };
 
         // IDs 4-15: 0 (hit, dodge, block, blockEffect, skillDamage, superDamage, etc.)
         for (var i = 4; i <= 15; i++) {
@@ -582,14 +632,14 @@
         // ID 16: always 50
         items['16'] = { _id: 16, _num: 50 };
 
-        // ID 17: hpPercent from equips (abilityID 17)
-        items['17'] = { _id: 17, _num: equipSumMap[17] || 0 };
+        // ID 17: total hpPercent (passive + equip)
+        items['17'] = { _id: 17, _num: totalHpPct };
 
-        // ID 18: armorPercent from equips (abilityID 18)
-        items['18'] = { _id: 18, _num: equipSumMap[18] || 0 };
+        // ID 18: total armorPercent (passive + equip)
+        items['18'] = { _id: 18, _num: totalArmorPct };
 
-        // ID 19: attackPercent from equips (abilityID 19)
-        items['19'] = { _id: 19, _num: equipSumMap[19] || 0 };
+        // ID 19: total attackPercent (passive + equip)
+        items['19'] = { _id: 19, _num: totalAtkPct };
 
         // ID 20: 0
         items['20'] = { _id: 20, _num: 0 };
@@ -600,10 +650,15 @@
         // ID 22: mirrors ID 0 (same as HP)
         items['22'] = { _id: 22, _num: totalHp };
 
-        // IDs 23-29: 0
+        // IDs 23-29: 0 (except ID 26 = extraArmor from equips)
         for (var j = 23; j <= 29; j++) {
             items[String(j)] = { _id: j, _num: 0 };
         }
+        // ID 26: extraArmor from equips (abilityID 26)
+        // BUG FIX: was zeroed by the 23-29 loop above, but extraArmor
+        // IS used by heroPower.json (powerParam=1 for all 13 heroTypes)
+        // and appears on 42 equips in equip.json
+        items['26'] = { _id: 26, _num: equipSumMap[26] || 0 };
 
         // ID 30: critical rate (talent * 1.5)
         var critRate = parseFloat((baseStats.talent * 1.5).toFixed(2));
@@ -912,16 +967,39 @@
         var suitAttrs = buildSuitAttrs(heroData);
         LOG.info('  Suit attrs count: ' + suitAttrs.length);
 
-        // --- 8. Build totalAttr (initially without power, then compute power, then update) ---
+        // --- 8. Gather passive skill percentage bonuses ---
+        var displayId = String(heroData._heroDisplayId);
+        var heroConfig = CONFIGS.hero ? CONFIGS.hero[displayId] : null;
+        var passivePcts = getPassiveSkillPercentages(heroConfig);
+        LOG.info('  Passive pcts: hpPct=' + passivePcts.hpPercent + ' atkPct=' + passivePcts.attackPercent +
+            ' armorPct=' + passivePcts.armorPercent + ' spdPct=' + passivePcts.speedPercent);
+
+        // --- 9. Merge suitAttrs bonuses into equipSumMap ---
+        // CRITICAL FIX: suit set bonuses (from equipSuit.json) must be included
+        // in the totalAttr calculation and power computation.
+        // Previously suitAttrs was only sent in the response but never merged,
+        // causing suit bonuses to be completely missing from hero stats and power.
+        for (var sa = 0; sa < suitAttrs.length; sa++) {
+            var saId = suitAttrs[sa]._id;
+            var saVal = suitAttrs[sa]._num;
+            equipSumMap[saId] = (equipSumMap[saId] || 0) + saVal;
+        }
+        LOG.info('  After suit merge, equipSumMap:');
+        var mergedKeys = Object.keys(equipSumMap);
+        for (var mk = 0; mk < mergedKeys.length; mk++) {
+            LOG.info('    abilityID ' + mergedKeys[mk] + ' = ' + equipSumMap[mergedKeys[mk]]);
+        }
+
+        // --- 10. Build totalAttr (initially without power, then compute power, then update) ---
         // First pass: build totalAttr with power=0 to get attrMap
-        var tempTotalAttr = buildTotalAttrWithEquips(baseStats, equipSumMap, 0);
+        var tempTotalAttr = buildTotalAttrWithEquips(baseStats, equipSumMap, passivePcts, 0);
         // Compute power using the temp totalAttr
         var power = computeCombatPower(baseStats.heroType, tempTotalAttr, baseStats.balancePower);
         LOG.info('  Computed power: ' + power);
         // Rebuild totalAttr with correct power
-        var totalAttrItems = buildTotalAttrWithEquips(baseStats, equipSumMap, power);
+        var totalAttrItems = buildTotalAttrWithEquips(baseStats, equipSumMap, passivePcts, power);
 
-        // --- 9. Save playerData ---
+        // --- 11. Save playerData ---
         if (playerData) {
             // Sync user._attribute with items
             if (playerData.user) {
@@ -961,7 +1039,7 @@
     }
 
     // ========================================================
-    // 15. ERROR RESPONSE BUILDER
+    // 16. ERROR RESPONSE BUILDER
     // ========================================================
     function buildErrorResponse(request, userId, heroId) {
         // Return a safe fallback that won't crash the client
@@ -994,7 +1072,7 @@
     }
 
     // ========================================================
-    // 16. REGISTER HANDLER
+    // 17. REGISTER HANDLER
     // ========================================================
     function register() {
         if (typeof window === 'undefined') {
@@ -1008,7 +1086,7 @@
         LOG.success('Handler registered: equip.wearAuto');
 
         var configStatus = [];
-        var configNames = ['hero', 'heroLevelAttr', 'heroTypeParam', 'heroLevelUpMul', 'heroEvolve', 'heroPower', 'equip', 'equipSuit'];
+        var configNames = ['hero', 'heroLevelAttr', 'heroTypeParam', 'heroLevelUpMul', 'heroEvolve', 'heroPower', 'equip', 'equipSuit', 'skillOutBattle'];
         for (var i = 0; i < configNames.length; i++) {
             configStatus.push(configNames[i] + '=' + (CONFIGS[configNames[i]] ? 'OK' : 'MISSING'));
         }
@@ -1016,7 +1094,7 @@
     }
 
     // ========================================================
-    // 17. INIT: Load configs then register
+    // 18. INIT: Load configs then register
     // ========================================================
     if (typeof window !== 'undefined' && window.MAIN_SERVER_HANDLERS) {
         loadAllConfigs(function() {
