@@ -546,12 +546,23 @@
     /**
      * accountLoginCallback - Called via TSBrowser.executeFunction("accountLoginCallback", ts.exitGame)
      * Line: 37294 - registers game-exit callback during login screen init
+     * The game passes exitGame function that should be called when user logs out
      */
+    var _exitGameCallback = null;
+    
     window.accountLoginCallback = function(callback) {
         LOG.call('accountLoginCallback()');
-        LOG.warn('Standalone mode - No external account login');
         if (typeof callback === 'function') {
-            callback();
+            _exitGameCallback = callback;
+            LOG.info('Exit game callback registered');
+        }
+    };
+    
+    // Function to trigger exit game (can be called externally)
+    window.LOCAL_SDK.triggerExitGame = function() {
+        if (typeof _exitGameCallback === 'function') {
+            LOG.info('Triggering exit game callback...');
+            _exitGameCallback();
         }
     };
 
