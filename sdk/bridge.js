@@ -1,26 +1,46 @@
 /**
  * ============================================================
- * BRIDGE.JS - DragonBall HTML5 Standalone Bridge
+ * BRIDGE.JS - DragonBall HTML5 Standalone Bridge v3.0
  * ============================================================
  * 
- * Purpose: Override egret.ExternalInterface untuk komunikasi
- * antara game dan SDK lokal tanpa native wrapper.
+ * PRINSIP: Bridge menangani SEMUA egret.ExternalInterface.call()
+ * yang dilakukan oleh index.html. Tidak memodifikasi file game.
  * 
- * Load Order: AFTER egret.web.min.js
+ * ExternalInterface calls dari index.html:
+ * - startGame        -> Kirim data SDK ke game (PALING KRITIS)
+ * - refresh           -> Reload halaman / switch user
+ * - changeView        -> View change notification
+ * - pei               -> Payment
+ * - giveLike          -> Facebook share
+ * - contact           -> Customer service
+ * - switchAccount     -> Switch account
+ * - fbGiveLive        -> Facebook like
+ * - userCenter        -> User center
+ * - gifBag            -> Gift bag
+ * - report2Third      -> Analytics report
+ * - changeLanguage    -> Language change (HARUS simpan ke localStorage!)
+ * - openURL           -> Open URL (HARUS pakai native window.open!)
  * 
- * Author: Local SDK Bridge
- * Version: 1.1.0
+ * Load Order: AFTER egret.web.min.js (via manifest.json)
+ * 
+ * BUG FIXES v3.0:
+ * - changeLanguage handler SEKARANG menyimpan bahasa via LOCAL_SDK.saveLanguage()
+ * - refresh + "switch usr" SEKARANG reset user via LOCAL_SDK.resetUser()
+ * - openURL SEKARANG pakai _nativeWindowOpen dari LOCAL_SDK (anti infinite loop)
+ * - switchAccount handler SEKARANG reset user sebelum reload
+ * 
+ * Version: 3.0.0
  * ============================================================
  */
 
 (function() {
     'use strict';
 
-        // ========================================================
-    // 1. STYLISH LOGGER - FIXED VERSION
+    // ========================================================
+    // 1. LOGGER
     // ========================================================
     var LOG = {
-        prefix: '🎮 [BRIDGE]',
+        prefix: '\uD83C\uDFAE [BRIDGE]',
         styles: {
             title: 'background: linear-gradient(90deg, #667eea 0%, #764ba2 100%); color: white; padding: 2px 8px; border-radius: 4px; font-weight: bold;',
             success: 'color: #10b981; font-weight: bold;',
@@ -30,66 +50,42 @@
             data: 'color: #8b5cf6;',
             separator: 'color: #6b7280;'
         },
-        
-        _formatTime: function() {
-            return new Date().toISOString().substr(11, 12);
-        },
-        
         _log: function(level, icon, message, data) {
-            var timestamp = this._formatTime();
+            var ts = new Date().toISOString().substr(11, 12);
             var style = this.styles[level] || this.styles.info;
-            
-            // Format: %c[Prefix] %c[Timestamp + Icon + Message]
-            var format = '%c' + this.prefix + ' %c[' + timestamp + '] ' + icon + ' ' + message;
-            
+            var fmt = '%c' + this.prefix + ' %c[' + ts + '] ' + icon + ' ' + message;
             if (data !== undefined) {
-                console.log(format, this.styles.title, style, data);
+                console.log(fmt, this.styles.title, style, data);
             } else {
-                console.log(format, this.styles.title, style);
+                console.log(fmt, this.styles.title, style);
             }
         },
-        
         title: function(message) {
-            var line = '══════════════════════════════════════════════════════';
-            // Gunakan dua %c agar garis tidak ikut masuk ke kotak judul
+            var line = '\u2550'.repeat(60);
             console.log('%c' + this.prefix + '%c ' + line, this.styles.title, this.styles.separator);
             console.log('%c' + this.prefix + '%c ' + message, this.styles.title, this.styles.title);
             console.log('%c' + this.prefix + '%c ' + line, this.styles.title, this.styles.separator);
         },
-        
-        success: function(message, data) { this._log('success', '✅', message, data); },
-        info: function(message, data) { this._log('info', 'ℹ️', message, data); },
-        warn: function(message, data) { this._log('warn', '⚠️', message, data); },
-        error: function(message, data) { this._log('error', '❌', message, data); },
-        data: function(message, data) { this._log('data', '📦', message, data); },
-        
-        call: function(name, message) {
-            this._log('info', '📞', 'call("' + name + '", "' + message + '")');
+        success: function(msg, data) { this._log('success', '\u2705', msg, data); },
+        info: function(msg, data) { this._log('info', '\u2139\uFE0F', msg, data); },
+        warn: function(msg, data) { this._log('warn', '\u26A0\uFE0F', msg, data); },
+        error: function(msg, data) { this._log('error', '\u274C', msg, data); },
+        data: function(msg, data) { this._log('data', '\uD83D\uDCE6', msg, data); },
+        call: function(name, msg) { this._log('info', '\uD83D\uDCDE', name + '("' + msg + '")'); },
+        callback: function(name, data) {
+            this._log('success', '\uD83D\uDD14', 'Callback: ' + name);
+            if (data !== undefined) this._log('data', '\uD83D\uDCE4', data);
         },
-        
-        callback: function(name, data) { 
-            this._log('success', '🔔', 'Callback triggered: ' + name);
-            if (data) {
-                // Perbaikan log Response Data agar tidak bocor
-                console.log('%c' + this.prefix + ' %c📤 Response Data:', this.styles.title, this.styles.data, data);
-            }
-        },
-        
         separator: function() {
-            console.log('%c' + this.prefix + '%c ────────────────────────────────────────────────────────', this.styles.title, this.styles.separator);
+            console.log('%c' + this.prefix + '%c ' + '\u2500'.repeat(60), this.styles.title, this.styles.separator);
         }
     };
 
-
     // ========================================================
-    // 2. CALLBACK STORAGE
+    // 2. STATE
     // ========================================================
     var _callbacks = {};
-    
-    // Track pending calls for delayed response
     var _pendingCalls = {};
-    
-    // Track initialization state
     var _state = {
         initialized: false,
         startGameTriggered: false,
@@ -98,108 +94,101 @@
     };
 
     // ========================================================
-    // 3. CHECK EGRET AVAILABILITY
+    // 3. CHECK EGRET
     // ========================================================
     if (typeof egret === 'undefined') {
-        console.error('🎮 [BRIDGE] ❌ FATAL: egret object not found!');
-        console.error('🎮 [BRIDGE] Make sure bridge.js is loaded AFTER egret.web.min.js');
+        console.error('\uD83C\uDFAE [BRIDGE] FATAL: egret object not found!');
         return;
     }
-    
     if (!egret.ExternalInterface) {
-        console.error('🎮 [BRIDGE] ❌ FATAL: egret.ExternalInterface not found!');
+        console.error('\uD83C\uDFAE [BRIDGE] FATAL: egret.ExternalInterface not found!');
         return;
     }
 
-    // ========================================================
-    // 4. STORE ORIGINAL REFERENCES (for debugging)
-    // ========================================================
-    var _originalCall = egret.ExternalInterface.call;
-    var _originalAddCallback = egret.ExternalInterface.addCallback;
-    
-    LOG.title('Bridge Initializing...');
-    LOG.info('Original call: function');
-    LOG.info('Original addCallback: function');
+    LOG.title('Bridge v3.0 Initializing...');
 
     // ========================================================
-    // 5. OVERRIDE addCallback
+    // 4. OVERRIDE addCallback
     // ========================================================
     egret.ExternalInterface.addCallback = function(name, callback) {
         _state.callbackCount++;
-        var callbackId = _state.callbackCount;
         
-        LOG.info('📌 addCallback("' + name + '") [ID: ' + callbackId + ']');
+        LOG.info('addCallback("' + name + '") [ID:' + _state.callbackCount + ']');
         
         if (typeof callback !== 'function') {
-            LOG.error('Callback is not a function!', typeof callback);
+            LOG.error('Callback is not a function: ' + typeof callback);
             return;
         }
         
-        // Store the callback
         _callbacks[name] = {
             fn: callback,
-            id: callbackId,
+            id: _state.callbackCount,
             registeredAt: new Date().toISOString()
         };
         
-        LOG.success('Callback registered: "' + name + '" [Total: ' + Object.keys(_callbacks).length + ']');
+        LOG.success('Registered: "' + name + '" [Total: ' + Object.keys(_callbacks).length + ']');
         
-        // Check if there's a pending call waiting for this callback
+        // Cek pending call
         if (_pendingCalls[name]) {
-            LOG.info('🔄 Found pending call for "' + name + '", triggering now...');
+            LOG.info('Pending call found for "' + name + '", triggering...');
             _triggerCallback(name, _pendingCalls[name].message);
             delete _pendingCalls[name];
         }
     };
 
     // ========================================================
-    // 6. HELPER: Trigger Callback
+    // 5. TRIGGER CALLBACK HELPER
     // ========================================================
     function _triggerCallback(name, message) {
-        LOG.info('🎯 _triggerCallback("' + name + '", ...)');
-        
-        var callbackObj = _callbacks[name];
-        if (!callbackObj) {
-            LOG.error('No callback registered for: "' + name + '"');
+        var cb = _callbacks[name];
+        if (!cb || typeof cb.fn !== 'function') {
+            LOG.error('No valid callback for: "' + name + '"');
             return false;
         }
-        
-        var callback = callbackObj.fn;
-        if (typeof callback !== 'function') {
-            LOG.error('Callback for "' + name + '" is not a function!');
-            return false;
-        }
-        
         try {
             LOG.callback(name, message);
-            callback(message);
+            cb.fn(message);
             return true;
         } catch (e) {
-            LOG.error('Error executing callback "' + name + '":', e);
+            LOG.error('Error in callback "' + name + '":', e);
             console.error(e);
             return false;
         }
     }
 
     // ========================================================
-    // 7. HELPER: Get SDK Data
+    // 6. GET SDK DATA HELPER
     // ========================================================
     function _getSDKData() {
         if (typeof window.LOCAL_SDK === 'undefined') {
-            LOG.error('window.LOCAL_SDK not found! Make sure sdk.js is loaded before bridge.js');
+            LOG.error('window.LOCAL_SDK not found!');
             return null;
         }
-        
         if (typeof window.LOCAL_SDK.getStartGameData !== 'function') {
-            LOG.error('window.LOCAL_SDK.getStartGameData is not a function!');
+            LOG.error('LOCAL_SDK.getStartGameData is not a function!');
             return null;
         }
-        
         return window.LOCAL_SDK.getStartGameData();
     }
 
     // ========================================================
-    // 8. OVERRIDE call - Main Handler
+    // 7. GET NATIVE WINDOW OPEN (anti infinite loop)
+    // ========================================================
+    // CRITICAL: index.html meng-overwrite window.open dengan:
+    //   var open = function(url) { ExternalInterface.call("openURL", url); }
+    // Kalau bridge memanggil window.open() → ExternalInterface.call("openURL")
+    // → bridge handler openURL → window.open() → LOOP INFINITE!
+    // Solution: Pakai _nativeWindowOpen yang disimpan sdk.js
+    function _getNativeOpen() {
+        if (typeof window.LOCAL_SDK !== 'undefined' && window.LOCAL_SDK._nativeWindowOpen) {
+            return window.LOCAL_SDK._nativeWindowOpen;
+        }
+        LOG.warn('LOCAL_SDK._nativeWindowOpen not available, falling back to window.open');
+        return window.open;
+    }
+
+    // ========================================================
+    // 8. OVERRIDE call - MAIN HANDLER
     // ========================================================
     egret.ExternalInterface.call = function(name, message) {
         _state.callCount++;
@@ -207,258 +196,284 @@
         
         LOG.title('Call #' + callId + ': ' + name);
         LOG.call(name, message);
-        LOG.info('Message: "' + message + '"');
         
-        // Route to appropriate handler
         switch (name) {
             
             // ================================================
-            // startGame - THE MOST CRITICAL ONE
+            // startGame - PALING KRITIS
             // ================================================
             case 'startGame':
-                LOG.info('🎮 startGame called - Game is requesting SDK data...');
-                
-                if (_state.startGameTriggered) {
-                    LOG.warn('startGame already triggered! Skipping duplicate call.');
-                    return;
-                }
-                _state.startGameTriggered = true;
-                
-                // Check if callback is already registered
-                if (_callbacks['startGame']) {
-                    LOG.info('✓ Callback already registered, scheduling response...');
-                    
-                    // Get data from LOCAL_SDK
-                    var startGameData = _getSDKData();
-                    if (!startGameData) {
-                        LOG.error('Failed to get startGame data from SDK!');
-                        return;
-                    }
-                    
-                    LOG.data('StartGame Data:', startGameData);
-                    
-                    // Trigger with delay to ensure everything is ready
-                    var delay = 100;
-                    LOG.info('⏱️ Scheduling callback in ' + delay + 'ms...');
-                    
-                    setTimeout(function() {
-                        LOG.title('Triggering startGame Callback');
-                        var responseJson = JSON.stringify(startGameData);
-                        LOG.data('Response JSON:', responseJson);
-                        _triggerCallback('startGame', responseJson);
-                        LOG.success('🚀 Game should start now!');
-                    }, delay);
-                    
-                } else {
-                    // Callback not registered yet, store as pending
-                    LOG.warn('Callback not registered yet, storing as pending...');
-                    _pendingCalls['startGame'] = {
-                        message: message,
-                        timestamp: new Date().toISOString()
-                    };
-                    
-                    // Wait for addCallback then trigger
-                    var checkInterval = setInterval(function() {
-                        if (_callbacks['startGame']) {
-                            clearInterval(checkInterval);
-                            LOG.info('✓ Callback now registered, triggering...');
-                            
-                            var startGameData = _getSDKData();
-                            if (startGameData) {
-                                setTimeout(function() {
-                                    _triggerCallback('startGame', JSON.stringify(startGameData));
-                                    LOG.success('🚀 Game should start now!');
-                                }, 100);
-                            }
-                        }
-                    }, 50);
-                    
-                    // Timeout after 5 seconds
-                    setTimeout(function() {
-                        if (_pendingCalls['startGame']) {
-                            clearInterval(checkInterval);
-                            LOG.error('⏰ Timeout waiting for startGame callback registration!');
-                        }
-                    }, 5000);
-                }
+                _handleStartGame();
                 break;
                 
             // ================================================
-            // refresh - Page Reload / User Switch
+            // refresh - Reload / Switch User
             // ================================================
             case 'refresh':
-                LOG.info('🔄 refresh called with message: "' + message + '"');
-                
-                if (message === 'refresh' || message === 'reload game') {
-                    LOG.info('📋 Action: Page reload requested');
-                    if (_callbacks['refresh']) {
-                        _triggerCallback('refresh', message);
-                    } else {
-                        LOG.warn('No refresh callback, direct reload...');
-                        setTimeout(function() {
-                            window.location.reload();
-                        }, 100);
-                    }
-                } else if (message === 'switch usr') {
-                    LOG.info('👤 Action: User switch requested');
-                    if (typeof window.LOCAL_SDK !== 'undefined' && window.LOCAL_SDK.switchUser) {
-                        window.LOCAL_SDK.switchUser();
-                    }
-                    setTimeout(function() {
-                        window.location.reload();
-                    }, 100);
-                } else {
-                    LOG.info('📋 Unknown refresh message: "' + message + '"');
-                }
+                _handleRefresh(message);
                 break;
                 
             // ================================================
-            // changeView - View Change Notification
+            // changeView - View notification
             // ================================================
             case 'changeView':
-                LOG.info('👁️ changeView: "' + message + '"');
-                LOG.info('📋 Action: View change logged (no response needed)');
+                LOG.info('changeView: ' + message);
                 break;
                 
             // ================================================
             // pei - Payment
             // ================================================
             case 'pei':
-                LOG.info('💰 pei (Payment) called');
-                try {
-                    var paymentData = JSON.parse(message);
-                    LOG.data('Payment Data:', paymentData);
-                    LOG.warn('⚠️ Payment in standalone mode - bypassed');
-                } catch (e) {
-                    LOG.error('Failed to parse payment data:', e);
-                }
+                LOG.info('Payment (pei) called');
+                try { LOG.data('Data:', JSON.parse(message)); } catch (e) {}
+                LOG.warn('Standalone mode - Payment bypassed');
                 break;
                 
             // ================================================
-            // giveLike - Facebook Share/Like
+            // giveLike - Facebook Share
             // ================================================
             case 'giveLike':
-                LOG.info('👍 giveLike (Share) called');
-                try {
-                    var shareData = JSON.parse(message);
-                    LOG.data('Share Data:', shareData);
-                    LOG.warn('⚠️ Share in standalone mode - bypassed');
-                } catch (e) {
-                    LOG.error('Failed to parse share data:', e);
-                }
+                LOG.info('giveLike (Share) called');
+                try { LOG.data('Data:', JSON.parse(message)); } catch (e) {}
+                LOG.warn('Standalone mode - Share bypassed');
                 break;
                 
             // ================================================
             // contact - Customer Service
             // ================================================
             case 'contact':
-                LOG.info('📞 contact (Customer Service) called');
-                LOG.warn('⚠️ Customer service not available in standalone mode');
+                LOG.info('contact (Customer Service) called');
                 break;
                 
             // ================================================
-            // switchAccount - Account Switch
+            // switchAccount - Switch Account
             // ================================================
             case 'switchAccount':
-                LOG.info('🔄 switchAccount called');
-                LOG.info('📋 Action: Account switch - will reload page');
-                if (typeof window.LOCAL_SDK !== 'undefined' && window.LOCAL_SDK.switchUser) {
-                    window.LOCAL_SDK.switchUser();
-                }
-                setTimeout(function() {
-                    window.location.reload();
-                }, 100);
+                LOG.info('switchAccount called');
+                _handleSwitchAccount();
                 break;
                 
             // ================================================
             // fbGiveLive - Facebook Like
             // ================================================
             case 'fbGiveLive':
-                LOG.info('👍 fbGiveLive (FB Like) called');
-                LOG.warn('⚠️ Facebook like not available in standalone mode');
+                LOG.info('fbGiveLive (FB Like) called');
                 break;
                 
             // ================================================
             // userCenter - User Center
             // ================================================
             case 'userCenter':
-                LOG.info('👤 userCenter called');
-                LOG.warn('⚠️ User center not available in standalone mode');
+                LOG.info('userCenter called');
                 break;
                 
             // ================================================
             // gifBag - Gift Bag
             // ================================================
             case 'gifBag':
-                LOG.info('🎁 gifBag (Gift) called');
-                LOG.warn('⚠️ Gift bag not available in standalone mode');
+                LOG.info('gifBag (Gift) called');
                 break;
                 
             // ================================================
-            // report2Third - Analytics Report
+            // report2Third - Analytics
             // ================================================
             case 'report2Third':
-                LOG.info('📊 report2Third (Analytics) called');
-                try {
-                    var reportData = JSON.parse(message);
-                    LOG.data('Report Data:', reportData);
-                    LOG.info('📋 Analytics logged (no server to send to)');
-                } catch (e) {
-                    LOG.error('Failed to parse report data:', e);
-                }
+                LOG.info('report2Third (Analytics) called');
+                try { LOG.data('Data:', JSON.parse(message)); } catch (e) {}
                 break;
                 
             // ================================================
             // changeLanguage - Language Change
             // ================================================
+            // BUG FIX v3.0: SEKARANG menyimpan bahasa ke localStorage!
+            // 
+            // Flow: index.html changeLanguage(lang) memanggil:
+            //   1. ExternalInterface.call("changeLanguage", lang)  ← kita tangkap di sini
+            //   2. window.location.reload()                        ← langsung reload
+            // 
+            // Masalah: Versi index.html TIDAK menyimpan bahasa ke localStorage.
+            // Jadi bridge HARUS menyimpannya sebelum reload terjadi.
+            // ========================================================
             case 'changeLanguage':
-                LOG.info('🌐 changeLanguage: "' + message + '"');
-                LOG.info('📋 Language change requested to: ' + message);
+                LOG.info('changeLanguage: ' + message);
+                if (message && typeof window.LOCAL_SDK !== 'undefined' && window.LOCAL_SDK.saveLanguage) {
+                    window.LOCAL_SDK.saveLanguage(message);
+                    LOG.success('Language saved via bridge: ' + message);
+                } else {
+                    LOG.warn('Cannot save language - LOCAL_SDK.saveLanguage not available');
+                }
                 break;
                 
             // ================================================
             // openURL - Open URL
             // ================================================
+            // BUG FIX v3.0: SEKARANG pakai _nativeWindowOpen!
+            // 
+            // index.html overwrite window.open:
+            //   var open = function(url) { ExternalInterface.call("openURL", url); }
+            // Kalau kita pakai window.open di sini → LOOP INFINITE!
+            // ========================================================
             case 'openURL':
-                LOG.info('🔗 openURL: "' + message + '"');
+                LOG.info('openURL: ' + message);
                 if (message) {
-                    LOG.info('📋 Opening URL in new tab: ' + message);
+                    var nativeOpen = _getNativeOpen();
                     try {
-                        window.open(message, '_blank');
-                        LOG.success('URL opened successfully');
+                        nativeOpen.call(window, message, '_blank');
+                        LOG.success('URL opened with native window.open');
                     } catch (e) {
                         LOG.error('Failed to open URL:', e);
                     }
-                } else {
-                    LOG.warn('No URL provided');
                 }
                 break;
                 
             // ================================================
-            // Unknown Handler
+            // Unknown
             // ================================================
             default:
-                LOG.warn('❓ Unknown call: "' + name + '" with message: "' + message + '"');
-                LOG.info('📋 This call has no handler and will be ignored');
+                LOG.warn('Unknown call: "' + name + '" message: "' + message + '"');
         }
         
         LOG.separator();
     };
 
     // ========================================================
-    // 9. MARK INITIALIZED
+    // 9. HANDLER: startGame
+    // ========================================================
+    function _handleStartGame() {
+        LOG.info('startGame - Game requesting SDK data...');
+        
+        if (_state.startGameTriggered) {
+            LOG.warn('startGame already triggered! Skipping.');
+            return;
+        }
+        _state.startGameTriggered = true;
+        
+        var doStartGame = function() {
+            var data = _getSDKData();
+            if (!data) {
+                LOG.error('Failed to get SDK data!');
+                return;
+            }
+            
+            LOG.data('SDK Data:', data);
+            
+            setTimeout(function() {
+                LOG.title('Triggering startGame Callback');
+                var json = JSON.stringify(data);
+                var success = _triggerCallback('startGame', json);
+                if (success) {
+                    LOG.success('Game should start now!');
+                } else {
+                    LOG.error('startGame callback failed!');
+                }
+            }, 100);
+        };
+        
+        if (_callbacks['startGame']) {
+            LOG.info('Callback already registered');
+            doStartGame();
+        } else {
+            LOG.info('Callback not yet registered, waiting...');
+            _pendingCalls['startGame'] = { message: '', timestamp: new Date().toISOString() };
+            
+            var interval = setInterval(function() {
+                if (_callbacks['startGame']) {
+                    clearInterval(interval);
+                    delete _pendingCalls['startGame'];
+                    LOG.info('Callback registered, triggering...');
+                    doStartGame();
+                }
+            }, 50);
+            
+            setTimeout(function() {
+                if (_pendingCalls['startGame']) {
+                    clearInterval(interval);
+                    LOG.error('Timeout (5s) waiting for startGame callback!');
+                }
+            }, 5000);
+        }
+    }
+
+    // ========================================================
+    // 10. HANDLER: refresh
+    // ========================================================
+    // BUG FIX v3.0: "switch usr" SEKARANG reset user data!
+    // 
+    // Flow: index.html switchUser() memanggil:
+    //   ExternalInterface.call("refresh", "switch usr")
+    // 
+    // Masalah: Versi lama bridge hanya reload tanpa reset userData.
+    // localStorage tetap ada → sdk.js load user lama → TIDAK berganti user!
+    // ========================================================
+    function _handleRefresh(message) {
+        LOG.info('refresh: "' + message + '"');
+        
+        if (message === 'switch usr') {
+            // Switch user - HARUS reset user data di localStorage!
+            LOG.info('Action: Switch user');
+            _handleSwitchAccount();
+        } else {
+            // Normal refresh (message = 'refresh' atau 'reload game')
+            LOG.info('Action: Page reload');
+            if (_callbacks['refresh']) {
+                _triggerCallback('refresh', message);
+            } else {
+                setTimeout(function() { window.location.reload(); }, 100);
+            }
+        }
+    }
+
+    // ========================================================
+    // 11. HANDLER: switchAccount
+    // ========================================================
+    // BUG FIX v3.0: SEKARANG reset user data sebelum reload!
+    // 
+    // Tanpa reset, localStorage masih berisi user lama.
+    // sdk.js akan load user lama → TIDAK ada efek switch account!
+    // ========================================================
+    function _handleSwitchAccount() {
+        LOG.info('Action: Switch account - resetting user data');
+        
+        // Reset user data di localStorage via LOCAL_SDK
+        if (typeof window.LOCAL_SDK !== 'undefined' && typeof window.LOCAL_SDK.resetUser === 'function') {
+            window.LOCAL_SDK.resetUser();
+            LOG.success('User data cleared via LOCAL_SDK.resetUser()');
+        } else {
+            // Fallback: langsung hapus localStorage
+            try {
+                localStorage.removeItem('dragonball_local_sdk');
+                LOG.success('User data cleared directly from localStorage');
+            } catch (e) {
+                LOG.error('Failed to clear user data:', e);
+            }
+        }
+        
+        // Reload setelah user data direset
+        setTimeout(function() { window.location.reload(); }, 100);
+    }
+
+    // ========================================================
+    // 12. INIT DONE
     // ========================================================
     _state.initialized = true;
     
-    LOG.title('Bridge Initialized Successfully!');
-    LOG.success('Total functions overridden: 2');
-    LOG.info('• egret.ExternalInterface.call → Custom handler');
-    LOG.info('• egret.ExternalInterface.addCallback → Custom handler');
+    LOG.title('Bridge v3.0 Initialized!');
+    LOG.success('Overridden: egret.ExternalInterface.call, addCallback');
+    LOG.info('Handlers: startGame, refresh, changeView, pei, giveLike,');
+    LOG.info('          contact, switchAccount, fbGiveLive, userCenter,');
+    LOG.info('          gifBag, report2Third, changeLanguage [SAVES LANG!],');
+    LOG.info('          openURL [USES NATIVE OPEN!]');
     LOG.info('');
-    LOG.info('Ready to handle game communication! 🚀');
+    LOG.info('Bug fixes from v2.0:');
+    LOG.info('  - changeLanguage now saves language to localStorage');
+    LOG.info('  - refresh "switch usr" now resets user data');
+    LOG.info('  - switchAccount now resets user data');
+    LOG.info('  - openURL now uses native window.open (anti infinite loop)');
+    LOG.info('');
+    LOG.info('Ready!');
 
     // ========================================================
-    // 10. EXPOSE DEBUG INFO (for console inspection)
+    // 13. DEBUG
     // ========================================================
     window.BRIDGE_DEBUG = {
         state: _state,
@@ -467,17 +482,15 @@
         triggerCallback: _triggerCallback,
         getSDKData: _getSDKData,
         logState: function() {
-            console.log('%c🎮 [BRIDGE] Current State:', 'font-weight: bold; color: #667eea;', {
+            console.log('%c\uD83C\uDFAE [BRIDGE] State:', 'font-weight:bold;color:#667eea;', {
                 initialized: _state.initialized,
                 startGameTriggered: _state.startGameTriggered,
-                callbackCount: _state.callbackCount,
                 callCount: _state.callCount,
-                registeredCallbacks: Object.keys(_callbacks),
+                callbackCount: _state.callbackCount,
+                callbacks: Object.keys(_callbacks),
                 pendingCalls: Object.keys(_pendingCalls)
             });
         }
     };
-    
-    LOG.info('💡 Debug: Use BRIDGE_DEBUG.logState() in console');
 
 })();
