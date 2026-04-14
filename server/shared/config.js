@@ -25,7 +25,10 @@
 require('dotenv').config();
 
 const config = {
+    // ============================================
     // Server ports (from client index.html and TSSocketClient init)
+    // Used by login-server: config.ports.login
+    // ============================================
     ports: {
         login: parseInt(process.env.LOGIN_PORT) || 8000,
         main: parseInt(process.env.MAIN_PORT) || 8001,
@@ -33,10 +36,45 @@ const config = {
         dungeon: parseInt(process.env.DUNGEON_PORT) || 8003,
     },
 
+    // ============================================
+    // Server configs (used by main-server, chat-server, dungeon-server)
+    // main-server: config.config.servers.main.port / .host
+    // ============================================
+    servers: {
+        login: {
+            port: parseInt(process.env.LOGIN_PORT) || 8000,
+            host: process.env.LOGIN_HOST || '0.0.0.0',
+        },
+        main: {
+            port: parseInt(process.env.MAIN_PORT) || 8001,
+            host: process.env.MAIN_HOST || '0.0.0.0',
+        },
+        chat: {
+            port: parseInt(process.env.CHAT_PORT) || 8002,
+            host: process.env.CHAT_HOST || '0.0.0.0',
+        },
+        dungeon: {
+            port: parseInt(process.env.DUNGEON_PORT) || 8003,
+            host: process.env.DUNGEON_HOST || '0.0.0.0',
+        },
+    },
+
+    // ============================================
+    // Security (used by main-server: config.config.security.teaKey)
+    // ============================================
+    security: {
+        teaKey: process.env.TEA_KEY || 'verification',
+    },
+
+    // ============================================
     // TEA encryption key (from client line 52008)
+    // Kept for backward compatibility — prefer config.security.teaKey
+    // ============================================
     teaKey: process.env.TEA_KEY || 'verification',
 
+    // ============================================
     // MariaDB configuration
+    // ============================================
     database: {
         host: process.env.DB_HOST || '127.0.0.1',
         port: parseInt(process.env.DB_PORT) || 3306,
@@ -46,12 +84,49 @@ const config = {
         connectionLimit: parseInt(process.env.DB_CONNECTION_LIMIT) || 10,
     },
 
+    // ============================================
     // Protocol version (from client: version: "1.0")
+    // ============================================
     version: '1.0',
 
+    // ============================================
     // Game version (from client: sent as gameVersion field)
+    // ============================================
     gameVersion: '1.0.0',
 };
+
+/**
+ * Validate all required configuration values.
+ * Called by main-server on startup: config.validateConfig()
+ * 
+ * @returns {boolean} true if all required fields are present
+ * @throws {Error} if critical config is missing
+ */
+function validateConfig() {
+    var errors = [];
+
+    if (!config.ports) errors.push('config.ports is missing');
+    if (!config.ports.login) errors.push('config.ports.login is missing');
+    if (!config.ports.main) errors.push('config.ports.main is missing');
+
+    if (!config.servers) errors.push('config.servers is missing');
+    if (!config.servers.main) errors.push('config.servers.main is missing');
+    if (!config.servers.main.port) errors.push('config.servers.main.port is missing');
+
+    if (!config.security) errors.push('config.security is missing');
+    if (!config.security.teaKey) errors.push('config.security.teaKey is missing');
+
+    if (!config.database) errors.push('config.database is missing');
+    if (!config.database.host) errors.push('config.database.host is missing');
+    if (!config.database.user) errors.push('config.database.user is missing');
+    if (!config.database.database) errors.push('config.database.database is missing');
+
+    if (errors.length > 0) {
+        throw new Error('[Config] Validation failed:\n  - ' + errors.join('\n  - '));
+    }
+
+    return true;
+}
 
 /**
  * Get server list for client
@@ -63,8 +138,7 @@ const config = {
  * 
  * Client processes response in selectNewServer (line 88652-88660):
  *   this.filterByWhiteList(t.serverList);
- *   var o = !t.history || t.history.length <= 0;
- *   var a = t.history.length > 0 ? t.history[0] : t.serverList[0].serverId;
+ *   var o = !t.history || t.history.length == 0 ? t.history[0] : t.serverList[0].serverId;
  *   var r = n.matchServerUrl(a, t.serverList);
  *   r ? n.onLoginSuccess(e, r, o) : n.selectServer(e, t)
  * 
@@ -100,8 +174,8 @@ function getServerList() {
             {
                 serverId: 1,
                 name: 'Server 1',
-                url: `http://127.0.0.1:${config.ports.main}`,
-                dungeonurl: `http://127.0.0.1:${config.ports.dungeon}`,
+                url: 'http://127.0.0.1:' + config.ports.main,
+                dungeonurl: 'http://127.0.0.1:' + config.ports.dungeon,
                 online: true,
                 hot: false,
                 "new": true,
@@ -115,4 +189,4 @@ function getServerList() {
     };
 }
 
-module.exports = { config, getServerList };
+module.exports = { config, getServerList, validateConfig };
