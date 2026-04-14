@@ -25,7 +25,9 @@
 'use strict';
 
 var DB = require('../../database/connection');
-var defaultData = require('../utils/defaultData');
+// FIX 3: Import from shared/defaultData (client-accurate nested structure)
+// NOT from ../utils/defaultData which has flat structure the client can't parse.
+var defaultData = require('../../shared/defaultData');
 var helpers = require('../utils/helpers');
 
 /**
@@ -55,21 +57,26 @@ var _staleSet = new Set();
 /**
  * Load user game_data from the database.
  *
- * Queries the `users` table for the `game_data` JSON column,
+ * Queries the `user_data` table (per-server) for the `game_data` JSON column,
  * parses it, merges with defaults to fill any missing fields,
  * and caches the result in memory.
+ *
+ * FIX 2: Changed from `users` table to `user_data` table with `server_id` filter.
+ * The schema puts game_data in `user_data` table, NOT the `users` table.
  *
  * If the data is already cached and not stale, returns the cached copy.
  * Always returns a deep clone — NEVER the cache reference directly.
  *
- * @param {number} userId - The user's unique ID
+ * @param {number|string} userId - The user's unique ID
+ * @param {number} [serverId=1] - The server ID (for multi-server support)
  * @returns {Promise<object>} Complete user game_data with all default fields
  *
  * @example
  *   var data = await userDataService.loadUserData(1001);
  *   console.log(data.level, data.gold, data.heroList);
  */
-function loadUserData(userId) {
+function loadUserData(userId, serverId) {
+    serverId = serverId || 1; // Default server ID
     // Return cached data if available and not stale
     if (_cache.has(userId) && !_staleSet.has(userId)) {
         // Move to end of Map (LRU: most recently used)
@@ -86,8 +93,8 @@ function loadUserData(userId) {
 
     console.log('[UserDataService] Loading game_data from DB for userId=' + userId);
 
-    // Query database for game_data JSON column
-    return DB.query('SELECT game_data FROM users WHERE user_id = ?', [userId])
+    // FIX 2: Query user_data table (NOT users table) with server_id filter
+    return DB.query('SELECT game_data FROM user_data WHERE user_id = ? AND server_id = ?', [userId, serverId])
         .then(function (rows) {
             if (!rows || rows.length === 0) {
                 console.error('[UserDataService] User not found: userId=' + userId);
@@ -107,8 +114,9 @@ function loadUserData(userId) {
                 }
             }
 
-            // Merge with defaults to ensure all 99 fields have values
-            var mergedData = defaultData.mergeWithDefaults(parsedData);
+            // Merge with defaults to ensure all fields have values
+            // FIX 3: shared/defaultData.mergeWithDefaults takes (loadedData, userId, nickName, serverId)
+            var mergedData = defaultData.mergeWithDefaults(parsedData, userId, userId, serverId);
 
             // Store in cache
             _evictIfNeeded();
@@ -127,10 +135,12 @@ function loadUserData(userId) {
  * Save user game_data to the database.
  *
  * Stringifies the gameData object and updates the `game_data`
- * column in the `users` table. Also updates the in-memory cache.
+ * FIX 2: Now queries the `user_data` table with server_id filter.
+ * Also updates the in-memory cache.
  *
- * @param {number} userId - The user's unique ID
+ * @param {number|string} userId - The user's unique ID
  * @param {object} gameData - Complete game_data object to save
+ * @param {number} [serverId=1] - The server ID (for multi-server support)
  * @returns {Promise<boolean>} True if save was successful
  *
  * @example
@@ -138,7 +148,8 @@ function loadUserData(userId) {
  *   data.gold += 100;
  *   await userDataService.saveUserData(1001, data);
  */
-function saveUserData(userId, gameData) {
+function saveUserData(userId, gameData, serverId) {
+    serverId = serverId || 1; // Default server ID
     if (!gameData || typeof gameData !== 'object') {
         console.error('[UserDataService] Invalid gameData provided for userId=' + userId);
         return Promise.reject(new Error('Invalid gameData: must be a non-null object'));
@@ -149,7 +160,8 @@ function saveUserData(userId, gameData) {
     console.log('[UserDataService] Saving game_data to DB for userId=' + userId +
         ' (size: ' + jsonData.length + ' bytes)');
 
-    return DB.query('UPDATE users SET game_data = ? WHERE user_id = ?', [jsonData, userId])
+    // FIX 2: UPDATE user_data table (NOT users table) with server_id filter
+    return DB.query('UPDATE user_data SET game_data = ?, update_time = ? WHERE user_id = ? AND server_id = ?', [jsonData, Date.now(), userId, serverId])
         .then(function (result) {
             if (result && result.affectedRows > 0) {
                 // Update cache
