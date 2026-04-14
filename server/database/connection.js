@@ -61,6 +61,17 @@ function getPool() {
 }
 
 /**
+ * Check if database pool is initialized and ready.
+ * Used by main-server health check endpoint:
+ *   dbReady: DB.isReady()
+ * 
+ * @returns {boolean} true if pool is initialized
+ */
+function isReady() {
+    return pool !== null;
+}
+
+/**
  * Execute a query
  * @param {string} sql - SQL query
  * @param {array} params - Query parameters
@@ -74,7 +85,7 @@ async function query(sql, params) {
         const result = await conn.query(sql, params);
         return result;
     } catch (err) {
-        logger.error('DB', `Query failed: ${sql}`, err.message);
+        logger.error('DB', 'Query failed: ' + sql, err.message);
         throw err;
     } finally {
         if (conn) conn.release();
@@ -102,8 +113,8 @@ async function initSchema() {
         logger.info('DB', 'Initializing database schema...');
 
         // Create database if not exists
-        await conn.query(`CREATE DATABASE IF NOT EXISTS \`${config.database.database}\``);
-        await conn.query(`USE \`${config.database.database}\``);
+        await conn.query('CREATE DATABASE IF NOT EXISTS `' + config.database.database + '`');
+        await conn.query('USE `' + config.database.database + '`');
 
         // ============================================
         // users table
@@ -222,4 +233,27 @@ async function initSchema() {
     }
 }
 
-module.exports = { initPool, getPool, query, initSchema };
+/**
+ * Gracefully close the connection pool.
+ * Called during server shutdown.
+ */
+async function closePool() {
+    if (pool) {
+        try {
+            await pool.end();
+            pool = null;
+            logger.info('DB', 'Connection pool closed');
+        } catch (err) {
+            logger.error('DB', 'Error closing pool:', err.message);
+        }
+    }
+}
+
+module.exports = {
+    initPool: initPool,
+    getPool: getPool,
+    isReady: isReady,
+    query: query,
+    initSchema: initSchema,
+    closePool: closePool,
+};
