@@ -1,18 +1,42 @@
 'use strict';
+
 var RH = require('../../shared/responseHelper');
+var logger = require('../../shared/utils/logger');
+
 function handle(socket, parsed, callback) {
-    switch (parsed.action) {
-        case 'buySeat': // TODO: WRITE — Buy a resonance cabin seat // REQ: cabinId, isSpecial, userId // RES: purchased seat info
-            callback(RH.success({})); break;
-        case 'clearSeatCD': // TODO: WRITE — Clear cooldown on a resonance cabin seat // REQ: cabinId, seatId, userId // RES: cleared seat cooldown
-            callback(RH.success({})); break;
-        case 'putChild': // TODO: WRITE — Place a hero child into a resonance seat // REQ: cabinId, heroId, seatId, userId // RES: updated cabin seat with child
-            callback(RH.success({})); break;
-        case 'removeChild': // TODO: WRITE — Remove a hero child from a resonance seat // REQ: cabinId, seatId, userId // RES: updated cabin seat without child
-            callback(RH.success({})); break;
-        case 'setMainHero': // TODO: WRITE — Set the main hero for a resonance cabin // REQ: cabinId, heroId, userId // RES: updated cabin with main hero
-            callback(RH.success({})); break;
-        default: callback(RH.success({}));
+    var action = parsed.action;
+    var userId = parsed.userId;
+
+    switch (action) {
+        case 'activate':
+            // TODO: Activate a resonance node
+            // REQ: resonanceId
+            // RES: activated resonance, stat bonuses
+            logger.info('RESONANCE', 'action=' + action + ' userId=' + (userId || '-'));
+            callback(RH.success({}));
+            break;
+
+        case 'getResonanceInfo':
+            // TODO: Get resonance system info and status
+            // REQ: -
+            // RES: resonance nodes, activation status, bonuses
+            logger.info('RESONANCE', 'action=' + action + ' userId=' + (userId || '-'));
+            callback(RH.success({}));
+            break;
+
+        case 'getResonanceReward':
+            // TODO: Claim resonance milestone reward
+            // REQ: resonanceId
+            // RES: reward items
+            logger.info('RESONANCE', 'action=' + action + ' userId=' + (userId || '-'));
+            callback(RH.success({}));
+            break;
+
+        default:
+            logger.warn('RESONANCE', 'Unknown action: ' + action);
+            callback(RH.error(RH.ErrorCode.INVALID_COMMAND, 'Unknown action: ' + action));
+            break;
     }
 }
+
 module.exports = { handle: handle };

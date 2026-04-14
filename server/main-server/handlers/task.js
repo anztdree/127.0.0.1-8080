@@ -1,22 +1,42 @@
 'use strict';
-var RH = require('../../shared/responseHelper');
 
-/**
- * Task Handler
- * 2 actions — WRITE: 1 | READ: 1
- */
+var RH = require('../../shared/responseHelper');
+var logger = require('../../shared/utils/logger');
+
 function handle(socket, parsed, callback) {
     var action = parsed.action;
+    var userId = parsed.userId;
+
     switch (action) {
-        case 'getReward': // TODO: WRITE — Claim task reward(s) by class and IDs
-            // REQ: taskClass, taskIds, userId
+        case 'getTaskList':
+            // TODO: Get main task/achievement list
+            // REQ: -
+            // RES: task list with progress and rewards
+            logger.info('TASK', 'action=' + action + ' userId=' + (userId || '-'));
             callback(RH.success({}));
             break;
-        case 'queryTask': // TODO: READ — Query task progress list for a task class
-            // REQ: taskClass, userId
+
+        case 'claimReward':
+            // TODO: Claim task completion reward
+            // REQ: taskId
+            // RES: reward items
+            logger.info('TASK', 'action=' + action + ' userId=' + (userId || '-'));
             callback(RH.success({}));
             break;
-        default: callback(RH.success({}));
+
+        case 'getDailyTask':
+            // TODO: Get daily task list
+            // REQ: -
+            // RES: daily task list with progress
+            logger.info('TASK', 'action=' + action + ' userId=' + (userId || '-'));
+            callback(RH.success({}));
+            break;
+
+        default:
+            logger.warn('TASK', 'Unknown action: ' + action);
+            callback(RH.error(RH.ErrorCode.INVALID_COMMAND, 'Unknown action: ' + action));
+            break;
     }
 }
+
 module.exports = { handle: handle };

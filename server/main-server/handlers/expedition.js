@@ -1,62 +1,58 @@
 'use strict';
-var RH = require('../../shared/responseHelper');
 
-/**
- * Expedition Handler
- * 12 actions — WRITE: 8 | READ: 0 | MIXED: 4
- */
+var RH = require('../../shared/responseHelper');
+var logger = require('../../shared/utils/logger');
+
 function handle(socket, parsed, callback) {
     var action = parsed.action;
+    var userId = parsed.userId;
+
     switch (action) {
-        case 'checkBattleResult': // TODO: WRITE — Check and record the result of an expedition battle
-            // REQ: battleField(GameFieldType.EXPEDITION), battleId, checkResult, runaway, userId, version
+        case 'startBattle':
+            // TODO: Start expedition battle stage
+            // REQ: stageId, team lineup
+            // RES: battle result, rewards
+            logger.info('EXPEDITION', 'action=' + action + ' userId=' + (userId || '-'));
             callback(RH.success({}));
             break;
-        case 'clickExpedition': // TODO: WRITE — Enter or interact with the expedition map
-            // REQ: userId, version
+
+        case 'getRecord':
+            // TODO: Get expedition progress record
+            // REQ: -
+            // RES: expedition stage progress, rewards
+            logger.info('EXPEDITION', 'action=' + action + ' userId=' + (userId || '-'));
             callback(RH.success({}));
             break;
-        case 'collection': // TODO: WRITE — Collect rewards from an expedition lesson
-            // REQ: add, lessonId, userId, version
+
+        case 'getDailyReward':
+            // TODO: Claim expedition daily reward
+            // REQ: -
+            // RES: reward items
+            logger.info('EXPEDITION', 'action=' + action + ' userId=' + (userId || '-'));
             callback(RH.success({}));
             break;
-        case 'delTeam': // TODO: WRITE — Delete a saved expedition team
-            // REQ: teamId, userId
+
+        case 'reset':
+            // TODO: Reset expedition progress
+            // REQ: -
+            // RES: reset confirmation
+            logger.info('EXPEDITION', 'action=' + action + ' userId=' + (userId || '-'));
             callback(RH.success({}));
             break;
-        case 'finishEvent': // TODO: WRITE — Finish an expedition event (mark complete)
-            // REQ: lessonIds, userId
+
+        case 'reward':
+            // TODO: Claim expedition stage reward
+            // REQ: stageId
+            // RES: reward items
+            logger.info('EXPEDITION', 'action=' + action + ' userId=' + (userId || '-'));
             callback(RH.success({}));
             break;
-        case 'investigation': // TODO: WRITE — Start investigation on expedition lesson nodes
-            // REQ: lessonIds, userId
-            callback(RH.success({}));
+
+        default:
+            logger.warn('EXPEDITION', 'Unknown action: ' + action);
+            callback(RH.error(RH.ErrorCode.INVALID_COMMAND, 'Unknown action: ' + action));
             break;
-        case 'putInMachine': // TODO: WRITE — Place a hero into the expedition training machine
-            // REQ: heroId, machineId, userId, version
-            callback(RH.success({}));
-            break;
-        case 'quickFinishEvent': // TODO: WRITE — Instantly finish an expedition event (premium)
-            // REQ: lessonId, userId
-            callback(RH.success({}));
-            break;
-        case 'saveTeam': // TODO: WRITE — Save expedition team composition
-            // REQ: heroIds, userId
-            callback(RH.success({}));
-            break;
-        case 'startBattle': // TODO: WRITE — Start an expedition battle
-            // REQ: battleField(GameFieldType.EXPEDITION), difficulty, team, userId, version
-            callback(RH.success({}));
-            break;
-        case 'startEvent': // TODO: WRITE — Begin an expedition event with assigned heroes
-            // REQ: heroIds, lessonId, userId
-            callback(RH.success({}));
-            break;
-        case 'takeOutMachine': // TODO: WRITE — Remove a hero from the expedition training machine
-            // REQ: machineId, userId, version
-            callback(RH.success({}));
-            break;
-        default: callback(RH.success({}));
     }
 }
+
 module.exports = { handle: handle };

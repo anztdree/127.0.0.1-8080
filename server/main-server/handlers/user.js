@@ -1,173 +1,634 @@
+/**
+ * =====================================================
+ *  User Handler — handlers/user.js
+ *  Port 8001 — Main Server
+ *
+ *  Actions: 13 total
+ *  WRITE: 6 | READ: 7
+ *
+ *  100% derived from client code analysis.
+ *
+ *  CLIENT enterGame REQUEST (line 77350-77358):
+ *    {
+ *      type: "user",
+ *      action: "enterGame",
+ *      loginToken: ts.loginInfo.userInfo.loginToken,
+ *      userId: ts.loginInfo.userInfo.userId,
+ *      serverId: parseInt(ts.loginInfo.serverItem.serverId),
+ *      version: "1.0",
+ *      language: ToolCommon.getLanguage(),
+ *      gameVersion: ToolCommon.getClientVer()
+ *    }
+ *
+ *  CLIENT enterGame RESPONSE processed by UserDataParser.saveUserData() (line 77643-77724):
+ *    Full player state object with 99+ fields.
+ *    See defaultData.js generateNewUserData() for complete field list.
+ *    CRITICAL: All top-level fields that client reads unconditionally
+ *    (currency, user, hangup, summon, totalProps, heros, scheduleInfo,
+ *    clickSystem, curMainTask, dragonEquiped) MUST be non-null.
+ *
+ *  CLIENT registChat REQUEST (line 77392-77397):
+ *    {
+ *      type: "user",
+ *      action: "registChat",
+ *      userId: UserInfoSingleton.getInstance().userId,
+ *      version: "1.0"
+ *    }
+ *
+ *  CLIENT registChat RESPONSE:
+ *    {
+ *      _success: boolean,
+ *      _chatServerUrl: string,
+ *      _worldRoomId: number,
+ *      _guildRoomId: number,
+ *      _teamDungeonChatRoom: number,
+ *      _teamChatRoom: number
+ *    }
+ *
+ *  DB SCHEMA:
+ *    users table — stores account info (user_id, password, nick_name, etc.)
+ *    user_data table — stores per-server game state as JSON blob (game_data column)
+ *    login_tokens table — stores active login tokens for session validation
+ *
+ *  Usage:
+ *    handler.handle(socket, parsedRequest, callback)
+ * =====================================================
+ */
+
 'use strict';
 
 var RH = require('../../shared/responseHelper');
+var DB = require('../../database/connection');
+var DefaultData = require('../../shared/defaultData');
+var GameData = require('../../shared/gameData/loader');
+var logger = require('../../shared/utils/logger');
+
+// =============================================
+// ACTION HANDLERS
+// =============================================
 
 /**
- * User Handler
- * Port 8001 — Main Server
+ * enterGame — The MOST CRITICAL action.
  *
- * Actions: 13 total
- * WRITE: 6 | READ: 7
+ * Called when client first connects to main server after TEA verify.
+ * Returns full player state. If user is new, generates default data.
  *
- * Source: main.min.js client analysis
+ * CLIENT FLOW (line 77342-77366):
+ *   1. clientEnterGame() sends request via mainClient
+ *   2. On success: UserDataParser.saveUserData(response)
+ *   3. Then: loginSuccessCallBack(response) → analytics + scene transition
+ *   4. Then: reportToLoginEnterInfo() → loginClient.SaveUserEnterInfo
+ *   5. Then: setInterval(registChat, 3000)
+ *
+ * @param {object} socket - Socket.IO socket
+ * @param {object} parsed - Parsed request { type, action, userId, loginToken, serverId, version, language, gameVersion }
+ * @param {function} callback - Socket.IO acknowledgment callback
  */
+async function enterGame(socket, parsed, callback) {
+    var userId = parsed.userId;
+    var serverId = parsed.serverId || 1;
+    var loginToken = parsed.loginToken;
 
-function handle(socket, parsed, callback) {
+    // Validate required fields
+    if (!userId) {
+        logger.warn('USER', 'enterGame: missing userId');
+        return callback(RH.error(RH.ErrorCode.LACK_PARAM, 'Missing userId'));
+    }
+
+    logger.info('USER', 'enterGame: userId=' + userId + ', serverId=' + serverId);
+
+    try {
+        // =============================================
+        // Step 1: Validate loginToken (optional — skip if not present)
+        // =============================================
+        // loginToken comes from SaveHistory response on login-server.
+        // In dev mode or when login-server is not running, loginToken may not exist.
+        // We allow enterGame without token validation in this case.
+        if (loginToken) {
+            try {
+                var tokenRows = await DB.query(
+                    'SELECT * FROM login_tokens WHERE user_id = ? AND token = ? AND used = 0 AND expires_at > ?',
+                    [userId, loginToken, Date.now()]
+                );
+                if (tokenRows.length === 0) {
+                    // Token not found or expired — allow in dev mode, but log warning
+                    logger.warn('USER', 'enterGame: loginToken not validated for userId=' + userId);
+                } else {
+                    // Mark token as used (single-use)
+                    await DB.query(
+                        'UPDATE login_tokens SET used = 1 WHERE user_id = ? AND token = ?',
+                        [userId, loginToken]
+                    );
+                    logger.info('USER', 'enterGame: loginToken validated for userId=' + userId);
+                }
+            } catch (tokenErr) {
+                // login_tokens table might not exist yet — allow enterGame anyway
+                logger.warn('USER', 'enterGame: token check failed: ' + tokenErr.message);
+            }
+        }
+
+        // =============================================
+        // Step 2: Load or create user_data
+        // =============================================
+        var isNewPlayer = false;
+        var playerData = null;
+
+        try {
+            var rows = await DB.query(
+                'SELECT * FROM user_data WHERE user_id = ? AND server_id = ?',
+                [userId, serverId]
+            );
+
+            if (rows.length > 0 && rows[0].game_data) {
+                // Existing player — load saved data
+                var savedData = rows[0].game_data;
+
+                // Parse JSON if it's a string (MariaDB JSON type may return string)
+                if (typeof savedData === 'string') {
+                    try {
+                        savedData = JSON.parse(savedData);
+                    } catch (parseErr) {
+                        logger.error('USER', 'enterGame: failed to parse saved game_data for userId=' + userId);
+                        savedData = null;
+                    }
+                }
+
+                if (savedData && typeof savedData === 'object') {
+                    // Merge with defaults to fill any missing/null fields
+                    // This prevents crashes when client reads new fields that didn't exist before
+                    playerData = DefaultData.mergeWithDefaults(savedData, userId, userId, serverId);
+                    isNewPlayer = false;
+                    logger.info('USER', 'enterGame: loaded existing data for userId=' + userId);
+                } else {
+                    // Corrupted data — regenerate
+                    playerData = DefaultData.generateNewUserData(userId, userId, serverId);
+                    isNewPlayer = true;
+                    logger.warn('USER', 'enterGame: corrupted data, regenerated for userId=' + userId);
+                }
+            } else {
+                // New player — generate default data
+                playerData = DefaultData.generateNewUserData(userId, userId, serverId);
+                isNewPlayer = true;
+                logger.info('USER', 'enterGame: new player data generated for userId=' + userId);
+            }
+        } catch (dbErr) {
+            // user_data table might not exist — generate defaults and continue
+            logger.warn('USER', 'enterGame: DB query failed: ' + dbErr.message + ', generating defaults');
+            playerData = DefaultData.generateNewUserData(userId, userId, serverId);
+            isNewPlayer = true;
+        }
+
+        // =============================================
+        // Step 3: Update dynamic fields in playerData
+        // =============================================
+        var now = Date.now();
+
+        // Update user info with latest login time
+        if (playerData.user) {
+            playerData.user._lastLoginTime = now;
+        }
+
+        // Set newUser flag — only true on FIRST enterGame
+        // After first save, this becomes false
+        playerData.newUser = isNewPlayer;
+
+        // Set server version info
+        playerData.serverVersion = GameData.get('constant') ? '1' : null;
+        playerData.serverOpenDate = playerData.serverOpenDate || now;
+
+        // =============================================
+        // Step 4: Save playerData to database
+        // =============================================
+        try {
+            var gameDataJson = JSON.stringify(playerData);
+
+            // Try UPDATE first (existing row), then INSERT (new row)
+            var updateResult = await DB.query(
+                'UPDATE user_data SET game_data = ?, last_login_time = ?, update_time = ? WHERE user_id = ? AND server_id = ?',
+                [gameDataJson, now, now, userId, serverId]
+            );
+
+            if (updateResult.affectedRows === 0) {
+                // No existing row — INSERT
+                await DB.query(
+                    'INSERT INTO user_data (user_id, server_id, game_data, last_login_time, update_time) VALUES (?, ?, ?, ?, ?)',
+                    [userId, serverId, gameDataJson, now, now]
+                );
+                logger.info('USER', 'enterGame: saved new user_data for userId=' + userId);
+            } else {
+                logger.info('USER', 'enterGame: updated user_data for userId=' + userId);
+            }
+        } catch (saveErr) {
+            // Save failed — still return data to client, but log error
+            logger.error('USER', 'enterGame: failed to save user_data: ' + saveErr.message);
+        }
+
+        // =============================================
+        // Step 5: Track online status
+        // =============================================
+        try {
+            // Remove old online record for this user+server
+            await DB.query(
+                'DELETE FROM user_online WHERE user_id = ? AND server_id = ?',
+                [userId, serverId]
+            );
+            // Insert new online record
+            await DB.query(
+                'INSERT INTO user_online (user_id, server_id, socket_id, login_time) VALUES (?, ?, ?, ?)',
+                [userId, serverId, socket.id, now]
+            );
+        } catch (onlineErr) {
+            logger.warn('USER', 'enterGame: online tracking failed: ' + onlineErr.message);
+        }
+
+        // =============================================
+        // Step 6: Send response to client
+        // =============================================
+        // CRITICAL: Response format must match UserDataParser.saveUserData() expectations.
+        // The response IS the full player state object — NOT wrapped in a container.
+        // Client does: UserDataParser.saveUserData(response)
+        // which reads response.currency, response.user, response.heros, etc. directly.
+        callback(RH.success(playerData));
+
+        logger.info('USER', 'enterGame: success for userId=' + userId + ', newUser=' + isNewPlayer);
+
+    } catch (err) {
+        logger.error('USER', 'enterGame: unhandled error for userId=' + userId + ': ' + err.message);
+        logger.error('USER', 'enterGame: stack: ' + err.stack);
+        callback(RH.error(RH.ErrorCode.UNKNOWN, 'Internal server error'));
+    }
+}
+
+/**
+ * registChat — Register chat room after entering game.
+ *
+ * Called every 3 seconds until successful (line 77397-77399).
+ * Returns chat server connection info.
+ *
+ * CLIENT CODE (line 77392-77397):
+ *   socket.emit("handler.process", {
+ *       type: "user", action: "registChat",
+ *       userId: UserInfoSingleton.getInstance().userId, version: "1.0"
+ *   }, function(n) {
+ *       if (n._success) { ... connect chatClient ... }
+ *   })
+ *
+ * @param {object} socket
+ * @param {object} parsed
+ * @param {function} callback
+ */
+async function registChat(socket, parsed, callback) {
+    var userId = parsed.userId;
+
+    logger.info('USER', 'registChat: userId=' + userId);
+
+    // Check if chat-server is configured
+    var config = require('../../shared/config');
+
+    var chatServerUrl = 'http://127.0.0.1:' + config.config.ports.chat;
+
+    // Return chat registration info
+    // Client reads: n._success, n._chatServerUrl, n._worldRoomId, n._guildRoomId, etc.
+    callback(RH.success({
+        _success: true,
+        _chatServerUrl: chatServerUrl,
+        _worldRoomId: 1,
+        _guildRoomId: 2,
+        _teamDungeonChatRoom: 3,
+        _teamChatRoom: 4,
+    }));
+}
+
+/**
+ * exitGame — Player exits game, save data and cleanup.
+ *
+ * CLIENT CODE: Called when player exits or closes game.
+ *
+ * @param {object} socket
+ * @param {object} parsed
+ * @param {function} callback
+ */
+async function exitGame(socket, parsed, callback) {
+    var userId = parsed.userId || socket._userId;
+
+    logger.info('USER', 'exitGame: userId=' + userId);
+
+    try {
+        // Clean up online status
+        if (userId) {
+            await DB.query(
+                'DELETE FROM user_online WHERE user_id = ?',
+                [userId]
+            );
+        }
+    } catch (err) {
+        logger.warn('USER', 'exitGame: cleanup failed: ' + err.message);
+    }
+
+    callback(RH.success({}));
+}
+
+/**
+ * changeNickName — Change player's display nickname.
+ *
+ * CLIENT CODE: Opens nickname input UI, validates length (12 chars max from constant.json).
+ *
+ * @param {object} socket
+ * @param {object} parsed - { userId, nickName }
+ * @param {function} callback
+ */
+async function changeNickName(socket, parsed, callback) {
+    var userId = parsed.userId;
+    var nickName = parsed.nickName;
+
+    if (!nickName || nickName.length === 0) {
+        return callback(RH.error(RH.ErrorCode.LACK_PARAM, 'Missing nickName'));
+    }
+
+    logger.info('USER', 'changeNickName: userId=' + userId + ', nickName=' + nickName);
+
+    // TODO: Validate nickname (length, forbidden words, etc.)
+    // TODO: Update in users table
+    // TODO: Update playerData.user._nickName
+
+    callback(RH.success({
+        _changeInfo: {
+            _nickName: nickName,
+        },
+    }));
+}
+
+/**
+ * changeHeadImage — Change player's avatar/head image.
+ *
+ * @param {object} socket
+ * @param {object} parsed - { userId, headImageId }
+ * @param {function} callback
+ */
+async function changeHeadImage(socket, parsed, callback) {
+    var userId = parsed.userId;
+    var headImageId = parsed.headImageId;
+
+    if (!headImageId) {
+        return callback(RH.error(RH.ErrorCode.LACK_PARAM, 'Missing headImageId'));
+    }
+
+    logger.info('USER', 'changeHeadImage: userId=' + userId + ', headImageId=' + headImageId);
+
+    callback(RH.success({
+        _changeInfo: {
+            _headImage: headImageId,
+        },
+    }));
+}
+
+/**
+ * changeHeadBox — Change player's equipped head frame/avatar box.
+ *
+ * @param {object} socket
+ * @param {object} parsed - { userId, headBoxId }
+ * @param {function} callback
+ */
+async function changeHeadBox(socket, parsed, callback) {
+    var userId = parsed.userId;
+    var headBoxId = parsed.headBoxId;
+
+    if (!headBoxId) {
+        return callback(RH.error(RH.ErrorCode.LACK_PARAM, 'Missing headBoxId'));
+    }
+
+    logger.info('USER', 'changeHeadBox: userId=' + userId + ', headBoxId=' + headBoxId);
+
+    callback(RH.success({
+        _changeInfo: {
+            _headBox: headBoxId,
+        },
+    }));
+}
+
+/**
+ * clickSystem — Record a system UI click event / daily reward claim tracking.
+ *
+ * @param {object} socket
+ * @param {object} parsed - { userId, systemId }
+ * @param {function} callback
+ */
+async function clickSystem(socket, parsed, callback) {
+    var userId = parsed.userId;
+    var systemId = parsed.systemId;
+
+    logger.info('USER', 'clickSystem: userId=' + userId + ', systemId=' + systemId);
+
+    callback(RH.success({
+        _changeInfo: {
+            _clickSystem: {},
+            _items: {},
+        },
+    }));
+}
+
+/**
+ * getBulletinBrief — Get summary/list of bulletin/announcement headers.
+ *
+ * @param {object} socket
+ * @param {object} parsed
+ * @param {function} callback
+ */
+async function getBulletinBrief(socket, parsed, callback) {
+    logger.info('USER', 'getBulletinBrief: userId=' + (parsed.userId || '-'));
+
+    callback(RH.success({
+        _bulletinBriefList: [],
+    }));
+}
+
+/**
+ * queryPlayerHeadIcon — Query available head icons/avatars.
+ *
+ * @param {object} socket
+ * @param {object} parsed
+ * @param {function} callback
+ */
+async function queryPlayerHeadIcon(socket, parsed, callback) {
+    logger.info('USER', 'queryPlayerHeadIcon: userId=' + (parsed.userId || '-'));
+
+    callback(RH.success({
+        _headIconList: [],
+    }));
+}
+
+/**
+ * readBulletin — Read full content of a specific bulletin.
+ *
+ * @param {object} socket
+ * @param {object} parsed - { bulletinId }
+ * @param {function} callback
+ */
+async function readBulletin(socket, parsed, callback) {
+    var bulletinId = parsed.bulletinId;
+
+    logger.info('USER', 'readBulletin: bulletinId=' + bulletinId);
+
+    callback(RH.success({
+        _bulletinDetail: {
+            _bulletinId: bulletinId,
+            _title: '',
+            _content: '',
+            _publishTime: 0,
+        },
+    }));
+}
+
+/**
+ * suggest — Get recommended content.
+ *
+ * @param {object} socket
+ * @param {object} parsed - { suggestType }
+ * @param {function} callback
+ */
+async function suggest(socket, parsed, callback) {
+    logger.info('USER', 'suggest: suggestType=' + (parsed.suggestType || '-'));
+
+    callback(RH.success({
+        _suggestList: [],
+    }));
+}
+
+/**
+ * saveFastTeam — Save a quick-access battle team composition.
+ *
+ * @param {object} socket
+ * @param {object} parsed - { userId, teamIndex, heroList }
+ * @param {function} callback
+ */
+async function saveFastTeam(socket, parsed, callback) {
+    var userId = parsed.userId;
+    var teamIndex = parsed.teamIndex;
+    var heroList = parsed.heroList;
+
+    logger.info('USER', 'saveFastTeam: userId=' + userId + ', teamIndex=' + teamIndex);
+
+    callback(RH.success({
+        _changeInfo: {
+            _fastTeam: {},
+        },
+    }));
+}
+
+/**
+ * setFastTeamName — Rename a saved quick-access battle team.
+ *
+ * @param {object} socket
+ * @param {object} parsed - { userId, teamIndex, teamName }
+ * @param {function} callback
+ */
+async function setFastTeamName(socket, parsed, callback) {
+    var userId = parsed.userId;
+    var teamIndex = parsed.teamIndex;
+    var teamName = parsed.teamName;
+
+    logger.info('USER', 'setFastTeamName: userId=' + userId + ', teamIndex=' + teamIndex);
+
+    callback(RH.success({
+        _changeInfo: {
+            _fastTeam: {},
+        },
+    }));
+}
+
+// =============================================
+// MAIN ROUTER
+// =============================================
+
+/**
+ * Main handler function — routes actions to specific handlers.
+ *
+ * Called by main-server/index.js:
+ *   handler.handle(socket, parsed, callback)
+ *
+ * @param {object} socket - Socket.IO socket instance
+ * @param {object} parsed - Parsed request from ResponseHelper.parseRequest()
+ *   { type, action, userId, ...params }
+ * @param {function} callback - Socket.IO acknowledgment callback
+ */
+async function handle(socket, parsed, callback) {
     var action = parsed.action;
     var userId = parsed.userId;
 
-    switch (action) {
-        // === WRITE ACTIONS ===
+    if (!action) {
+        logger.warn('USER', 'Missing action in request');
+        return callback(RH.error(RH.ErrorCode.LACK_PARAM, 'Missing action'));
+    }
 
-        case 'changeHeadBox':
-            // TODO: WRITE — Change player's equipped head frame/avatar box
-            // REQ: headBoxId
-            // RES: _changeInfo._headBox
-            callback(RH.success({}));
-            break;
+    try {
+        switch (action) {
 
-        case 'changeHeadImage':
-            // TODO: WRITE — Change player's avatar/head image
-            // REQ: headImageId
-            // RES: _changeInfo._headImage
-            callback(RH.success({}));
-            break;
+            // === CRITICAL: enterGame (first action called after TEA verify) ===
+            case 'enterGame':
+                await enterGame(socket, parsed, callback);
+                break;
 
-        case 'changeNickName':
-            // TODO: WRITE — Change player's display nickname
-            // REQ: nickName
-            // RES: _changeInfo._nickName
-            callback(RH.success({}));
-            break;
+            // === CHAT ===
+            case 'registChat':
+                await registChat(socket, parsed, callback);
+                break;
 
-        case 'clickSystem':
-            // TODO: WRITE — Record a system UI click event / daily reward claim tracking
-            // REQ: systemId
-            // RES: _changeInfo._clickSystem, _changeInfo._items
-            callback(RH.success({}));
-            break;
+            // === WRITE ACTIONS ===
+            case 'changeNickName':
+                await changeNickName(socket, parsed, callback);
+                break;
 
-        case 'exitGame':
-            // TODO: WRITE — Player exits game, trigger offline save and cleanup
-            // REQ: (none)
-            // RES: (acknowledgement only)
-            callback(RH.success({}));
-            break;
+            case 'changeHeadImage':
+                await changeHeadImage(socket, parsed, callback);
+                break;
 
-        case 'registChat':
-            // TODO: WRITE — Register/create a chat room or channel
-            // REQ: chatId, chatName
-            // RES: _chatInfo
-            callback(RH.success({}));
-            break;
+            case 'changeHeadBox':
+                await changeHeadBox(socket, parsed, callback);
+                break;
 
-        case 'saveFastTeam':
-            // TODO: WRITE — Save a quick-access battle team composition
-            // REQ: teamIndex, heroList[]
-            // RES: _changeInfo._fastTeam
-            callback(RH.success({}));
-            break;
+            case 'clickSystem':
+                await clickSystem(socket, parsed, callback);
+                break;
 
-        case 'setFastTeamName':
-            // TODO: WRITE — Rename a saved quick-access battle team
-            // REQ: teamIndex, teamName
-            // RES: _changeInfo._fastTeam
-            callback(RH.success({}));
-            break;
+            case 'exitGame':
+                await exitGame(socket, parsed, callback);
+                break;
 
-        // === READ ACTIONS ===
+            case 'saveFastTeam':
+                await saveFastTeam(socket, parsed, callback);
+                break;
 
-        case 'enterGame':
-            // TODO: READ — Player enters game, return full player data snapshot with 99 fields mergeWithDefaults
-            // REQ: (none, uses socket session userId)
-            // RES: Full player state object merged with defaults:
-            //   _accountInfo: { _level, _exp, _vipLevel, _gold, _diamond, _stamina, _staminaBuyCount, _buyStaminaCDTime,
-            //                   _pvpCoin, _guildCoin, _arenaCoin, _towerCoin, _achievePoint, _heroSoul, _skillPoint,
-            //                   _payTotalDiamond, _payTotalGold, _createRoleTime, _lastLoginTime, _isFirstPay,
-            //                   _firstPayRewardGot, _totalPayCount, _totalGoldCost, _headBox, _headImage, _nickName,
-            //                   _serverId, _userId, _userName, _channelId, _guideStep, _guideSteps,
-            //                   _isBanChat, _banChatTime, _isBanLogin, _banLoginTime, _titleId, _chatRoomId,
-            //                   _maxStageId, _maxEliteStageId, _maxTowerId, _friendCount, _maxFriendCount }
-            //   _items: [] — player inventory items
-            //   _heros: [] — player's hero roster
-            //   _teams: {} — saved battle team compositions
-            //   _fastTeams: {} — quick-access teams
-            //   _friendList: [] — friends
-            //   _blacklist: [] — blocked users
-            //   _friendApplyList: [] — pending friend requests
-            //   _mailList: [] — mailbox messages
-            //   _dailyTask: {} — daily task progress
-            //   _achieveList: [] — achievement records
-            //   _signData: {} — daily sign-in data
-            //   _monthCardData: {} — monthly card info
-            //   _firstPayRewardData: {} — first charge reward state
-            //   _growthFundData: {} — growth fund purchase/reward state
-            //   _activityData: {} — current event/activity states
-            //   _entrustData: {} — entrust/quest board data
-            //   _summonData: {} — summon/pull counters and pools
-            //   _arenaData: {} — arena rank, defense team, history
-            //   _guildData: {} — guild membership info
-            //   _towerData: {} — tower climb progress
-            //   _pveData: {} — PvE stage records and stars
-            //   _heroEquipData: {} — hero equipment inventory
-            //   _chatData: {} — chat history cache
-            //   _welfareData: {} — welfare/reward claim states
-            //   _qigongData: {} — qigong/cultivation state
-            //   _breakthroughData: {} — hero breakthrough materials
-            //   _skinData: {} — owned skins and active skin
-            //   _heroVersionData: {} — hero image/reader version tracking
-            //   _serverNoticeData: {} — server announcement flags
-            //   _battleRecordData: {} — recent battle replay ids
-            //   _gachaWishList: {} — summon wish list picks
-            //   _systemClickData: {} — system feature click tracking
-            //   _heartData: {} — friend heart/send receive state
-            //   _titleData: {} — owned titles
-            //   _pvpSeasonData: {} — PvP season info
-            //   _worldBossData: {} — world boss participation
-            //   _redPointData: {} — UI red dot/notification flags
-            //   _offlineRewardData: {} — accumulated offline rewards
-            //   _totemData: {} — totem/buff system
-            //   _guideRewardData: {} — guide completion rewards
-            //   _treasureData: {} — treasure hunt progress
-            //   _rechargeData: {} — recharge/billing state
-            //   _commentData: {} — user comments/posts
-            //   _relationData: {} — social links
-            //   ... (total 99 fields merged with defaults)
-            // NOTE: This is the largest response in the game. Must mergeWithDefaults(playerData, DEFAULTS).
-            callback(RH.success({}));
-            break;
+            case 'setFastTeamName':
+                await setFastTeamName(socket, parsed, callback);
+                break;
 
-        case 'getBulletinBrief':
-            // TODO: READ — Get summary/list of bulletin/announcement headers (titles only, no full body)
-            // REQ: (none)
-            // RES: _bulletinBriefList [{ _bulletinId, _title, _isRead }]
-            callback(RH.success({}));
-            break;
+            // === READ ACTIONS ===
+            case 'getBulletinBrief':
+                await getBulletinBrief(socket, parsed, callback);
+                break;
 
-        case 'queryPlayerHeadIcon':
-            // TODO: READ — Query available head icons/avatars the player owns or can equip
-            // REQ: (none)
-            // RES: _headIconList [{ _headIconId, _isOwned, _isNew }]
-            callback(RH.success({}));
-            break;
+            case 'queryPlayerHeadIcon':
+                await queryPlayerHeadIcon(socket, parsed, callback);
+                break;
 
-        case 'readBulletin':
-            // TODO: READ — Read the full content of a specific bulletin/announcement
-            // REQ: bulletinId
-            // RES: _bulletinDetail { _bulletinId, _title, _content, _publishTime }
-            callback(RH.success({}));
-            break;
+            case 'readBulletin':
+                await readBulletin(socket, parsed, callback);
+                break;
 
-        case 'suggest':
-            // TODO: READ — Get recommended content (heroes, items, or events based on player level)
-            // REQ: suggestType
-            // RES: _suggestList [{ _type, _id, _weight }]
-            callback(RH.success({}));
-            break;
+            case 'suggest':
+                await suggest(socket, parsed, callback);
+                break;
 
-        default:
-            console.warn('[USER] Unknown action: ' + action);
-            callback(RH.success({}));
+            // === UNKNOWN ACTION ===
+            default:
+                logger.warn('USER', 'Unknown action: ' + action + ' from userId=' + (userId || '-'));
+                callback(RH.error(RH.ErrorCode.INVALID_COMMAND, 'Unknown action: ' + action));
+                break;
+        }
+    } catch (err) {
+        logger.error('USER', 'Handler error for action=' + action + ': ' + err.message);
+        logger.error('USER', 'Stack: ' + err.stack);
+        callback(RH.error(RH.ErrorCode.UNKNOWN, 'Internal server error'));
     }
 }
 

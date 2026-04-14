@@ -1,75 +1,98 @@
 'use strict';
-var RH = require('../../shared/responseHelper');
 
-/**
- * Combat Handler — arena
- * 10 actions — WRITE: 7 | READ: 3
- */
+var RH = require('../../shared/responseHelper');
+var logger = require('../../shared/utils/logger');
+
 function handle(socket, parsed, callback) {
     var action = parsed.action;
+    var userId = parsed.userId;
+
     switch (action) {
         case 'buy':
-            // TODO: WRITE — Purchase arena challenge entries
-            // REQ: userId, version
-            // RES: _fields
+            // TODO: Purchase arena entry or battle attempt
+            // REQ: buyType, count
+            // RES: updated resources, remaining buy count
+            logger.info('ARENA', 'action=' + action + ' userId=' + (userId || '-'));
             callback(RH.success({}));
             break;
+
         case 'getBattleRecord':
-            // TODO: READ — Retrieve a specific arena battle replay record
-            // REQ: battleField(GameFieldType.ARENA), battleId, userId, version
-            // RES: _fields
+            // TODO: Get arena battle history records
+            // REQ: page, pageSize
+            // RES: battle record list
+            logger.info('ARENA', 'action=' + action + ' userId=' + (userId || '-'));
             callback(RH.success({}));
             break;
+
         case 'getDailyReward':
-            // TODO: WRITE — Claim the daily arena ranking reward
-            // REQ: userId
-            // RES: _fields
+            // TODO: Claim daily arena ranking reward
+            // REQ: -
+            // RES: reward items
+            logger.info('ARENA', 'action=' + action + ' userId=' + (userId || '-'));
             callback(RH.success({}));
             break;
+
         case 'getRank':
-            // TODO: READ — Fetch arena leaderboard rankings within a range
-            // REQ: start, end, userId, version
-            // RES: _fields
+            // TODO: Get arena leaderboard ranking data
+            // REQ: page, pageSize
+            // RES: rank list with player info
+            logger.info('ARENA', 'action=' + action + ' userId=' + (userId || '-'));
             callback(RH.success({}));
             break;
+
         case 'getRecord':
-            // TODO: READ — Get the player's own arena battle history
-            // REQ: userId, version
-            // RES: _fields
+            // TODO: Get personal arena record/score
+            // REQ: -
+            // RES: arena score, rank, wins, losses
+            logger.info('ARENA', 'action=' + action + ' userId=' + (userId || '-'));
             callback(RH.success({}));
             break;
+
         case 'join':
-            // TODO: WRITE — Enter/join the arena season
-            // REQ: userId, version
-            // RES: _fields
+            // TODO: Join arena matchmaking queue
+            // REQ: -
+            // RES: match result or queue status
+            logger.info('ARENA', 'action=' + action + ' userId=' + (userId || '-'));
             callback(RH.success({}));
             break;
+
         case 'select':
-            // TODO: WRITE — Select a target opponent in the arena
-            // REQ: userId, version
-            // RES: _fields
+            // TODO: Select arena opponent or season rewards
+            // REQ: targetId or selection info
+            // RES: selection result
+            logger.info('ARENA', 'action=' + action + ' userId=' + (userId || '-'));
             callback(RH.success({}));
             break;
+
         case 'setTeam':
-            // TODO: WRITE — Set the defense team used in arena
-            // REQ: team, userId, version
-            // RES: _fields
+            // TODO: Set arena defense team formation
+            // REQ: team lineup (hero positions)
+            // RES: updated team data
+            logger.info('ARENA', 'action=' + action + ' userId=' + (userId || '-'));
             callback(RH.success({}));
             break;
+
         case 'startBattle':
-            // TODO: WRITE — Start an arena PvP battle against a ranked opponent
-            // REQ: battleField(GameFieldType.ARENA), enemyRank, selUser, selfRank, team, userId, version
-            // RES: _fields
+            // TODO: Start arena battle against opponent
+            // REQ: opponentId
+            // RES: battle result data
+            logger.info('ARENA', 'action=' + action + ' userId=' + (userId || '-'));
             callback(RH.success({}));
             break;
+
         case 'topAward':
-            // TODO: WRITE — Claim a tier-based top ranking arena reward
-            // REQ: rewardId, userId, version
-            // RES: _fields
+            // TODO: Claim top rank season award
+            // REQ: -
+            // RES: reward items list
+            logger.info('ARENA', 'action=' + action + ' userId=' + (userId || '-'));
             callback(RH.success({}));
             break;
+
         default:
-            callback(RH.success({}));
+            logger.warn('ARENA', 'Unknown action: ' + action);
+            callback(RH.error(RH.ErrorCode.INVALID_COMMAND, 'Unknown action: ' + action));
+            break;
     }
 }
+
 module.exports = { handle: handle };

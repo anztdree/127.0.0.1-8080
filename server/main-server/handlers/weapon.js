@@ -1,22 +1,66 @@
 'use strict';
+
 var RH = require('../../shared/responseHelper');
+var logger = require('../../shared/utils/logger');
+
 function handle(socket, parsed, callback) {
-    switch (parsed.action) {
-        case 'levelUpHalo': // TODO: WRITE — Level up a weapon halo skill // REQ: chooseHalo, costWeaponIds, heroId, userId, version, weaponId // RES: updated weapon halo data
-            callback(RH.success({})); break;
-        case 'merge': // TODO: WRITE — Merge weapon pieces into a full weapon // REQ: num, pieces[{id}], userId, version // RES: merged weapon info
-            callback(RH.success({})); break;
-        case 'reborn': // TODO: WRITE — Reborn weapons, optionally keeping star level // REQ: keepStar, userId, version, weaponIds // RES: reborn weapon results
-            callback(RH.success({})); break;
-        case 'resolve': // TODO: WRITE — Resolve/decompose weapons into materials // REQ: userId, version, weaponIds // RES: resolved materials
-            callback(RH.success({})); break;
-        case 'takeOff': // TODO: WRITE — Take off a weapon from a hero // REQ: heroId, userId, version, weaponId // RES: updated hero without weapon
-            callback(RH.success({})); break;
-        case 'upgrade': // TODO: WRITE — Upgrade a weapon's level // REQ: heroId, userId, version, weaponId // RES: upgraded weapon data
-            callback(RH.success({})); break;
-        case 'wear': // TODO: WRITE — Wear a weapon onto a hero // REQ: heroId, userId, version, weaponId // RES: updated hero with weapon
-            callback(RH.success({})); break;
-        default: callback(RH.success({}));
+    var action = parsed.action;
+    var userId = parsed.userId;
+
+    switch (action) {
+        case 'equip':
+            // TODO: Equip a weapon onto hero
+            // REQ: heroId, weaponId
+            // RES: updated hero weapon
+            logger.info('WEAPON', 'action=' + action + ' userId=' + (userId || '-'));
+            callback(RH.success({}));
+            break;
+
+        case 'unequip':
+            // TODO: Unequip a weapon from hero
+            // REQ: heroId
+            // RES: updated hero weapon
+            logger.info('WEAPON', 'action=' + action + ' userId=' + (userId || '-'));
+            callback(RH.success({}));
+            break;
+
+        case 'upgrade':
+            // TODO: Upgrade weapon level
+            // REQ: weaponId, materials
+            // RES: upgraded weapon stats
+            logger.info('WEAPON', 'action=' + action + ' userId=' + (userId || '-'));
+            callback(RH.success({}));
+            break;
+
+        case 'refine':
+            // TODO: Refine weapon to improve sub-stats
+            // REQ: weaponId, refine materials
+            // RES: refined weapon stats
+            logger.info('WEAPON', 'action=' + action + ' userId=' + (userId || '-'));
+            callback(RH.success({}));
+            break;
+
+        case 'compose':
+            // TODO: Compose/craft weapon from materials
+            // REQ: targetWeaponId, materials
+            // RES: composed weapon
+            logger.info('WEAPON', 'action=' + action + ' userId=' + (userId || '-'));
+            callback(RH.success({}));
+            break;
+
+        case 'sell':
+            // TODO: Sell weapon for gold
+            // REQ: weaponId
+            // RES: gold received
+            logger.info('WEAPON', 'action=' + action + ' userId=' + (userId || '-'));
+            callback(RH.success({}));
+            break;
+
+        default:
+            logger.warn('WEAPON', 'Unknown action: ' + action);
+            callback(RH.error(RH.ErrorCode.INVALID_COMMAND, 'Unknown action: ' + action));
+            break;
     }
 }
+
 module.exports = { handle: handle };

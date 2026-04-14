@@ -1,30 +1,42 @@
 'use strict';
-var RH = require('../../shared/responseHelper');
 
-/**
- * Time Machine Handler
- * 4 actions — WRITE: 4 | READ: 0
- */
+var RH = require('../../shared/responseHelper');
+var logger = require('../../shared/utils/logger');
+
 function handle(socket, parsed, callback) {
     var action = parsed.action;
+    var userId = parsed.userId;
+
     switch (action) {
-        case 'checkBattleResult': // TODO: WRITE — Check and record time machine battle result
-            // REQ: battleField(GameFieldType.TIMETRAVEL), battleId, checkResult, machineId, userId, version
+        case 'draw':
+            // TODO: Draw/spin time machine gacha
+            // REQ: count
+            // RES: draw results, rewards
+            logger.info('TIMEMACHINE', 'action=' + action + ' userId=' + (userId || '-'));
             callback(RH.success({}));
             break;
-        case 'getReward': // TODO: WRITE — Claim time machine stage reward
-            // REQ: machineId, userId
+
+        case 'getRecord':
+            // TODO: Get time machine draw records
+            // REQ: -
+            // RES: draw history
+            logger.info('TIMEMACHINE', 'action=' + action + ' userId=' + (userId || '-'));
             callback(RH.success({}));
             break;
-        case 'start': // TODO: WRITE — Start a time machine level/stage
-            // REQ: heroId, level, machineId, timeType, userId
+
+        case 'getDailyReward':
+            // TODO: Claim time machine daily reward
+            // REQ: -
+            // RES: reward items
+            logger.info('TIMEMACHINE', 'action=' + action + ' userId=' + (userId || '-'));
             callback(RH.success({}));
             break;
-        case 'startBoss': // TODO: WRITE — Start a time machine boss battle
-            // REQ: battleField(GameFieldType.TIMETRAVEL), machineId, team, userId
-            callback(RH.success({}));
+
+        default:
+            logger.warn('TIMEMACHINE', 'Unknown action: ' + action);
+            callback(RH.error(RH.ErrorCode.INVALID_COMMAND, 'Unknown action: ' + action));
             break;
-        default: callback(RH.success({}));
     }
 }
+
 module.exports = { handle: handle };

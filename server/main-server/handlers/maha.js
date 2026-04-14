@@ -1,38 +1,58 @@
 'use strict';
-var RH = require('../../shared/responseHelper');
 
-/**
- * Maha Handler
- * 6 actions — WRITE: 4 | READ: 2
- */
+var RH = require('../../shared/responseHelper');
+var logger = require('../../shared/utils/logger');
+
 function handle(socket, parsed, callback) {
     var action = parsed.action;
+    var userId = parsed.userId;
+
     switch (action) {
-        case 'buyTimes': // TODO: WRITE — Purchase extra Maha adventure challenge attempts
-            // REQ: userId, version
+        case 'startBattle':
+            // TODO: Start maha (ultimate) battle
+            // REQ: stageId, team lineup
+            // RES: battle result, rewards
+            logger.info('MAHA', 'action=' + action + ' userId=' + (userId || '-'));
             callback(RH.success({}));
             break;
-        case 'friendBattle': // TODO: WRITE — Start a friend battle in Maha adventure against a boss
-            // REQ: battleField(GameFieldType.MAHAADVENTURE), bossId, team, userId, version
+
+        case 'getRecord':
+            // TODO: Get maha battle progress record
+            // REQ: -
+            // RES: cleared stages, scores
+            logger.info('MAHA', 'action=' + action + ' userId=' + (userId || '-'));
             callback(RH.success({}));
             break;
-        case 'getFriend': // TODO: READ — Get the user's friend list for Maha adventure co-op
-            // REQ: userId, version
+
+        case 'getDailyReward':
+            // TODO: Claim maha daily reward
+            // REQ: -
+            // RES: reward items
+            logger.info('MAHA', 'action=' + action + ' userId=' + (userId || '-'));
             callback(RH.success({}));
             break;
-        case 'join': // TODO: WRITE — Join the Maha adventure event
-            // REQ: userId, version
+
+        case 'buy':
+            // TODO: Purchase maha battle attempt
+            // REQ: count
+            // RES: updated resources, remaining attempts
+            logger.info('MAHA', 'action=' + action + ' userId=' + (userId || '-'));
             callback(RH.success({}));
             break;
-        case 'risk': // TODO: WRITE — Perform a Maha risk/gamble action
-            // REQ: userId, version
+
+        case 'getRank':
+            // TODO: Get maha leaderboard
+            // REQ: page, pageSize
+            // RES: rank list
+            logger.info('MAHA', 'action=' + action + ' userId=' + (userId || '-'));
             callback(RH.success({}));
             break;
-        case 'startBattle': // TODO: WRITE — Start a Maha adventure battle
-            // REQ: battleField(GameFieldType.MAHAADVENTURE), team, userId, version
-            callback(RH.success({}));
+
+        default:
+            logger.warn('MAHA', 'Unknown action: ' + action);
+            callback(RH.error(RH.ErrorCode.INVALID_COMMAND, 'Unknown action: ' + action));
             break;
-        default: callback(RH.success({}));
     }
 }
+
 module.exports = { handle: handle };

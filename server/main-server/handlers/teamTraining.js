@@ -1,16 +1,50 @@
 'use strict';
+
 var RH = require('../../shared/responseHelper');
+var logger = require('../../shared/utils/logger');
+
 function handle(socket, parsed, callback) {
-    switch (parsed.action) {
-        case 'autoTraining': // TODO: WRITE — perform automatic team training iterations // REQ: times, userId, version // RES: trainingResults, updatedTraining
-            callback(RH.success({})); break;
-        case 'reborn': // TODO: WRITE — reborn/reset team training progress // REQ: userId, version // RES: rebornResult, updatedTraining
-            callback(RH.success({})); break;
-        case 'training': // TODO: WRITE — execute a single team training session // REQ: userId, version // RES: trainingResult, updatedTraining
-            callback(RH.success({})); break;
-        case 'unlock': // TODO: WRITE — unlock a new team training slot or feature // REQ: userId, version // RES: unlockedTraining, updatedTraining
-            callback(RH.success({})); break;
-        default: callback(RH.success({}));
+    var action = parsed.action;
+    var userId = parsed.userId;
+
+    switch (action) {
+        case 'startTraining':
+            // TODO: Start team training session
+            // REQ: team lineup, training type
+            // RES: training started, timer info
+            logger.info('TEAMTRAINING', 'action=' + action + ' userId=' + (userId || '-'));
+            callback(RH.success({}));
+            break;
+
+        case 'getTrainingReward':
+            // TODO: Claim team training rewards
+            // REQ: -
+            // RES: training rewards, exp, items
+            logger.info('TEAMTRAINING', 'action=' + action + ' userId=' + (userId || '-'));
+            callback(RH.success({}));
+            break;
+
+        case 'getRecord':
+            // TODO: Get team training records
+            // REQ: -
+            // RES: training history, progress
+            logger.info('TEAMTRAINING', 'action=' + action + ' userId=' + (userId || '-'));
+            callback(RH.success({}));
+            break;
+
+        case 'buy':
+            // TODO: Purchase team training slot or speedup
+            // REQ: buyType
+            // RES: updated resources
+            logger.info('TEAMTRAINING', 'action=' + action + ' userId=' + (userId || '-'));
+            callback(RH.success({}));
+            break;
+
+        default:
+            logger.warn('TEAMTRAINING', 'Unknown action: ' + action);
+            callback(RH.error(RH.ErrorCode.INVALID_COMMAND, 'Unknown action: ' + action));
+            break;
     }
 }
+
 module.exports = { handle: handle };

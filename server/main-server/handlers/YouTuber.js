@@ -1,16 +1,42 @@
 'use strict';
+
 var RH = require('../../shared/responseHelper');
+var logger = require('../../shared/utils/logger');
+
 function handle(socket, parsed, callback) {
-    switch (parsed.action) {
-        case 'getYouTuberRecruitReward': // TODO: WRITE — Claim YouTuber recruitment reward
-            // REQ: userId
-            // RES: YouTuber recruit reward data
-            callback(RH.success({})); break;
-        case 'joinYouTuberPlan': // TODO: WRITE — Join the YouTuber partnership plan
-            // REQ: mailAddr, userId
-            // RES: join plan result
-            callback(RH.success({})); break;
-        default: callback(RH.success({}));
+    var action = parsed.action;
+    var userId = parsed.userId;
+
+    switch (action) {
+        case 'get':
+            // TODO: Get YouTuber promotional reward info
+            // REQ: -
+            // RES: YouTuber reward status and list
+            logger.info('YOUTUBER', 'action=' + action + ' userId=' + (userId || '-'));
+            callback(RH.success({}));
+            break;
+
+        case 'claim':
+            // TODO: Claim YouTuber promotional reward
+            // REQ: rewardId
+            // RES: reward items
+            logger.info('YOUTUBER', 'action=' + action + ' userId=' + (userId || '-'));
+            callback(RH.success({}));
+            break;
+
+        case 'hidden':
+            // TODO: Hide/dismiss YouTuber promotional popup
+            // REQ: -
+            // RES: hidden status confirmation
+            logger.info('YOUTUBER', 'action=' + action + ' userId=' + (userId || '-'));
+            callback(RH.success({}));
+            break;
+
+        default:
+            logger.warn('YOUTUBER', 'Unknown action: ' + action);
+            callback(RH.error(RH.ErrorCode.INVALID_COMMAND, 'Unknown action: ' + action));
+            break;
     }
 }
+
 module.exports = { handle: handle };

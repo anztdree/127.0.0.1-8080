@@ -1,51 +1,58 @@
 'use strict';
-var RH = require('../../shared/responseHelper');
 
-/**
- * Combat Handler — bossCompetition
- * 6 actions — WRITE: 4 | READ: 2
- */
+var RH = require('../../shared/responseHelper');
+var logger = require('../../shared/utils/logger');
+
 function handle(socket, parsed, callback) {
     var action = parsed.action;
+    var userId = parsed.userId;
+
     switch (action) {
-        case 'attackBoss':
-            // TODO: WRITE — Launch an attack on a world boss in the competition
-            // REQ: battleField(GameFieldType.BOSSSNATCH), bossId, isDouble, team, userId
-            // RES: _fields
+        case 'attack':
+            // TODO: Attack the boss in competition
+            // REQ: bossId, team lineup
+            // RES: battle result, damage dealt
+            logger.info('BOSSCOMPETITION', 'action=' + action + ' userId=' + (userId || '-'));
             callback(RH.success({}));
             break;
-        case 'attackOwner':
-            // TODO: WRITE — Challenge the current boss owner to steal/snatch ownership
-            // REQ: battleField(GameFieldType.BOSSSNATCH), bossId, ownerId, team, userId, version
-            // RES: _fields
+
+        case 'getRank':
+            // TODO: Get boss competition leaderboard
+            // REQ: page, pageSize
+            // RES: rank list with damage scores
+            logger.info('BOSSCOMPETITION', 'action=' + action + ' userId=' + (userId || '-'));
             callback(RH.success({}));
             break;
-        case 'autoFight':
-            // TODO: WRITE — Toggle auto-fight mode for a world boss
-            // REQ: autoFight, bossId, userId
-            // RES: _fields
+
+        case 'getDailyReward':
+            // TODO: Claim boss competition daily reward
+            // REQ: -
+            // RES: reward items
+            logger.info('BOSSCOMPETITION', 'action=' + action + ' userId=' + (userId || '-'));
             callback(RH.success({}));
             break;
-        case 'buyTimes':
-            // TODO: WRITE — Purchase additional boss competition attack attempts
-            // REQ: times, userId, version
-            // RES: _fields
+
+        case 'buy':
+            // TODO: Purchase boss competition attack attempt
+            // REQ: count
+            // RES: updated resources, remaining attempts
+            logger.info('BOSSCOMPETITION', 'action=' + action + ' userId=' + (userId || '-'));
             callback(RH.success({}));
             break;
-        case 'getBossList':
-            // TODO: READ — Retrieve the list of active world bosses in competition
-            // REQ: userId, version
-            // RES: _fields
+
+        case 'getRecord':
+            // TODO: Get boss competition personal record
+            // REQ: -
+            // RES: attack history, damage records
+            logger.info('BOSSCOMPETITION', 'action=' + action + ' userId=' + (userId || '-'));
             callback(RH.success({}));
             break;
-        case 'getDetail':
-            // TODO: READ — Get detailed info about a specific world boss and damage rankings
-            // REQ: bossId, damageStartTime, userId
-            // RES: _fields
-            callback(RH.success({}));
-            break;
+
         default:
-            callback(RH.success({}));
+            logger.warn('BOSSCOMPETITION', 'Unknown action: ' + action);
+            callback(RH.error(RH.ErrorCode.INVALID_COMMAND, 'Unknown action: ' + action));
+            break;
     }
 }
+
 module.exports = { handle: handle };

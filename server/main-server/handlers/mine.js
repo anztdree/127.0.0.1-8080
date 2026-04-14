@@ -1,36 +1,58 @@
 'use strict';
+
 var RH = require('../../shared/responseHelper');
+var logger = require('../../shared/utils/logger');
+
 function handle(socket, parsed, callback) {
-    switch (parsed.action) {
-        case 'buyStep': // TODO: WRITE — Purchase additional mine exploration steps
-            // REQ: userId, version
-            // RES: updated step count and cost info
-            callback(RH.success({})); break;
-        case 'getChest': // TODO: WRITE — Collect a chest at a target position in the mine
-            // REQ: targetX, targetY, userId, version
-            // RES: chest reward data
-            callback(RH.success({})); break;
-        case 'getInfo': // TODO: READ — Get mine info for the user
-            // REQ: userId, version
-            // RES: mine level, position, steps remaining
-            callback(RH.success({})); break;
-        case 'move': // TODO: WRITE — Move the character to a target position in the mine
-            // REQ: targetX, targetY, userId, version
-            // RES: new position and triggered events
-            callback(RH.success({})); break;
-        case 'openAll': // TODO: WRITE — Open all available chests in the current mine
-            // REQ: userId, version
-            // RES: combined chest rewards
-            callback(RH.success({})); break;
-        case 'resetCurLevel': // TODO: WRITE — Reset the current mine level
-            // REQ: userId, version
-            // RES: reset mine level result
-            callback(RH.success({})); break;
-        case 'startBattle': // TODO: WRITE — Start a mine battle at a position
-            // REQ: battleField(GameFieldType.MINE), targetX, targetY, team, userId, version
-            // RES: battle initiation result
-            callback(RH.success({})); break;
-        default: callback(RH.success({}));
+    var action = parsed.action;
+    var userId = parsed.userId;
+
+    switch (action) {
+        case 'dig':
+            // TODO: Dig in mine for resources
+            // REQ: mineId
+            // RES: dig result, found resources
+            logger.info('MINE', 'action=' + action + ' userId=' + (userId || '-'));
+            callback(RH.success({}));
+            break;
+
+        case 'getRecord':
+            // TODO: Get mine dig records
+            // REQ: -
+            // RES: dig history, total resources
+            logger.info('MINE', 'action=' + action + ' userId=' + (userId || '-'));
+            callback(RH.success({}));
+            break;
+
+        case 'getDailyReward':
+            // TODO: Claim mine daily reward
+            // REQ: -
+            // RES: reward items
+            logger.info('MINE', 'action=' + action + ' userId=' + (userId || '-'));
+            callback(RH.success({}));
+            break;
+
+        case 'buy':
+            // TODO: Purchase mine dig attempt
+            // REQ: count
+            // RES: updated resources, remaining attempts
+            logger.info('MINE', 'action=' + action + ' userId=' + (userId || '-'));
+            callback(RH.success({}));
+            break;
+
+        case 'reset':
+            // TODO: Reset mine daily progress
+            // REQ: -
+            // RES: reset confirmation
+            logger.info('MINE', 'action=' + action + ' userId=' + (userId || '-'));
+            callback(RH.success({}));
+            break;
+
+        default:
+            logger.warn('MINE', 'Unknown action: ' + action);
+            callback(RH.error(RH.ErrorCode.INVALID_COMMAND, 'Unknown action: ' + action));
+            break;
     }
 }
+
 module.exports = { handle: handle };

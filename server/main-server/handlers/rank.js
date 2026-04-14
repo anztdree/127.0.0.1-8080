@@ -1,16 +1,42 @@
 'use strict';
+
 var RH = require('../../shared/responseHelper');
+var logger = require('../../shared/utils/logger');
+
 function handle(socket, parsed, callback) {
-    switch (parsed.action) {
-        case 'getRank': // TODO: READ — Get leaderboard rankings by type
-            // REQ: rankType, userId
-            // RES: rank list data
-            callback(RH.success({})); break;
-        case 'like': // TODO: WRITE — Like a player on the leaderboard
-            // REQ: rankType, userId
-            // RES: like result
-            callback(RH.success({})); break;
-        default: callback(RH.success({}));
+    var action = parsed.action;
+    var userId = parsed.userId;
+
+    switch (action) {
+        case 'getRank':
+            // TODO: Get leaderboard ranking data
+            // REQ: rankType, page, pageSize
+            // RES: rank list with player info
+            logger.info('RANK', 'action=' + action + ' userId=' + (userId || '-'));
+            callback(RH.success({}));
+            break;
+
+        case 'getMyRank':
+            // TODO: Get player's own ranking info
+            // REQ: rankType
+            // RES: my rank, score, percentile
+            logger.info('RANK', 'action=' + action + ' userId=' + (userId || '-'));
+            callback(RH.success({}));
+            break;
+
+        case 'getRankReward':
+            // TODO: Claim ranking season reward
+            // REQ: rankType
+            // RES: reward items based on rank
+            logger.info('RANK', 'action=' + action + ' userId=' + (userId || '-'));
+            callback(RH.success({}));
+            break;
+
+        default:
+            logger.warn('RANK', 'Unknown action: ' + action);
+            callback(RH.error(RH.ErrorCode.INVALID_COMMAND, 'Unknown action: ' + action));
+            break;
     }
 }
+
 module.exports = { handle: handle };

@@ -1,16 +1,50 @@
 'use strict';
+
 var RH = require('../../shared/responseHelper');
+var logger = require('../../shared/utils/logger');
+
 function handle(socket, parsed, callback) {
-    switch (parsed.action) {
-        case 'appraisal': // TODO: WRITE — Appraise a gemstone to reveal its attributes // REQ: stoneId, userId // RES: appraised gemstone attributes
-            callback(RH.success({})); break;
-        case 'levelUp': // TODO: WRITE — Level up a gemstone using cost materials // REQ: costStack, costUnique, displayId, stoneId, userId // RES: leveled up gemstone data
-            callback(RH.success({})); break;
-        case 'takeOff': // TODO: WRITE — Take off a gemstone from a hero // REQ: stoneId, userId // RES: updated hero without gemstone
-            callback(RH.success({})); break;
-        case 'wear': // TODO: WRITE — Wear gemstones onto a hero // REQ: displayIds, heroId, stoneIds, userId // RES: updated hero with gemstones
-            callback(RH.success({})); break;
-        default: callback(RH.success({}));
+    var action = parsed.action;
+    var userId = parsed.userId;
+
+    switch (action) {
+        case 'equip':
+            // TODO: Equip a gemstone onto equipment slot
+            // REQ: equipId, gemstoneId, slotId
+            // RES: updated equipment
+            logger.info('GEMSTONE', 'action=' + action + ' userId=' + (userId || '-'));
+            callback(RH.success({}));
+            break;
+
+        case 'unequip':
+            // TODO: Unequip a gemstone from equipment
+            // REQ: equipId, slotId
+            // RES: updated equipment
+            logger.info('GEMSTONE', 'action=' + action + ' userId=' + (userId || '-'));
+            callback(RH.success({}));
+            break;
+
+        case 'upgrade':
+            // TODO: Upgrade gemstone level
+            // REQ: gemstoneId, materials
+            // RES: upgraded gemstone stats
+            logger.info('GEMSTONE', 'action=' + action + ' userId=' + (userId || '-'));
+            callback(RH.success({}));
+            break;
+
+        case 'compose':
+            // TODO: Compose higher grade gemstone from lower ones
+            // REQ: targetGemstoneId, materials
+            // RES: composed gemstone
+            logger.info('GEMSTONE', 'action=' + action + ' userId=' + (userId || '-'));
+            callback(RH.success({}));
+            break;
+
+        default:
+            logger.warn('GEMSTONE', 'Unknown action: ' + action);
+            callback(RH.error(RH.ErrorCode.INVALID_COMMAND, 'Unknown action: ' + action));
+            break;
     }
 }
+
 module.exports = { handle: handle };

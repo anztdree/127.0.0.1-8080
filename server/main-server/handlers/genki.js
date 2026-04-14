@@ -1,16 +1,42 @@
 'use strict';
+
 var RH = require('../../shared/responseHelper');
+var logger = require('../../shared/utils/logger');
+
 function handle(socket, parsed, callback) {
-    switch (parsed.action) {
-        case 'queryGenki': // TODO: WRITE — Query genki details for a player // REQ: genkiId, queryUserId, serverId, userId, version // RES: genki detail data
-            callback(RH.success({})); break;
-        case 'smelt': // TODO: WRITE — Smelt genki items into materials // REQ: genkiIds, smeltType, userId // RES: smelted materials result
-            callback(RH.success({})); break;
-        case 'takeOff': // TODO: WRITE — Take off a genki from a hero // REQ: genkiId, heroId, userId // RES: updated hero without genki
-            callback(RH.success({})); break;
-        case 'wear': // TODO: WRITE — Wear a genki onto a hero slot // REQ: genkiId, heroId, pos, userId // RES: updated hero with genki equipped
-            callback(RH.success({})); break;
-        default: callback(RH.success({}));
+    var action = parsed.action;
+    var userId = parsed.userId;
+
+    switch (action) {
+        case 'get':
+            // TODO: Get genki (energy/stamina) info
+            // REQ: -
+            // RES: current genki, max genki, regen timer
+            logger.info('GENKI', 'action=' + action + ' userId=' + (userId || '-'));
+            callback(RH.success({}));
+            break;
+
+        case 'upgrade':
+            // TODO: Upgrade genki capacity/limit
+            // REQ: -
+            // RES: new max genki
+            logger.info('GENKI', 'action=' + action + ' userId=' + (userId || '-'));
+            callback(RH.success({}));
+            break;
+
+        case 'reset':
+            // TODO: Reset genki (buy refill)
+            // REQ: -
+            // RES: updated genki
+            logger.info('GENKI', 'action=' + action + ' userId=' + (userId || '-'));
+            callback(RH.success({}));
+            break;
+
+        default:
+            logger.warn('GENKI', 'Unknown action: ' + action);
+            callback(RH.error(RH.ErrorCode.INVALID_COMMAND, 'Unknown action: ' + action));
+            break;
     }
 }
+
 module.exports = { handle: handle };

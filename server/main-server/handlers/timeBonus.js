@@ -1,22 +1,34 @@
 'use strict';
-var RH = require('../../shared/responseHelper');
 
-/**
- * Time Bonus Handler
- * 2 actions — WRITE: 2 | READ: 0
- */
+var RH = require('../../shared/responseHelper');
+var logger = require('../../shared/utils/logger');
+
 function handle(socket, parsed, callback) {
     var action = parsed.action;
+    var userId = parsed.userId;
+
     switch (action) {
-        case 'buyBonus': // TODO: WRITE — Purchase a time-limited bonus pack
-            // REQ: bonusId, price, times, userId, version
+        case 'get':
+            // TODO: Get time bonus info and availability
+            // REQ: -
+            // RES: time bonus status, countdown
+            logger.info('TIMEBONUS', 'action=' + action + ' userId=' + (userId || '-'));
             callback(RH.success({}));
             break;
-        case 'triggerLackOfGoldBonus': // TODO: WRITE — Trigger a lack-of-gold bonus popup/reward
-            // REQ: userId
+
+        case 'claim':
+            // TODO: Claim available time bonus reward
+            // REQ: -
+            // RES: reward items
+            logger.info('TIMEBONUS', 'action=' + action + ' userId=' + (userId || '-'));
             callback(RH.success({}));
             break;
-        default: callback(RH.success({}));
+
+        default:
+            logger.warn('TIMEBONUS', 'Unknown action: ' + action);
+            callback(RH.error(RH.ErrorCode.INVALID_COMMAND, 'Unknown action: ' + action));
+            break;
     }
 }
+
 module.exports = { handle: handle };

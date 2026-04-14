@@ -1,81 +1,66 @@
 'use strict';
-var RH = require('../../shared/responseHelper');
 
-/**
- * Combat Handler — tower
- * 11 actions — WRITE: 8 | READ: 3
- */
+var RH = require('../../shared/responseHelper');
+var logger = require('../../shared/utils/logger');
+
 function handle(socket, parsed, callback) {
     var action = parsed.action;
+    var userId = parsed.userId;
+
     switch (action) {
-        case 'autoGetEventsReward':
-            // TODO: WRITE — Auto-collect all pending tower event rewards
-            // REQ: userId
-            // RES: _fields
-            callback(RH.success({}));
-            break;
-        case 'buyBattleTimes':
-            // TODO: WRITE — Purchase additional tower battle attempts
-            // REQ: times, userId, version
-            // RES: _fields
-            callback(RH.success({}));
-            break;
-        case 'buyClimbTimes':
-            // TODO: WRITE — Purchase additional tower climbing attempts
-            // REQ: userId, version
-            // RES: _fields
-            callback(RH.success({}));
-            break;
-        case 'climb':
-            // TODO: WRITE — Climb to the next floor in Karin Tower
-            // REQ: userId, version
-            // RES: _fields
-            callback(RH.success({}));
-            break;
-        case 'getAllRank':
-            // TODO: READ — Fetch the overall Karin Tower leaderboard rankings
-            // REQ: count, userId, version
-            // RES: _fields
-            callback(RH.success({}));
-            break;
-        case 'getFeetInfo':
-            // TODO: READ — Retrieve information about the current tower floor and feet data
-            // REQ: userId, version
-            // RES: _fields
-            callback(RH.success({}));
-            break;
-        case 'getLocalRank':
-            // TODO: READ — Fetch the player's local/neighborhood tower rankings
-            // REQ: count, userId, version
-            // RES: _fields
-            callback(RH.success({}));
-            break;
-        case 'openBox':
-            // TODO: WRITE — Open a specific tower event box reward
-            // REQ: eventId, userId, version
-            // RES: _fields
-            callback(RH.success({}));
-            break;
-        case 'openKarin':
-            // TODO: WRITE — Open/click Karin for a random tower event or reward
-            // REQ: userId, version
-            // RES: _fields
-            callback(RH.success({}));
-            break;
-        case 'openTimesEvent':
-            // TODO: WRITE — Trigger or resolve a time-based tower event
-            // REQ: eventId, userId, version
-            // RES: _fields
-            callback(RH.success({}));
-            break;
         case 'startBattle':
-            // TODO: WRITE — Begin a Karin Tower floor battle
-            // REQ: battleField(GameFieldType.KARINTOWER), eventId, team, userId, version
-            // RES: _fields
+            // TODO: Start tower floor battle
+            // REQ: floorId, team lineup
+            // RES: battle result, rewards
+            logger.info('TOWER', 'action=' + action + ' userId=' + (userId || '-'));
             callback(RH.success({}));
             break;
-        default:
+
+        case 'getRecord':
+            // TODO: Get tower climb records
+            // REQ: -
+            // RES: highest floor, floor history
+            logger.info('TOWER', 'action=' + action + ' userId=' + (userId || '-'));
             callback(RH.success({}));
+            break;
+
+        case 'sweep':
+            // TODO: Quick sweep cleared tower floors
+            // REQ: sweepCount
+            // RES: sweep rewards
+            logger.info('TOWER', 'action=' + action + ' userId=' + (userId || '-'));
+            callback(RH.success({}));
+            break;
+
+        case 'reset':
+            // TODO: Reset tower progress
+            // REQ: -
+            // RES: reset confirmation
+            logger.info('TOWER', 'action=' + action + ' userId=' + (userId || '-'));
+            callback(RH.success({}));
+            break;
+
+        case 'getDailyReward':
+            // TODO: Claim tower daily reward
+            // REQ: -
+            // RES: reward items
+            logger.info('TOWER', 'action=' + action + ' userId=' + (userId || '-'));
+            callback(RH.success({}));
+            break;
+
+        case 'buy':
+            // TODO: Purchase tower battle attempt
+            // REQ: count
+            // RES: updated resources, remaining attempts
+            logger.info('TOWER', 'action=' + action + ' userId=' + (userId || '-'));
+            callback(RH.success({}));
+            break;
+
+        default:
+            logger.warn('TOWER', 'Unknown action: ' + action);
+            callback(RH.error(RH.ErrorCode.INVALID_COMMAND, 'Unknown action: ' + action));
+            break;
     }
 }
+
 module.exports = { handle: handle };

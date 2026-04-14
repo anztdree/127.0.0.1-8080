@@ -1,63 +1,58 @@
 'use strict';
-var RH = require('../../shared/responseHelper');
 
-/**
- * Combat Handler — cellGame
- * 8 actions — WRITE: 7 | READ: 1
- */
+var RH = require('../../shared/responseHelper');
+var logger = require('../../shared/utils/logger');
+
 function handle(socket, parsed, callback) {
     var action = parsed.action;
+    var userId = parsed.userId;
+
     switch (action) {
-        case 'checkBattleResult':
-            // TODO: WRITE — Verify and process the outcome of a cell game battle
-            // REQ: battleField(GameFieldType.CELLGAME), battleId, checkResult, userId, version
-            // RES: _fields
-            callback(RH.success({}));
-            break;
-        case 'getChest':
-            // TODO: WRITE — Open and claim a cell game chest reward
-            // REQ: userId, version
-            // RES: _fields
-            callback(RH.success({}));
-            break;
-        case 'getInfo':
-            // TODO: READ — Retrieve the player's current cell game progress and state
-            // REQ: userId, version
-            // RES: _fields
-            callback(RH.success({}));
-            break;
-        case 'recoverHero':
-            // TODO: WRITE — Revive/recover heroes after cell game battles
-            // REQ: heroIds, userId, version
-            // RES: _fields
-            callback(RH.success({}));
-            break;
-        case 'reset':
-            // TODO: WRITE — Reset the current cell game run progress
-            // REQ: userId, version
-            // RES: _fields
-            callback(RH.success({}));
-            break;
-        case 'resetCellGame':
-            // TODO: WRITE — Full reset of the cell game (daily or forced)
-            // REQ: userId
-            // RES: _fields
-            callback(RH.success({}));
-            break;
         case 'setTeam':
-            // TODO: WRITE — Set the team composition for cell game battles
-            // REQ: team, userId, version
-            // RES: _fields
+            // TODO: Set cell game team formation
+            // REQ: team lineup (hero positions)
+            // RES: updated team data
+            logger.info('CELLGAME', 'action=' + action + ' userId=' + (userId || '-'));
             callback(RH.success({}));
             break;
+
         case 'startBattle':
-            // TODO: WRITE — Begin a cell game battle encounter
-            // REQ: team, userId, version
-            // RES: _fields
+            // TODO: Start cell game battle
+            // REQ: stageId or level
+            // RES: battle result, rewards
+            logger.info('CELLGAME', 'action=' + action + ' userId=' + (userId || '-'));
             callback(RH.success({}));
             break;
-        default:
+
+        case 'getRecord':
+            // TODO: Get cell game progress record
+            // REQ: -
+            // RES: highest level, scores
+            logger.info('CELLGAME', 'action=' + action + ' userId=' + (userId || '-'));
             callback(RH.success({}));
+            break;
+
+        case 'getDailyReward':
+            // TODO: Claim cell game daily reward
+            // REQ: -
+            // RES: reward items
+            logger.info('CELLGAME', 'action=' + action + ' userId=' + (userId || '-'));
+            callback(RH.success({}));
+            break;
+
+        case 'buy':
+            // TODO: Purchase cell game attempt
+            // REQ: count
+            // RES: updated resources, remaining attempts
+            logger.info('CELLGAME', 'action=' + action + ' userId=' + (userId || '-'));
+            callback(RH.success({}));
+            break;
+
+        default:
+            logger.warn('CELLGAME', 'Unknown action: ' + action);
+            callback(RH.error(RH.ErrorCode.INVALID_COMMAND, 'Unknown action: ' + action));
+            break;
     }
 }
+
 module.exports = { handle: handle };

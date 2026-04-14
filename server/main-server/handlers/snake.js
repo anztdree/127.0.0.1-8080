@@ -1,63 +1,66 @@
 'use strict';
-var RH = require('../../shared/responseHelper');
 
-/**
- * Combat Handler — snake
- * 8 actions — WRITE: 5 | READ: 3
- */
+var RH = require('../../shared/responseHelper');
+var logger = require('../../shared/utils/logger');
+
 function handle(socket, parsed, callback) {
     var action = parsed.action;
+    var userId = parsed.userId;
+
     switch (action) {
-        case 'awardBox':
-            // TODO: WRITE — Open and claim a specific snake dungeon reward box
-            // REQ: boxId, userId, version
-            // RES: _fields
-            callback(RH.success({}));
-            break;
-        case 'getAllBoxReward':
-            // TODO: WRITE — Claim all available snake dungeon box rewards at once
-            // REQ: userId
-            // RES: _fields
-            callback(RH.success({}));
-            break;
-        case 'getEnemyInfo':
-            // TODO: READ — Retrieve enemy information for a specific snake dungeon lesson
-            // REQ: lessId, userId, version
-            // RES: _fields
-            callback(RH.success({}));
-            break;
-        case 'getSnakeInfo':
-            // TODO: READ — Get the player's current snake dungeon progress and state
-            // REQ: userId, version
-            // RES: _fields
-            callback(RH.success({}));
-            break;
-        case 'recoverHero':
-            // TODO: WRITE — Revive/recover heroes after snake dungeon battles
-            // REQ: heroIds, userId, version
-            // RES: _fields
-            callback(RH.success({}));
-            break;
-        case 'reset':
-            // TODO: WRITE — Reset the snake dungeon progress for a fresh run
-            // REQ: userId, version
-            // RES: _fields
-            callback(RH.success({}));
-            break;
         case 'startBattle':
-            // TODO: WRITE — Begin a snake dungeon battle encounter
-            // REQ: battleField(GameFieldType.SNAKEDUNGEON), team, userId, version
-            // RES: _fields
+            // TODO: Start snake game battle stage
+            // REQ: stageId, team lineup
+            // RES: battle result, rewards
+            logger.info('SNAKE', 'action=' + action + ' userId=' + (userId || '-'));
             callback(RH.success({}));
             break;
+
+        case 'getRecord':
+            // TODO: Get snake game progress record
+            // REQ: -
+            // RES: cleared stages, scores
+            logger.info('SNAKE', 'action=' + action + ' userId=' + (userId || '-'));
+            callback(RH.success({}));
+            break;
+
+        case 'getDailyReward':
+            // TODO: Claim snake game daily reward
+            // REQ: -
+            // RES: reward items
+            logger.info('SNAKE', 'action=' + action + ' userId=' + (userId || '-'));
+            callback(RH.success({}));
+            break;
+
         case 'sweep':
-            // TODO: WRITE — Quick-clear a snake dungeon stage (sweep)
-            // REQ: userId, version
-            // RES: _fields
+            // TODO: Quick sweep cleared snake game stage
+            // REQ: stageId, sweepCount
+            // RES: sweep rewards
+            logger.info('SNAKE', 'action=' + action + ' userId=' + (userId || '-'));
             callback(RH.success({}));
             break;
-        default:
+
+        case 'buy':
+            // TODO: Purchase snake game attempt
+            // REQ: count
+            // RES: updated resources, remaining attempts
+            logger.info('SNAKE', 'action=' + action + ' userId=' + (userId || '-'));
             callback(RH.success({}));
+            break;
+
+        case 'reset':
+            // TODO: Reset snake game progress or attempts
+            // REQ: -
+            // RES: reset confirmation
+            logger.info('SNAKE', 'action=' + action + ' userId=' + (userId || '-'));
+            callback(RH.success({}));
+            break;
+
+        default:
+            logger.warn('SNAKE', 'Unknown action: ' + action);
+            callback(RH.error(RH.ErrorCode.INVALID_COMMAND, 'Unknown action: ' + action));
+            break;
     }
 }
+
 module.exports = { handle: handle };

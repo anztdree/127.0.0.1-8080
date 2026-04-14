@@ -1,36 +1,58 @@
 'use strict';
+
 var RH = require('../../shared/responseHelper');
+var logger = require('../../shared/utils/logger');
+
 function handle(socket, parsed, callback) {
-    switch (parsed.action) {
-        case 'answer': // TODO: WRITE — Submit an answer in the training quiz
-            // REQ: choose, userId, version
-            // RES: answer result and reward
-            callback(RH.success({})); break;
-        case 'buyTimes': // TODO: WRITE — Purchase additional training battle times
-            // REQ: userId, version
-            // RES: updated training times
-            callback(RH.success({})); break;
-        case 'checkBattleResult': // TODO: WRITE — Verify training battle result
-            // REQ: battleField(GameFieldType.TRAINING), battleId, checkResult, userId, version
-            // RES: battle verification result
-            callback(RH.success({})); break;
-        case 'getLog': // TODO: READ — Get training battle log history
-            // REQ: userId, version
-            // RES: training log data
-            callback(RH.success({})); break;
-        case 'move': // TODO: WRITE — Move to a new training stage or position
-            // REQ: userId, version
-            // RES: new training position data
-            callback(RH.success({})); break;
-        case 'runAway': // TODO: WRITE — Flee from a training battle
-            // REQ: userId, version
-            // RES: escape result
-            callback(RH.success({})); break;
-        case 'startBattle': // TODO: WRITE — Start a training battle
-            // REQ: battleField(GameFieldType.TRAINING), team, userId, version
-            // RES: battle initiation result
-            callback(RH.success({})); break;
-        default: callback(RH.success({}));
+    var action = parsed.action;
+    var userId = parsed.userId;
+
+    switch (action) {
+        case 'startTraining':
+            // TODO: Start hero training session
+            // REQ: heroId, slotId
+            // RES: training started, timer info
+            logger.info('TRAINING', 'action=' + action + ' userId=' + (userId || '-'));
+            callback(RH.success({}));
+            break;
+
+        case 'getTrainingReward':
+            // TODO: Claim completed training rewards
+            // REQ: heroId, slotId
+            // RES: training rewards, exp gained
+            logger.info('TRAINING', 'action=' + action + ' userId=' + (userId || '-'));
+            callback(RH.success({}));
+            break;
+
+        case 'getRecord':
+            // TODO: Get training history records
+            // REQ: -
+            // RES: training history, active sessions
+            logger.info('TRAINING', 'action=' + action + ' userId=' + (userId || '-'));
+            callback(RH.success({}));
+            break;
+
+        case 'buy':
+            // TODO: Purchase training slot or speedup
+            // REQ: buyType
+            // RES: updated resources
+            logger.info('TRAINING', 'action=' + action + ' userId=' + (userId || '-'));
+            callback(RH.success({}));
+            break;
+
+        case 'reset':
+            // TODO: Reset training progress
+            // REQ: heroId, slotId
+            // RES: reset confirmation
+            logger.info('TRAINING', 'action=' + action + ' userId=' + (userId || '-'));
+            callback(RH.success({}));
+            break;
+
+        default:
+            logger.warn('TRAINING', 'Unknown action: ' + action);
+            callback(RH.error(RH.ErrorCode.INVALID_COMMAND, 'Unknown action: ' + action));
+            break;
     }
 }
+
 module.exports = { handle: handle };

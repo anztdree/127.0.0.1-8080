@@ -1,20 +1,58 @@
 'use strict';
+
 var RH = require('../../shared/responseHelper');
+var logger = require('../../shared/utils/logger');
+
 function handle(socket, parsed, callback) {
-    switch (parsed.action) {
-        case 'autoDelMail': // TODO: WRITE — automatically delete expired or read mails // REQ: userId, version // RES: deletedCount
-            callback(RH.success({})); break;
-        case 'delMail': // TODO: WRITE — delete a specific mail by ID // REQ: mailId, userId, version // RES: success
-            callback(RH.success({})); break;
-        case 'getAllReward': // TODO: WRITE — claim all pending mail attachments at once // REQ: userId, version // RES: rewards
-            callback(RH.success({})); break;
-        case 'getMailList': // TODO: READ — retrieve the user's mail inbox list // REQ: userId, version // RES: mails
-            callback(RH.success({})); break;
-        case 'getReward': // TODO: WRITE — claim attachment reward from a specific mail // REQ: mailId, userId, version // RES: reward
-            callback(RH.success({})); break;
-        case 'readMail': // TODO: WRITE — mark a mail as read // REQ: mailId, userId, version // RES: updatedMail
-            callback(RH.success({})); break;
-        default: callback(RH.success({}));
+    var action = parsed.action;
+    var userId = parsed.userId;
+
+    switch (action) {
+        case 'getMailList':
+            // TODO: Get player mail list
+            // REQ: page, pageSize
+            // RES: mail list with read/claim status
+            logger.info('MAIL', 'action=' + action + ' userId=' + (userId || '-'));
+            callback(RH.success({}));
+            break;
+
+        case 'readMail':
+            // TODO: Mark a mail as read
+            // REQ: mailId
+            // RES: updated mail status
+            logger.info('MAIL', 'action=' + action + ' userId=' + (userId || '-'));
+            callback(RH.success({}));
+            break;
+
+        case 'claimAttachment':
+            // TODO: Claim attachment from a specific mail
+            // REQ: mailId
+            // RES: claimed items
+            logger.info('MAIL', 'action=' + action + ' userId=' + (userId || '-'));
+            callback(RH.success({}));
+            break;
+
+        case 'claimAll':
+            // TODO: Claim attachments from all mails at once
+            // REQ: -
+            // RES: claimed items list
+            logger.info('MAIL', 'action=' + action + ' userId=' + (userId || '-'));
+            callback(RH.success({}));
+            break;
+
+        case 'deleteMail':
+            // TODO: Delete a mail
+            // REQ: mailId
+            // RES: deletion confirmation
+            logger.info('MAIL', 'action=' + action + ' userId=' + (userId || '-'));
+            callback(RH.success({}));
+            break;
+
+        default:
+            logger.warn('MAIL', 'Unknown action: ' + action);
+            callback(RH.error(RH.ErrorCode.INVALID_COMMAND, 'Unknown action: ' + action));
+            break;
     }
 }
+
 module.exports = { handle: handle };

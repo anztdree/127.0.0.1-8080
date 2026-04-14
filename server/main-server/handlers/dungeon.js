@@ -1,39 +1,66 @@
 'use strict';
-var RH = require('../../shared/responseHelper');
 
-/**
- * Combat Handler — dungeon
- * 4 actions — WRITE: 4 | READ: 0
- */
+var RH = require('../../shared/responseHelper');
+var logger = require('../../shared/utils/logger');
+
 function handle(socket, parsed, callback) {
     var action = parsed.action;
+    var userId = parsed.userId;
+
     switch (action) {
-        case 'buyCount':
-            // TODO: WRITE — Purchase additional dungeon entry counts
-            // REQ: dungeonType, times, userId, version
-            // RES: _fields
-            callback(RH.success({}));
-            break;
-        case 'checkBattleResult':
-            // TODO: WRITE — Verify and process the outcome of a dungeon battle
-            // REQ: battleField(GameFieldType.EQUIPDUNGEON), battleId, checkResult, dungeonLevel, dungeonType, userId, version
-            // RES: _fields
-            callback(RH.success({}));
-            break;
         case 'startBattle':
-            // TODO: WRITE — Initiate an equipment dungeon battle
-            // REQ: battleField(GameFieldType.EQUIPDUNGEON), dungeonLevel, dungeonType, team, userId, version
-            // RES: _fields
+            // TODO: Start dungeon battle
+            // REQ: dungeonId, stageId, team lineup
+            // RES: battle result, rewards
+            logger.info('DUNGEON', 'action=' + action + ' userId=' + (userId || '-'));
             callback(RH.success({}));
             break;
+
+        case 'getRecord':
+            // TODO: Get dungeon clear records
+            // REQ: -
+            // RES: cleared stages, star ratings
+            logger.info('DUNGEON', 'action=' + action + ' userId=' + (userId || '-'));
+            callback(RH.success({}));
+            break;
+
+        case 'getDailyReward':
+            // TODO: Claim dungeon daily reward
+            // REQ: -
+            // RES: reward items
+            logger.info('DUNGEON', 'action=' + action + ' userId=' + (userId || '-'));
+            callback(RH.success({}));
+            break;
+
         case 'sweep':
-            // TODO: WRITE — Quick-clear a dungeon level multiple times (sweep)
-            // REQ: dungeonLevel, dungeonType, times, userId
-            // RES: _fields
+            // TODO: Quick sweep cleared dungeon stage
+            // REQ: dungeonId, stageId, sweepCount
+            // RES: sweep rewards
+            logger.info('DUNGEON', 'action=' + action + ' userId=' + (userId || '-'));
             callback(RH.success({}));
             break;
-        default:
+
+        case 'buy':
+            // TODO: Purchase dungeon attempt
+            // REQ: count
+            // RES: updated resources, remaining attempts
+            logger.info('DUNGEON', 'action=' + action + ' userId=' + (userId || '-'));
             callback(RH.success({}));
+            break;
+
+        case 'reset':
+            // TODO: Reset dungeon progress or daily attempts
+            // REQ: -
+            // RES: reset confirmation
+            logger.info('DUNGEON', 'action=' + action + ' userId=' + (userId || '-'));
+            callback(RH.success({}));
+            break;
+
+        default:
+            logger.warn('DUNGEON', 'Unknown action: ' + action);
+            callback(RH.error(RH.ErrorCode.INVALID_COMMAND, 'Unknown action: ' + action));
+            break;
     }
 }
+
 module.exports = { handle: handle };
