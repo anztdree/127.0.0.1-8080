@@ -125,7 +125,14 @@ function error(code, dataStr) {
  * Client source (line 77182):
  *   if("SUCCESS" == t.ret) { ... process push data ... }
  * 
- * @param {object} dataObj - Push data object
+ * Client reads action from INSIDE the parsed data (line 77186):
+ *   var o = JSON.parse(t.data);
+ *   if("Kickout" == o.action) { ... }
+ * 
+ * FIX #6: Do NOT set action at top-level of response.
+ * The action must be INSIDE dataObj (which becomes the data string).
+ * 
+ * @param {object} dataObj - Push data object (action should be inside this object)
  * @returns {object} Push response
  */
 function push(dataObj) {
@@ -133,8 +140,8 @@ function push(dataObj) {
     return {
         ret: 'SUCCESS',   // String "SUCCESS" for push/notify (NOT number 0)
         data: JSON.stringify(dataObj || {}),
-        action: dataObj ? dataObj.action : undefined,
-        // FIX 6: Add serverTime and server0Time to push responses (client expects these)
+        // FIX #6: Removed top-level action — client reads action from inside data payload
+        compress: false,  // FIX #3: Added for consistency — notify data is never compressed
         serverTime: now,
         server0Time: now,
     };
