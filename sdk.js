@@ -529,9 +529,10 @@
                     v1 = (v1 + (((v0 << 4) + k2) ^ (v0 + sum) ^ ((v0 >>> 5) + k3))) >>> 0;
                 }
 
+                // LITTLE-ENDIAN output — matches game's native TEA (shared/tea.js longsToStr)
                 result.push(
-                    (v0 >>> 24) & 0xFF, (v0 >>> 16) & 0xFF, (v0 >>> 8) & 0xFF, v0 & 0xFF,
-                    (v1 >>> 24) & 0xFF, (v1 >>> 16) & 0xFF, (v1 >>> 8) & 0xFF, v1 & 0xFF
+                    v0 & 0xFF, (v0 >>> 8) & 0xFF, (v0 >>> 16) & 0xFF, (v0 >>> 24) & 0xFF,
+                    v1 & 0xFF, (v1 >>> 8) & 0xFF, (v1 >>> 16) & 0xFF, (v1 >>> 24) & 0xFF
                 );
             }
             return this._bytesToHex(result);
@@ -564,9 +565,10 @@
                     sum = (sum - this.DELTA) >>> 0;
                 }
 
+                // LITTLE-ENDIAN output — matches game's native TEA (shared/tea.js longsToStr)
                 result.push(
-                    (v0 >>> 24) & 0xFF, (v0 >>> 16) & 0xFF, (v0 >>> 8) & 0xFF, v0 & 0xFF,
-                    (v1 >>> 24) & 0xFF, (v1 >>> 16) & 0xFF, (v1 >>> 8) & 0xFF, v1 & 0xFF
+                    v0 & 0xFF, (v0 >>> 8) & 0xFF, (v0 >>> 16) & 0xFF, (v0 >>> 24) & 0xFF,
+                    v1 & 0xFF, (v1 >>> 8) & 0xFF, (v1 >>> 16) & 0xFF, (v1 >>> 24) & 0xFF
                 );
             }
 
@@ -577,10 +579,9 @@
             return this._bytesToString(result);
         },
 
-        // BUG FIX #5: TEACipher byte encoding — changed from UTF-8 to Latin-1
-        // The game's original TEA cipher uses 1 char = 1 byte (Latin-1/ISO-8859-1),
-        // NOT UTF-8 multi-byte encoding. Using UTF-8 would produce wrong byte
-        // counts for non-ASCII characters, breaking the 8-byte block alignment.
+        // TEACipher byte encoding — Latin-1 (1 char = 1 byte)
+        // The game's original TEA cipher (shared/tea.js, main.min.js line 79574)
+        // uses 1 char = 1 byte (Latin-1/ISO-8859-1), NOT UTF-8 multi-byte.
         // Each character is encoded as a single byte: charCodeAt(i) & 0xFF
         _stringToBytes: function (str) {
             var bytes = [];
@@ -598,8 +599,11 @@
             return str;
         },
 
+        // LITTLE-ENDIAN byte order — matches game's native TEA (shared/tea.js strToLongs)
+        // The game uses: charCodeAt(i*4) + (charCodeAt(i*4+1) << 8) + (charCodeAt(i*4+2) << 16) + (charCodeAt(i*4+3) << 24)
+        // This is LITTLE-ENDIAN: least significant byte first
         _bytesToUint32: function (bytes, offset) {
-            return ((bytes[offset] << 24) | (bytes[offset + 1] << 16) | (bytes[offset + 2] << 8) | bytes[offset + 3]) >>> 0;
+            return (bytes[offset] + (bytes[offset + 1] << 8) + (bytes[offset + 2] << 16) + ((bytes[offset + 3] << 24) >>> 0)) >>> 0;
         },
 
         _bytesToHex: function (bytes) {
