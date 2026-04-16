@@ -62,6 +62,8 @@ var DB = require('../../database/connection');
 var DefaultData = require('../../shared/defaultData');
 var GameData = require('../../shared/gameData/loader');
 var logger = require('../../shared/utils/logger');
+var UserDataService = require('../services/userDataService');
+var configModule = require('../../shared/config');
 
 // =============================================
 // ACTION HANDLERS
@@ -138,98 +140,65 @@ async function enterGame(socket, parsed, callback) {
         }
 
         // =============================================
-        // Step 2: Load or create user_data
+        // Step 2: Load or create user data via UserDataService
         // =============================================
-        var isNewPlayer = false;
+        // UserDataService handles: DB query, JSON parse, mergeWithDefaults, cache
+        // enterGame just decides: new player vs existing player
         var playerData = null;
+        var isNewPlayer = false;
 
         try {
-            var rows = await DB.query(
-                'SELECT * FROM user_data WHERE user_id = ? AND server_id = ?',
-                [userId, serverId]
-            );
+            playerData = await UserDataService.loadUserData(userId, serverId);
+        } catch (loadErr) {
+            logger.warn('USER', 'enterGame: loadUserData failed: ' + loadErr.message);
+        }
 
-            if (rows.length > 0 && rows[0].game_data) {
-                // Existing player — load saved data
-                var savedData = rows[0].game_data;
-
-                // Parse JSON if it's a string (MariaDB JSON type may return string)
-                if (typeof savedData === 'string') {
-                    try {
-                        savedData = JSON.parse(savedData);
-                    } catch (parseErr) {
-                        logger.error('USER', 'enterGame: failed to parse saved game_data for userId=' + userId);
-                        savedData = null;
-                    }
-                }
-
-                if (savedData && typeof savedData === 'object') {
-                    // Merge with defaults to fill any missing/null fields
-                    // This prevents crashes when client reads new fields that didn't exist before
-                    playerData = DefaultData.mergeWithDefaults(savedData, userId, userId, serverId);
-                    isNewPlayer = false;
-                    logger.info('USER', 'enterGame: loaded existing data for userId=' + userId);
-                } else {
-                    // Corrupted data — regenerate
-                    playerData = DefaultData.generateNewUserData(userId, userId, serverId);
-                    isNewPlayer = true;
-                    logger.warn('USER', 'enterGame: corrupted data, regenerated for userId=' + userId);
-                }
-            } else {
-                // New player — generate default data
-                playerData = DefaultData.generateNewUserData(userId, userId, serverId);
-                isNewPlayer = true;
-                logger.info('USER', 'enterGame: new player data generated for userId=' + userId);
-            }
-        } catch (dbErr) {
-            // user_data table might not exist — generate defaults and continue
-            logger.warn('USER', 'enterGame: DB query failed: ' + dbErr.message + ', generating defaults');
+        if (!playerData) {
+            // New player — generate default data
             playerData = DefaultData.generateNewUserData(userId, userId, serverId);
             isNewPlayer = true;
+            logger.info('USER', 'enterGame: new player data generated for userId=' + userId);
+        } else {
+            logger.info('USER', 'enterGame: loaded existing data for userId=' + userId);
         }
 
         // =============================================
-        // Step 3: Update dynamic fields in playerData
+        // Step 3: Update dynamic fields
         // =============================================
         var now = Date.now();
 
-        // Update user info with latest login time
+        // Update login time
         if (playerData.user) {
             playerData.user._lastLoginTime = now;
         }
 
-        // Set newUser flag — only true on FIRST enterGame
-        // After first save, this becomes false
+        // newUser — response-time flag set per enterGame call
+        // Not in defaultData (not persistent) — enterGame decides based on actual state
         playerData.newUser = isNewPlayer;
 
-        // Set server version info
-        playerData.serverVersion = GameData.get('constant') ? '1' : null;
+        // serverVersion — from server config, not a boolean check
+        playerData.serverVersion = configModule.config.version || null;
+
+        // serverOpenDate — set on first login, preserved after
         playerData.serverOpenDate = playerData.serverOpenDate || now;
 
         // =============================================
-        // Step 4: Save playerData to database
+        // Step 4: Save to database
         // =============================================
         try {
-            var gameDataJson = JSON.stringify(playerData);
-
-            // Try UPDATE first (existing row), then INSERT (new row)
-            var updateResult = await DB.query(
-                'UPDATE user_data SET game_data = ?, last_login_time = ?, update_time = ? WHERE user_id = ? AND server_id = ?',
-                [gameDataJson, now, now, userId, serverId]
-            );
-
-            if (updateResult.affectedRows === 0) {
-                // No existing row — INSERT
+            if (isNewPlayer) {
+                // First time — INSERT new row into user_data table
                 await DB.query(
                     'INSERT INTO user_data (user_id, server_id, game_data, last_login_time, update_time) VALUES (?, ?, ?, ?, ?)',
-                    [userId, serverId, gameDataJson, now, now]
+                    [userId, serverId, JSON.stringify(playerData), now, now]
                 );
-                logger.info('USER', 'enterGame: saved new user_data for userId=' + userId);
+                logger.info('USER', 'enterGame: inserted new user_data for userId=' + userId);
             } else {
+                // Existing player — UPDATE via UserDataService (cache-aware)
+                await UserDataService.saveUserData(userId, playerData, serverId);
                 logger.info('USER', 'enterGame: updated user_data for userId=' + userId);
             }
         } catch (saveErr) {
-            // Save failed — still return data to client, but log error
             logger.error('USER', 'enterGame: failed to save user_data: ' + saveErr.message);
         }
 
@@ -296,8 +265,7 @@ async function registChat(socket, parsed, callback) {
 
     logger.info('USER', 'registChat: userId=' + userId);
 
-    // Check if chat-server is configured
-    var configModule = require('../../shared/config');
+    // Chat server URL from config
     var chatServerUrl = 'http://127.0.0.1:' + configModule.config.ports.chat;
 
     // Return chat registration info
