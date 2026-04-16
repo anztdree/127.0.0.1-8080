@@ -341,13 +341,16 @@ var UP_TYPE = {
 };
 
 /**
- * Skill type enum (from client SkillBasic).
- * Used in activeSkill request: stype = SkillBasic.POTENTIAL
+ * Skill type enum — matches client SkillBasic (line 84964-84967).
+ *   SkillBasic.NORMAL = 0, SKILL = 1, SKILL_PASSIVE = 2, SUPER = 3, POTENTIAL = 4
+ * Used in activeSkill request: stype = SkillBasic.POTENTIAL (= 4)
  */
 var SKILL_TYPE = {
-    PASSIVE: 0,
-    POTENTIAL: 1,
-    SUPER: 2
+    NORMAL: 0,
+    SKILL: 1,
+    SKILL_PASSIVE: 2,
+    SUPER: 3,
+    POTENTIAL: 4
 };
 
 
@@ -538,13 +541,49 @@ function getHeroEvolveEntries(heroDisplayId) {
     var config = GameData.get('heroEvolve');
     if (!config) return null;
     var entries = config[heroDisplayId] || config[String(heroDisplayId)];
-    return entries || null;
+    if (!entries) return null;
+
+    // Merge heroEvolveRed config (client: getlocalHeroEvolve line 53305-53309)
+    // Red evolve entries extend the evolve table for heroes past normal evolve caps
+    var redConfig = GameData.get('heroEvolveRed');
+    if (redConfig) {
+        var redEntries = redConfig[heroDisplayId] || redConfig[String(heroDisplayId)];
+        if (redEntries) {
+            var base = Array.isArray(entries) ? entries : [entries];
+            var red = Array.isArray(redEntries) ? redEntries : [redEntries];
+            return base.concat(red);
+        }
+    }
+
+    return Array.isArray(entries) ? entries : [entries];
 }
 
 /**
- * Get the next evolve entry for a hero at current evolveLevel.
- * Evolve steps: current + 20 (or current + 10 for levels > 100).
- * The "next" entry is the one with level === currentEvolveLevel + step.
+ * Get the evolve entry matching a specific hero level.
+ * Client: getHeroEvolveLocal(displayId, level) finds entry where entry.level == level.
+ * Used in getHeroNextState (line 85923), setHeroPassiveSkillState (line 85519),
+ * evolveBtnTap (line 121123), setEvolveWarnLabel (line 121098), etc.
+ *
+ * @param {string|number} heroDisplayId
+ * @param {number} heroLevel - The hero's current level
+ * @returns {object|null} Evolve config entry or null
+ */
+function getEvolveEntryByLevel(heroDisplayId, heroLevel) {
+    var entries = getHeroEvolveEntries(heroDisplayId);
+    if (!entries || !Array.isArray(entries)) return null;
+
+    for (var i = 0; i < entries.length; i++) {
+        if (entries[i].level == heroLevel) {
+            return entries[i];
+        }
+    }
+    return null;
+}
+
+/**
+ * Get the next evolve entry for a hero based on current evolveLevel.
+ * Uses step-based progression: +20 for evolveLevel < 100, +10 for >= 100.
+ * Falls back to iterating entries to find the first one > currentEvolveLevel.
  *
  * @param {string|number} heroDisplayId
  * @param {number} currentEvolveLevel
@@ -554,13 +593,19 @@ function getNextEvolveEntry(heroDisplayId, currentEvolveLevel) {
     var entries = getHeroEvolveEntries(heroDisplayId);
     if (!entries || !Array.isArray(entries)) return null;
 
-    // Determine step: +20 for evolveLevel < 100, +10 for >= 100
+    // Primary: step-based lookup
     var step = currentEvolveLevel < 100 ? 20 : 10;
     var targetLevel = currentEvolveLevel + step;
-
     for (var i = 0; i < entries.length; i++) {
-        if (entries[i].level === targetLevel) {
+        if (entries[i].level == targetLevel) {
             return entries[i];
+        }
+    }
+
+    // Fallback: find first entry with level > currentEvolveLevel
+    for (var j = 0; j < entries.length; j++) {
+        if (entries[j].level > currentEvolveLevel) {
+            return entries[j];
         }
     }
     return null;
@@ -746,6 +791,41 @@ function getSelfBreakCost(quality, breakLevel) {
  *   { breakType, breakLevel, level, levelNeeded, costID1, costNum1,
  *     ability1, abilityID1, value1, abilityAffected1, ... }
  *
+ * [BUG 3 FIX] Now also checks breakType2 for heroes with secondary break type.
+ * Client (line 85569): r[u].breakType && r[u].breakType != hero.breakType ||
+ *   (r[u].breakType || !r[u].breakType2 || r[u].breakType2 == hero.breakType2)
+ *
+ * @param {string} breakType - e.g. "break_damageUp"
+ * @param {number} breakLevel - Current break tier (1-6+)
+ * @param {number} level - Position within tier (1-21)
+ * @param {string} [breakType2] - Optional secondary break type
+ * @returns {object|null} Training node entry
+ */
+function getSelfBreakEntry(breakType, breakLevel, level, breakType2) {
+    var config = GameData.get('selfBreak');
+    if (!config) return null;
+
+    var keys = Object.keys(config);
+    for (var i = 0; i < keys.length; i++) {
+        var entry = config[keys[i]];
+        // Match breakType (if entry has one), and breakType2 (if entry has one)
+        var typeMatch = !entry.breakType || entry.breakType === breakType;
+        var type2Match = !entry.breakType2 || !breakType2 || entry.breakType2 === breakType2;
+        if (typeMatch && type2Match &&
+            entry.breakLevel === breakLevel &&
+            entry.level === level) {
+            return entry;
+        }
+    }
+    return null;
+}
+
+/**
+ * Get selfBreak training entry for break type and level position.
+ * selfBreak.json: keyed sequentially, each has
+ *   { breakType, breakLevel, level, levelNeeded, costID1, costNum1,
+ *     ability1, abilityID1, value1, abilityAffected1, ... }
+ *
  * @param {string} breakType - e.g. "break_damageUp"
  * @param {number} breakLevel - Current break tier (1-6+)
  * @param {number} level - Position within tier (1-21)
@@ -773,9 +853,10 @@ function getSelfBreakEntry(breakType, breakLevel, level) {
  *
  * @param {string} breakType - e.g. "break_damageUp"
  * @param {number} breakLevel - Break tier
+ * @param {string} [breakType2] - Optional secondary break type
  * @returns {Array} Array of training entries
  */
-function getSelfBreakEntriesForLevel(breakType, breakLevel) {
+function getSelfBreakEntriesForLevel(breakType, breakLevel, breakType2) {
     var config = GameData.get('selfBreak');
     if (!config) return [];
 
@@ -783,7 +864,9 @@ function getSelfBreakEntriesForLevel(breakType, breakLevel) {
     var keys = Object.keys(config);
     for (var i = 0; i < keys.length; i++) {
         var entry = config[keys[i]];
-        if (entry.breakType === breakType && entry.breakLevel === breakLevel) {
+        var typeMatch = !entry.breakType || entry.breakType === breakType;
+        var type2Match = !entry.breakType2 || !breakType2 || entry.breakType2 === breakType2;
+        if (typeMatch && type2Match && entry.breakLevel === breakLevel) {
             results.push(entry);
         }
     }
@@ -795,6 +878,14 @@ function getSelfBreakEntriesForLevel(breakType, breakLevel) {
 /**
  * Get selfBreak quality multiplier.
  * selfBreakQuality.json: keys "1"-"4", each has { quality, costPara, abilityPara }.
+ *
+ * [BUG 2 FIX] Client uses abilityPara for training cost multiplier, not costPara.
+ * Client getHeroLimitBreakQualityParm (line 85819-85828) returns abilityPara.
+ * Client setTrainCost (line 126362): costNum1 * breakQualityParm (abilityPara).
+ * Client checkHeroBreakLimitRedPoint (line 85851): costNum1 * i (abilityPara).
+ *
+ * costPara may be used for other calculations (unlock costs, etc.).
+ * abilityPara is used for training cost adjustment per quality tier.
  *
  * @param {string} quality - Quality tier
  * @returns {object} { costPara: 1, abilityPara: 1 }
@@ -1676,7 +1767,7 @@ function addHero(gameData, heroId, heroDisplayId, level) {
             _damageUp: 0
         },
         _superSkillLevel: {},
-        _potentialLevel: {},
+        _potentialLevel: { "1": 0, "2": 0, "3": 0 },
         _qigong: null,
         _qigongTmp: null,
         _qigongStage: 1,
@@ -1926,26 +2017,43 @@ function buildLinkHeroesResponse(gameData, heroId, heroData) {
 
     var linkHeroes = {};
 
+    // [BUG 4 FIX] Normalize _linkTo to array for consistent iteration.
+    // Client can send _linkTo as either a string (single link) or an array (multiple links).
+    var linkToTargets = heroData._linkTo;
+    if (linkToTargets && !Array.isArray(linkToTargets)) {
+        linkToTargets = [linkToTargets];
+    }
+
     // If this hero links TO another hero, the target needs updating
-    if (heroData._linkTo) {
-        var targetHero = getHero(gameData, heroData._linkTo);
-        if (targetHero) {
-            var targetAttrs = calculateHeroAttrs(targetHero, gameData);
-            linkHeroes[heroData._linkTo] = {
-                basicAttr: targetAttrs._baseAttr,
-                totalAttr: targetAttrs._totalAttr,
-                breakInfo: targetHero._breakInfo,
-                qigong: targetHero._qigong
-            };
+    if (linkToTargets) {
+        for (var lt = 0; lt < linkToTargets.length; lt++) {
+            var targetId = String(linkToTargets[lt]);
+            var targetHero = getHero(gameData, targetId);
+            if (targetHero) {
+                var targetAttrs = calculateHeroAttrs(targetHero, gameData);
+                // [BUG 3 FIX] Include full hero data in 'hero' field.
+                // Client setDecomposeHeroLink (line 85269): a.hero = o.hero → SetHeroDataToModel(o.hero)
+                // Without 'hero' field, client crashes trying to call SetHeroDataToModel(undefined).
+                linkHeroes[targetId] = {
+                    hero: targetHero,
+                    basicAttr: targetAttrs._baseAttr,
+                    totalAttr: targetAttrs._totalAttr,
+                    breakInfo: targetHero._breakInfo,
+                    qigong: targetHero._qigong
+                };
+            }
         }
     }
 
     // If another hero links FROM this hero, the source needs updating
     if (heroData._linkFrom) {
-        var sourceHero = getHero(gameData, heroData._linkFrom);
+        // _linkFrom is always a single heroId (string)
+        var sourceId = String(heroData._linkFrom);
+        var sourceHero = getHero(gameData, sourceId);
         if (sourceHero) {
             var sourceAttrs = calculateHeroAttrs(sourceHero, gameData);
-            linkHeroes[heroData._linkFrom] = {
+            linkHeroes[sourceId] = {
+                hero: sourceHero,
                 basicAttr: sourceAttrs._baseAttr,
                 totalAttr: sourceAttrs._totalAttr,
                 breakInfo: sourceHero._breakInfo,
@@ -2455,34 +2563,68 @@ function actionAutoLevelUp(parsed, callback) {
 // =============================================
 
 /**
- * ACTION 3: evolve — Star up / evolve a hero.
+ * ACTION 3: evolve — Evolve a hero (breakthrough evolve).
  *
- * CLIENT REQUEST (line 121132):
+ * CLIENT REQUEST (line 121120-121152):
  *   { type:"hero", action:"evolve", userId, heroId, version:"1.0" }
  *
- * CLIENT CALLBACK — HerosManager.levelUpCallBack (same as autoLevelUp):
- *   - Reads same fields: heroId, _evolveLevel, _heroLevel, _baseAttr, _totalAttr,
- *     _changeInfo, _totalCost, _earringTotalCost
- *   - Also updates: setHeroPassiveSkillState, setHeroProactiveSkillState (line 85159)
+ * CLIENT CALLBACK (line 121146-121151):
+ *   if(e._changeInfo) {
+ *     HerosManager.getInstance().levelUpCallBack(e, !0)   // isEvolve=true
+ *     ItemsCommonSingleton.getInstance().resetTtemsCallBack(e)
+ *     ts.closeWindow("HeroEvolve")
+ *     var i = t.getOnUpdate(); i()  // refresh UI
+ *   }
  *
- * EVOLVE SYSTEM:
- *   Each evolve step increases evolveLevel by 20 (for < 100) or 10 (for >= 100).
- *   Evolve entries are in heroEvolve.json[heroDisplayId], sorted by level ascending.
- *   Each entry has:
- *     - level: the evolveLevel after this evolve (20, 40, 60, 80, 100, 110, 120, ...)
- *     - costID1/num1, costID2/num2: evolve capsule and gold costs
- *     - hp/attack/armor/speed: flat stat bonuses granted
- *     - needLevel: minimum hero level required
- *     - needQuality: minimum quality required
- *     - needStar: minimum star rating required (self fragments)
- *     - needNum: number of self fragments needed
- *     - skillPassive1ID/Level: passive skill unlocked at this evolve
- *     - skillID: active skill (typically heroDisplayId + "01")
- *     - normalID: normal attack skill
+ * HerosManager.levelUpCallBack (line 85149-85158, called with isEvolve=true):
+ *   1. setHeroLevelUpDataChange(e, mainHero)
+ *      → e._evolveLevel && (t.heroBaseAttr.evolveLevel = e._evolveLevel,
+ *          setHeroPassiveSkillState(t), setHeroProactiveSkillState(t))
+ *      → e._heroLevel && (t.heroBaseAttr.level = e._heroLevel)
+ *   2. for(a in o.linkTo) { setHeroLevelUpDataChange(e, linkedHero) }
+ *   3. setTotalAttrs(e, o) → processes _baseAttr, _totalAttr, _totalCost,
+ *      _linkHeroesBasicAttr, _linkHeroesTotalAttr
  *
- * MAX LEVEL CHANGE:
- *   After evolve, maxLevel increases by 20 (or 10 for >= 100).
- *   If current level exceeds new maxLevel, level is capped.
+ * setHeroPassiveSkillState (line 85514-85537):
+ *   - Gets evolve entry by (displayId, evolveLevel)
+ *   - If entry exists: overrides normal/proactive/passive skills from entry
+ *   - If no entry: falls back to hero.json base skills
+ *   - Also processes red passive skills (redPassive1-3ID/Level)
+ *
+ * setHeroProactiveSkillState (line 85500-85503):
+ *   - Gets proactive level from WakeUp config based on heroStar
+ *   - Applies level to proactive skill
+ *
+ * CLIENT PRE-CHECKS (line 121093-121106, 121120-121152):
+ *   1. getHeroNextState checks TYPE_EVOLVE vs TYPE_WAITSTARUP:
+ *      - TYPE_WAITSTARUP if: expeditionMaxLevel<=0 AND heroStar < entry.needStarSelf
+ *      - TYPE_EVOLVE otherwise (if heroLevel == entry.level AND heroLevel > evolveLevel)
+ *   2. checkHeroEvolveNeed(quality, needLevel, needNum, needStar):
+ *      Counts sacrificial heroes in roster meeting quality/level/star requirements
+ *   3. hasOtherHero must be true for evolve button to be enabled
+ *
+ * EVOLVE ENTRY LOOKUP (line 85991-85994):
+ *   getHeroEvolveLocal(displayId, heroBaseAttr.level) → entry where entry.level == heroLevel
+ *   Note: entry.level is the hero LEVEL threshold AND the resulting evolveLevel.
+ *
+ * EVOLVE CONFIG FIELDS (heroEvolve.json + heroEvolveRed.json merged):
+ *   level, costID1/num1, costID2/num2, costID3/num3,
+ *   needLevel, needQuality, needNum, needStar, needStarSelf,
+ *   hp, attack, normalID, skillID,
+ *   skillPassive1-3ID/Level, redPassive1-3ID/Level,
+ *   activation, levelUp
+ *
+ * IMPORTANT — EVOLVE DOES NOT:
+ *   - Change heroStar (stars only change via wakeUp/starUp)
+ *   - Consume sacrificial heroes (they're a prerequisite gate only)
+ *   - Consume hero fragments (_fragment)
+ *   - Change hero level
+ *
+ * EVOLVE DOES:
+ *   - Set evolveLevel = entry.level
+ *   - Consume cost items (costID1/2/3, num1/2/3)
+ *   - Also evolve ALL linked heroes (client applies _evolveLevel to linked heroes)
+ *   - Recalculate attributes (evolve bonuses from hp/attack in entries)
  *
  * @param {object} parsed - Request data
  * @param {function} callback - Response callback
@@ -2514,21 +2656,41 @@ function actionEvolve(parsed, callback) {
         var currentEvolve = heroData._heroBaseAttr._evolveLevel || 0;
         var level = heroData._heroBaseAttr._level || 1;
         var star = heroData._heroStar || 0;
-        var fragment = heroData._fragment || 0;
 
-        // Find next evolve entry
-        var nextEntry = getNextEvolveEntry(displayId, currentEvolve);
-        if (!nextEntry) {
-            // Already at max evolve level
-            var maxAttrs = calculateHeroAttrs(heroData, gameData);
-            logger.info('HERO', 'evolve userId=' + userId + ' heroId=' + heroId + ' already at max evolve');
+        // Find evolve entry matching hero's CURRENT LEVEL
+        // Client: getHeroEvolveLocal(displayId, heroBaseAttr.level)
+        // getHeroNextState checks: entry.level == heroLevel AND heroLevel > evolveLevel
+        var evolveEntry = getEvolveEntryByLevel(displayId, level);
+
+        if (!evolveEntry) {
+            // No evolve entry at current level — hero not at an evolve point
+            var noEntryAttrs = calculateHeroAttrs(heroData, gameData);
+            logger.info('HERO', 'evolve userId=' + userId + ' heroId=' + heroId
+                + ' no evolve entry at level ' + level);
             callback(RH.success({
                 heroId: heroId,
                 _evolveLevel: currentEvolve,
                 _heroLevel: level,
-                _baseAttr: maxAttrs._baseAttr,
-                _totalAttr: maxAttrs._totalAttr,
-                _changeInfo: buildChangeInfo([]),
+                _baseAttr: noEntryAttrs._baseAttr,
+                _totalAttr: noEntryAttrs._totalAttr,
+                _changeInfo: { _items: [] },
+                _totalCost: buildTotalCostResponse(heroData)
+            }));
+            return;
+        }
+
+        // Already evolved at this level
+        if (level <= currentEvolve) {
+            var alreadyAttrs = calculateHeroAttrs(heroData, gameData);
+            logger.info('HERO', 'evolve userId=' + userId + ' heroId=' + heroId
+                + ' already evolved at level ' + level + ' (evolveLevel=' + currentEvolve + ')');
+            callback(RH.success({
+                heroId: heroId,
+                _evolveLevel: currentEvolve,
+                _heroLevel: level,
+                _baseAttr: alreadyAttrs._baseAttr,
+                _totalAttr: alreadyAttrs._totalAttr,
+                _changeInfo: { _items: [] },
                 _totalCost: buildTotalCostResponse(heroData)
             }));
             return;
@@ -2536,35 +2698,49 @@ function actionEvolve(parsed, callback) {
 
         // === VALIDATION ===
 
-        // Check needLevel (hero must be at or above required level)
-        if (nextEntry.needLevel && level < nextEntry.needLevel) {
-            var failAttrs = calculateHeroAttrs(heroData, gameData);
+        // Check needStarSelf — hero's own star requirement
+        // Client (line 85930-85931): heroStar < entry.needStarSelf → TYPE_WAITSTARUP
+        if (evolveEntry.needStarSelf && star < evolveEntry.needStarSelf) {
+            var starFailAttrs = calculateHeroAttrs(heroData, gameData);
+            logger.info('HERO', 'evolve userId=' + userId + ' heroId=' + heroId
+                + ' needStarSelf=' + evolveEntry.needStarSelf + ' but star=' + star);
             callback(RH.success({
                 heroId: heroId,
                 _evolveLevel: currentEvolve,
                 _heroLevel: level,
-                _baseAttr: failAttrs._baseAttr,
-                _totalAttr: failAttrs._totalAttr,
-                _changeInfo: buildChangeInfo([]),
+                _baseAttr: starFailAttrs._baseAttr,
+                _totalAttr: starFailAttrs._totalAttr,
+                _changeInfo: { _items: [] },
                 _openType: OPEN_TYPE.TIPS,
                 _totalCost: buildTotalCostResponse(heroData)
             }));
             return;
         }
 
-        // Check needStar (self fragments / star pieces)
-        if (nextEntry.needStar && nextEntry.needNum && nextEntry.needNum > 0) {
-            // needStarSelf from the evolve entry — how many of own fragments needed
-            var selfStarNeeded = nextEntry.needStarSelf || nextEntry.needStar;
-            if (fragment < selfStarNeeded) {
-                var failAttrs2 = calculateHeroAttrs(heroData, gameData);
+        // Check sacrificial hero prerequisites (line 85748-85753: checkHeroEvolveNeed)
+        // needNum heroes with: quality >= needQuality, level >= needLevel, star >= needStar
+        // These are NOT consumed — only a gate check
+        if (evolveEntry.needNum && evolveEntry.needNum > 0) {
+            var requiredQuality = evolveEntry.needQuality ? String(evolveEntry.needQuality).toLowerCase() : 'white';
+            var requiredLevel = evolveEntry.needLevel || 0;
+            var requiredStar = evolveEntry.needStar || 0;
+            var requiredCount = evolveEntry.needNum;
+
+            var heroQualityNum = QUALITY_INDEX[requiredQuality] || 1;
+            var sacrificialCount = countSacrificialHeroes(gameData, heroId, heroQualityNum, requiredLevel, requiredStar);
+
+            if (sacrificialCount < requiredCount) {
+                var sacFailAttrs = calculateHeroAttrs(heroData, gameData);
+                logger.info('HERO', 'evolve userId=' + userId + ' heroId=' + heroId
+                    + ' need ' + requiredCount + ' sacrificial heroes (quality>=' + heroQualityNum
+                    + ' level>=' + requiredLevel + ' star>=' + requiredStar + ') but has ' + sacrificialCount);
                 callback(RH.success({
                     heroId: heroId,
                     _evolveLevel: currentEvolve,
                     _heroLevel: level,
-                    _baseAttr: failAttrs2._baseAttr,
-                    _totalAttr: failAttrs2._totalAttr,
-                    _changeInfo: buildChangeInfo([]),
+                    _baseAttr: sacFailAttrs._baseAttr,
+                    _totalAttr: sacFailAttrs._totalAttr,
+                    _changeInfo: { _items: [] },
                     _openType: OPEN_TYPE.TIPS,
                     _totalCost: buildTotalCostResponse(heroData)
                 }));
@@ -2572,90 +2748,108 @@ function actionEvolve(parsed, callback) {
             }
         }
 
-        // Check cost 1 (evolve capsule)
-        var changes = [];
-        if (nextEntry.costID1 && nextEntry.num1 > 0) {
-            if (!hasItem(gameData, nextEntry.costID1, nextEntry.num1)) {
-                var failAttrs3 = calculateHeroAttrs(heroData, gameData);
+        // Check and consume cost items (up to 3 cost slots: costID1/2/3)
+        var itemChanges = [];  // { _id, _num } entries for _changeInfo
+        var costFailed = false;
+
+        for (var ci = 1; ci <= 3; ci++) {
+            var costId = evolveEntry['costID' + ci];
+            var costNum = evolveEntry['num' + ci];
+            if (!costId || !costNum || costNum <= 0) continue;
+
+            if (!hasItem(gameData, costId, costNum)) {
+                // Return with appropriate openType
+                var costFailAttrs = calculateHeroAttrs(heroData, gameData);
+                var openType = hasItem(gameData, costId, 1) ? OPEN_TYPE.TIME_BONUS : OPEN_TYPE.TIPS;
+                logger.info('HERO', 'evolve userId=' + userId + ' heroId=' + heroId
+                    + ' not enough item ' + costId + ' (need ' + costNum + ')');
                 callback(RH.success({
                     heroId: heroId,
                     _evolveLevel: currentEvolve,
                     _heroLevel: level,
-                    _baseAttr: failAttrs3._baseAttr,
-                    _totalAttr: failAttrs3._totalAttr,
-                    _changeInfo: buildChangeInfo([]),
-                    _openType: hasItem(gameData, nextEntry.costID1, 1) ? OPEN_TYPE.TIME_BONUS : OPEN_TYPE.TIPS,
+                    _baseAttr: costFailAttrs._baseAttr,
+                    _totalAttr: costFailAttrs._totalAttr,
+                    _changeInfo: { _items: [] },
+                    _openType: openType,
                     _totalCost: buildTotalCostResponse(heroData)
                 }));
-                return;
+                costFailed = true;
+                break;
             }
-            changes.push(addItem(gameData, nextEntry.costID1, -nextEntry.num1));
-            addTotalCostEntry(heroData, 'evolve', nextEntry.costID1, nextEntry.num1);
+
+            // Deduct the cost item
+            var result = addItem(gameData, costId, -costNum);
+            itemChanges.push(result);
+            addTotalCostEntry(heroData, 'evolve', costId, costNum);
         }
 
-        // Check cost 2 (gold)
-        if (nextEntry.costID2 && nextEntry.num2 > 0) {
-            if (!hasItem(gameData, nextEntry.costID2, nextEntry.num2)) {
-                var failAttrs4 = calculateHeroAttrs(heroData, gameData);
-                callback(RH.success({
-                    heroId: heroId,
-                    _evolveLevel: currentEvolve,
-                    _heroLevel: level,
-                    _baseAttr: failAttrs4._baseAttr,
-                    _totalAttr: failAttrs4._totalAttr,
-                    _changeInfo: buildChangeInfo([]),
-                    _openType: hasItem(gameData, nextEntry.costID2, 1) ? OPEN_TYPE.TIME_BONUS : OPEN_TYPE.TIPS,
-                    _totalCost: buildTotalCostResponse(heroData)
-                }));
-                return;
-            }
-            changes.push(addItem(gameData, nextEntry.costID2, -nextEntry.num2));
-            addTotalCostEntry(heroData, 'evolve', nextEntry.costID2, nextEntry.num2);
-        }
-
-        // Consume self fragments if needed
-        if (nextEntry.needNum && nextEntry.needNum > 0) {
-            heroData._fragment = (heroData._fragment || 0) - nextEntry.needNum;
-        }
+        if (costFailed) return;
 
         // === EXECUTE EVOLVE ===
-        var newEvolveLevel = nextEntry.level; // This is the new evolveLevel (e.g., 20, 40, 60, ...)
+        var newEvolveLevel = evolveEntry.level;
         heroData._heroBaseAttr._evolveLevel = newEvolveLevel;
-        heroData._heroStar = star + 1;
+        // NOTE: evolve does NOT change heroStar — stars only change via wakeUp
 
-        // Update max level
-        var newMaxLevel = getMaxLevel(newEvolveLevel, star + 1);
-        heroData._heroBaseAttr.maxlevel = newMaxLevel;
-
-        // If current level exceeds new max level, cap it
-        if (level > newMaxLevel) {
-            heroData._heroBaseAttr._level = newMaxLevel;
+        // Update linked heroes' evolveLevel (client applies _evolveLevel to ALL linked heroes)
+        // levelUpCallBack: for(a in o.linkTo) { setHeroLevelUpDataChange(e, linkedHero) }
+        // setHeroLevelUpDataChange: e._evolveLevel && (t.heroBaseAttr.evolveLevel = e._evolveLevel, setSkills...)
+        var linkedHeroIds = [];
+        var linkTo = heroData._linkTo;
+        if (linkTo) {
+            var linkArray = Array.isArray(linkTo) ? linkTo : [linkTo];
+            for (var li = 0; li < linkArray.length; li++) {
+                var linkedId = String(linkArray[li]);
+                var linkedHero = getHero(gameData, linkedId);
+                if (linkedHero) {
+                    linkedHero._heroBaseAttr._evolveLevel = newEvolveLevel;
+                    linkedHeroIds.push(linkedId);
+                }
+            }
         }
 
         // Recalculate attributes after evolve
         var newAttrs = calculateHeroAttrs(heroData, gameData);
-        var linkHeroes = buildLinkHeroesResponse(gameData, heroId, heroData);
 
+        // Build _linkHeroesBasicAttr and _linkHeroesTotalAttr for linked heroes
+        var linkHeroesBasicAttr = null;
+        var linkHeroesTotalAttr = null;
+        if (linkedHeroIds.length > 0) {
+            linkHeroesBasicAttr = {};
+            linkHeroesTotalAttr = {};
+            for (var li2 = 0; li2 < linkedHeroIds.length; li2++) {
+                var lhid = linkedHeroIds[li2];
+                var linkedHeroData = getHero(gameData, lhid);
+                if (linkedHeroData) {
+                    var linkedAttrs = calculateHeroAttrs(linkedHeroData, gameData);
+                    linkHeroesBasicAttr[lhid] = linkedAttrs._baseAttr;
+                    linkHeroesTotalAttr[lhid] = linkedAttrs._totalAttr;
+                }
+            }
+        }
+
+        // Build response
         var response = {
             heroId: heroId,
             _evolveLevel: newEvolveLevel,
-            _heroLevel: heroData._heroBaseAttr._level,
+            _heroLevel: level,
             _baseAttr: newAttrs._baseAttr,
             _totalAttr: newAttrs._totalAttr,
-            _changeInfo: buildChangeInfo(changes),
-            _totalCost: buildTotalCostResponse(heroData),
-            _earringTotalCost: { _items: [] }
+            _changeInfo: { _items: itemChanges },
+            _totalCost: buildTotalCostResponse(heroData)
         };
 
-        if (linkHeroes) {
-            response._linkHeroes = linkHeroes;
+        // Linked heroes attrs (client setTotalAttrs reads these)
+        if (linkHeroesBasicAttr) {
+            response._linkHeroesBasicAttr = linkHeroesBasicAttr;
+        }
+        if (linkHeroesTotalAttr) {
+            response._linkHeroesTotalAttr = linkHeroesTotalAttr;
         }
 
         // Save and respond
         userDataService.saveUserData(userId, gameData).then(function () {
             logger.info('HERO', 'evolve userId=' + userId + ' heroId=' + heroId
-                + ' evolveLevel=' + currentEvolve + '→' + newEvolveLevel
-                + ' star=' + star + '→' + (star + 1));
+                + ' evolveLevel=' + currentEvolve + '→' + newEvolveLevel);
             callback(RH.success(response));
         }).catch(function (saveErr) {
             logger.error('HERO', 'evolve save error: ' + saveErr.message);
@@ -2665,6 +2859,62 @@ function actionEvolve(parsed, callback) {
         logger.error('HERO', 'evolve error: ' + err.message);
         callback(RH.error(RH.ErrorCode.UNKNOWN_ERROR, 'Evolve failed'));
     });
+}
+
+/**
+ * Count sacrificial heroes in the user's roster that meet evolve requirements.
+ * Mirrors client: checkHeroEvolveNeed (line 85748-85753)
+ *
+ * Client checks: heroQuality >= requiredQuality, heroBaseAttr.level >= requiredLevel,
+ * heroStar >= requiredStar, NOT expedition hero, NOT linked hero
+ *
+ * @param {object} gameData - User's game data
+ * @param {string} excludeHeroId - Hero being evolved (exclude from count)
+ * @param {number} requiredQuality - Min quality numeric (1-7 from QUALITY_INDEX)
+ * @param {number} requiredLevel - Min level
+ * @param {number} requiredStar - Min star
+ * @returns {number} Count of eligible sacrificial heroes
+ */
+function countSacrificialHeroes(gameData, excludeHeroId, requiredQuality, requiredLevel, requiredStar) {
+    if (!gameData || !gameData.heros || !gameData.heros._heros) return 0;
+
+    var count = 0;
+    var excludeIdStr = String(excludeHeroId);
+    var heroKeys = Object.keys(gameData.heros._heros);
+
+    for (var i = 0; i < heroKeys.length; i++) {
+        var hKey = heroKeys[i];
+        if (hKey === excludeIdStr) continue;  // exclude the hero being evolved
+
+        var h = gameData.heros._heros[hKey];
+        if (!h) continue;
+
+        // Skip expedition heroes (client: expeditionMaxLevel <= 0)
+        if (h._expeditionMaxLevel && h._expeditionMaxLevel > 0) continue;
+
+        // Skip linked heroes (client: !linkFrom)
+        if (h._linkFrom) continue;
+
+        // Check quality (client: heroQuality >= required)
+        // heroQuality comes from hero.json config (STATIC), not evolveLevel
+        var hBaseQuality = getHeroBaseQuality(h._heroDisplayId);
+        var hQualityNum = QUALITY_INDEX[hBaseQuality] || 1;
+        if (hQualityNum < requiredQuality) continue;
+
+        // Check level (client: heroBaseAttr.level >= requiredLevel)
+        var hLevel = (h._heroBaseAttr && h._heroBaseAttr._level) || 0;
+        if (hLevel < requiredLevel) continue;
+
+        // Check star (client: heroStar >= requiredStar)
+        var hStar = h._heroStar || 0;
+        if (hStar < requiredStar) continue;
+
+        count++;
+        // Early exit if we have enough (client: r >= n)
+        // Not needed here since we need the total for logging, but could optimize
+    }
+
+    return count;
 }
 
 
@@ -2718,6 +2968,7 @@ function actionResolve(parsed, callback) {
 
         var changes = [];
         var linkHeroes = {};
+        var resolvedCount = 0;
 
         for (var i = 0; i < heroIds.length; i++) {
             var hid = String(heroIds[i]);
@@ -2727,7 +2978,11 @@ function actionResolve(parsed, callback) {
                 continue;
             }
 
-            var quality = getHeroQuality(heroData);
+            // [BUG 1 FIX] Use BASE quality from hero.json config, NOT evolveLevel-based quality.
+            // Client: heroQuality = HeroCommon.colorToHeroColor(heroInfo.quality)
+            // heroResolve.json is keyed by base quality: "1"=white, "2"=green, etc.
+            // Using evolveLevel-based quality would give wrong reward (e.g. evolved green→purple gives 25x instead of 2x).
+            var quality = getHeroBaseQuality(heroData._heroDisplayId);
 
             // Build linked heroes response BEFORE removing
             var heroLinks = buildLinkHeroesResponse(gameData, hid, heroData);
@@ -2745,8 +3000,14 @@ function actionResolve(parsed, callback) {
                     + ' reward: ' + resolveConfig.num + 'x item ' + resolveConfig.resolveTo);
             }
 
-            // Remove the hero
+            // [BUG 2 FIX] Remove hero from all teams BEFORE deleting from roster.
+            // Client calls removeHeroFromList which removes from HerosManager.
+            // Server must also clean arenaTeam, topBattleTeam, expeditionTeam, guildBossTeam, towerTeam.
+            removeHeroFromAllTeams(gameData, hid);
+
+            // Remove the hero from roster
             removeHero(gameData, hid);
+            resolvedCount++;
         }
 
         var response = {
@@ -2761,7 +3022,7 @@ function actionResolve(parsed, callback) {
         }
 
         userDataService.saveUserData(userId, gameData).then(function () {
-            logger.info('HERO', 'resolve userId=' + userId + ' resolved ' + heroIds.length + ' heroes');
+            logger.info('HERO', 'resolve userId=' + userId + ' resolved ' + resolvedCount + '/' + heroIds.length + ' heroes');
             callback(RH.success(response));
         }).catch(function (saveErr) {
             logger.error('HERO', 'resolve save error: ' + saveErr.message);
@@ -2817,7 +3078,7 @@ function actionResolve(parsed, callback) {
 function actionReborn(parsed, callback) {
     var userId = parsed.userId;
     var heroIds = parsed.heros;
-    var keepStar = parsed.keepStar;
+    var keepStar = !!parsed.keepStar; // Default false; true = preserve star, no wakeup refund
 
     logger.info('HERO', 'reborn userId=' + userId + ' heroes=' + JSON.stringify(heroIds)
         + ' keepStar=' + keepStar);
@@ -2834,9 +3095,18 @@ function actionReborn(parsed, callback) {
         }
 
         var changes = [];
-        var linkHeroes = {};
         var addHeroes = [];
+        var linkHeroes = {};
+        var totalDiamondCost = 0;
+        var heroesToProcess = []; // Pre-validate and collect info
 
+        // =============================================
+        // PHASE 1: Validate all heroes, calculate diamond cost
+        // Client reference: getHeroRebirthPrice (line 52095-52098)
+        //   heroRebirth[qualityIndex].num = diamond cost per hero
+        //   Quality index: White=0, Green=1, Blue=2, Purple=3, Orange=4,
+        //                 SilverOrange=5, SuperOrange=6
+        // =============================================
         for (var i = 0; i < heroIds.length; i++) {
             var hid = String(heroIds[i]);
             var heroData = getHero(gameData, hid);
@@ -2845,54 +3115,211 @@ function actionReborn(parsed, callback) {
                 continue;
             }
 
-            var quality = getHeroQuality(heroData);
-            var displayId = heroData._heroDisplayId;
-            var currentStar = heroData._heroStar || 0;
+            // [BUG 1 FIX] Use BASE quality from hero.json config, NOT evolveLevel-based.
+            // Client (line 85398-85400): o.heroQuality = colorToHeroColor(heroInfo.quality)
+            // heroInfo.quality is STATIC per hero template — always the same regardless of evolve.
+            // getHeroQuality() uses evolveLevel → WRONG for diamond cost lookup.
+            var baseQuality = getHeroBaseQuality(heroData._heroDisplayId);
 
-            // Build linked heroes response BEFORE removing
-            var heroLinks = buildLinkHeroesResponse(gameData, hid, heroData);
+            // Calculate diamond cost from heroRebirth config
+            // Client (line 52095-52098): return t[n].num where t = heroRebirth, n = quality index
+            // Server: getRebirthConfig maps quality name → config[String(qualityIndex)]
+            var rebirthConfig = getRebirthConfig(baseQuality);
+            var heroDiamondCost = (rebirthConfig && rebirthConfig.num > 0) ? rebirthConfig.num : 0;
+            totalDiamondCost += heroDiamondCost;
+
+            // Initialize totalCost if missing (for older heroes that might not have it)
+            initTotalCost(heroData);
+
+            // Client eligibility check (line 107373):
+            //   expeditionMaxLevel > 0 || (level > 1 || star >= 1)
+            var currentLevel = heroData._heroBaseAttr ? (heroData._heroBaseAttr._level || 1) : 1;
+            var currentStar = heroData._heroStar || 0;
+            var expeditionMax = heroData._expeditionMaxLevel || 0;
+            if (expeditionMax <= 0 && currentLevel <= 1 && currentStar <= 0) {
+                logger.warn('HERO', 'reborn heroId=' + hid + ' not eligible (level='
+                    + currentLevel + ' star=' + currentStar + '), skipping');
+                continue;
+            }
+
+            heroesToProcess.push({
+                hid: hid,
+                heroData: heroData,
+                displayId: heroData._heroDisplayId,
+                currentStar: currentStar,
+                diamondCost: heroDiamondCost
+            });
+        }
+
+        if (heroesToProcess.length === 0) {
+            callback(RH.error(RH.ErrorCode.LACK_PARAM, 'No eligible heroes to reborn'));
+            return;
+        }
+
+        // =============================================
+        // [BUG 2 FIX] Check and consume diamonds BEFORE processing
+        // Client (line 106033): i += ToolCommon.getHeroRebirthPrice(l.heroQuality)
+        // Client checks isDiamondEnough before allowing reborn.
+        // Server must verify and deduct total diamond cost.
+        // =============================================
+        if (totalDiamondCost > 0) {
+            if (!hasItem(gameData, ITEM.DIAMOND, totalDiamondCost)) {
+                callback(RH.error(RH.ErrorCode.LACK_PARAM, 'Not enough diamonds. Need: '
+                    + totalDiamondCost));
+                return;
+            }
+            changes.push(addItem(gameData, ITEM.DIAMOND, -totalDiamondCost));
+            logger.info('HERO', 'reborn total diamond cost=' + totalDiamondCost + ' for '
+                + heroesToProcess.length + ' heroes');
+        }
+
+        // =============================================
+        // PHASE 2: Process each hero — refund, remove, recreate
+        // =============================================
+        for (var j = 0; j < heroesToProcess.length; j++) {
+            var info = heroesToProcess[j];
+            var heroData = info.heroData;
+            var totalCost = heroData._totalCost;
+
+            // [BUG 5 FIX] Remove hero from all teams before deletion.
+            // Same pattern as resolve bug fix. Without this, hero remains in
+            // arenaTeam, topBattleTeam, expeditionTeam, guildBossTeam, towerTeam
+            // causing ghost references.
+            removeHeroFromAllTeams(gameData, info.hid);
+
+            // =============================================
+            // [BUG 3 FIX] Refund ALL totalCost materials.
+            // Client gainItemList (line 106052-106079) builds reward preview from:
+            //   totalCost.levelUp  — ALWAYS refunded
+            //   totalCost.evolve   — ALWAYS refunded
+            //   totalCost.qigong   — ALWAYS refunded (EnergyStone at 80%)
+            //   totalCost.heroBreak — ALWAYS refunded
+            //   totalCost.wakeUp   — ONLY if keepStar=false (BUG 4 interaction)
+            // Server _totalCost format: { _levelUp:[], _evolve:[], _qigong:[],
+            //                             _heroBreak:[], _wakeUp:[] }
+            // Each entry: { _id: itemId, _num: amount }
+            // =============================================
+
+            // --- Level-up materials: 100% refund ---
+            if (totalCost._levelUp && Array.isArray(totalCost._levelUp)) {
+                for (var lu = 0; lu < totalCost._levelUp.length; lu++) {
+                    var luEntry = totalCost._levelUp[lu];
+                    if (luEntry._num > 0) {
+                        changes.push(addItem(gameData, String(luEntry._id), luEntry._num));
+                    }
+                }
+            }
+
+            // --- Evolve materials: 100% refund ---
+            if (totalCost._evolve && Array.isArray(totalCost._evolve)) {
+                for (var ev = 0; ev < totalCost._evolve.length; ev++) {
+                    var evEntry = totalCost._evolve[ev];
+                    if (evEntry._num > 0) {
+                        changes.push(addItem(gameData, String(evEntry._id), evEntry._num));
+                    }
+                }
+            }
+
+            // --- Qigong materials: 100% refund, EnergyStone (136) at 80% ---
+            // Client (line 106074):
+            //   a.qigong[s].id == EnergyStone && (l = Math.floor(.8 * a.qigong[s].num))
+            // EnergyStone = 136 (client line 78651, matches ITEM.ENERGY_STONE)
+            if (totalCost._qigong && Array.isArray(totalCost._qigong)) {
+                for (var qg = 0; qg < totalCost._qigong.length; qg++) {
+                    var qgEntry = totalCost._qigong[qg];
+                    if (qgEntry._num > 0) {
+                        var qgRefund = qgEntry._num;
+                        // [BUG 8 FIX] Apply 80% reduction for EnergyStone
+                        if (String(qgEntry._id) === String(ITEM.ENERGY_STONE)) {
+                            qgRefund = Math.floor(qgEntry._num * 0.8);
+                        }
+                        if (qgRefund > 0) {
+                            changes.push(addItem(gameData, String(qgEntry._id), qgRefund));
+                        }
+                    }
+                }
+            }
+
+            // --- Hero break materials: 100% refund ---
+            if (totalCost._heroBreak && Array.isArray(totalCost._heroBreak)) {
+                for (var hb = 0; hb < totalCost._heroBreak.length; hb++) {
+                    var hbEntry = totalCost._heroBreak[hb];
+                    if (hbEntry._num > 0) {
+                        changes.push(addItem(gameData, String(hbEntry._id), hbEntry._num));
+                    }
+                }
+            }
+
+            // --- Wakeup materials: ONLY if keepStar=false ---
+            // Client (line 106062-106065):
+            //   0 == n.heroRetainStar → refund wakeUp, hero fragment at star=0
+            //   1 == n.heroRetainStar → NO wakeUp refund, hero fragment at current star
+            // [BUG 4 FIX] Was missing entirely. Now correctly conditional.
+            if (!keepStar && totalCost._wakeUp && Array.isArray(totalCost._wakeUp)) {
+                for (var wu = 0; wu < totalCost._wakeUp.length; wu++) {
+                    var wuEntry = totalCost._wakeUp[wu];
+                    if (wuEntry._num > 0) {
+                        changes.push(addItem(gameData, String(wuEntry._id), wuEntry._num));
+                    }
+                }
+            }
+
+            // Build linked heroes response BEFORE removing the hero.
+            // After removal, link references are cleaned up by removeHero().
+            // Client (line 106287): setDecomposeHeroLink(n._linkHeroes)
+            var heroLinks = buildLinkHeroesResponse(gameData, info.hid, heroData);
             if (heroLinks) {
                 for (var lk in heroLinks) {
                     linkHeroes[lk] = heroLinks[lk];
                 }
             }
 
-            // Get rebirth refund from heroRebirth.json
-            var rebirthConfig = getRebirthConfig(quality);
-            if (rebirthConfig && rebirthConfig.num > 0 && rebirthConfig.rebirthNeeded) {
-                changes.push(addItem(gameData, rebirthConfig.rebirthNeeded, rebirthConfig.num));
-                logger.info('HERO', 'reborn heroId=' + hid + ' refund: '
-                    + rebirthConfig.num + 'x item ' + rebirthConfig.rebirthNeeded);
-            }
+            // Remove old hero from roster
+            removeHero(gameData, info.hid);
 
-            if (keepStar && currentStar > 0) {
-                // keepStar = true: recreate hero at star level 1, level 1
-                // Save displayId and star before removing
-                var savedDisplayId = displayId;
-                var savedStar = currentStar;
+            // =============================================
+            // [BUG 4 & 5 FIX] Always recreate the hero.
+            // Client (line 106196-106210): _addHeroes ALWAYS contains the reborn hero.
+            // Old code only created hero when keepStar=true && star>0 — hero was LOST otherwise!
+            //
+            // keepStar=false → star=0, wakeup materials refunded (above)
+            // keepStar=true  → star=preserved, NO wakeup refund (above)
+            // =============================================
+            var newHeroId = getNextHeroId(gameData);
+            var newHero = addHero(gameData, newHeroId, info.displayId, 1);
 
-                // Remove old hero
-                removeHero(gameData, hid);
+            // [BUG 4 FIX] Set star based on keepStar flag
+            newHero._heroStar = keepStar ? info.currentStar : 0;
 
-                // Create new hero at 1 star
-                var newHeroId = getNextHeroId(gameData);
-                var newHero = addHero(gameData, newHeroId, savedDisplayId, 1);
-                newHero._heroStar = 1; // Reset to 1 star (minimum)
-                newHero._heroBaseAttr._evolveLevel = 0;
-                newHero._heroBaseAttr._level = 1;
-                newHero._heroBaseAttr.maxlevel = getMaxLevel(0, 1);
+            // [BUG 7 FIX] getMaxLevel now takes heroData object, not (evolveLevel, star).
+            // The addHero() already calls getMaxLevel internally with evolveLevel=0,
+            // but we need to recalculate with the correct star level.
+            newHero._heroBaseAttr.maxlevel = getMaxLevel(newHero);
 
-                // Add to _addHeroes response
-                addHeroes.push(newHero);
+            // Reset evolveLevel and level (addHero already sets these, but be explicit)
+            newHero._heroBaseAttr._evolveLevel = 0;
+            newHero._heroBaseAttr._level = 1;
 
-                logger.info('HERO', 'reborn keepStar heroId=' + hid + ' → new heroId=' + newHeroId);
-            } else {
-                // keepStar = false: just delete the hero
-                removeHero(gameData, hid);
-                logger.info('HERO', 'reborn delete heroId=' + hid);
-            }
+            // addHero() already initializes _totalCost as empty — this is correct
+            // because all costs were refunded above.
+
+            addHeroes.push(newHero);
+
+            logger.info('HERO', 'reborn heroId=' + info.hid + ' → new heroId=' + newHeroId
+                + ' star=' + newHero._heroStar + ' keepStar=' + keepStar
+                + ' diamondCost=' + info.diamondCost
+                + ' refunded=' + (totalCost._levelUp.length + totalCost._evolve.length
+                    + totalCost._qigong.length + totalCost._heroBreak.length
+                    + (keepStar ? 0 : totalCost._wakeUp.length)) + ' cost entries');
         }
 
+        // =============================================
+        // Build response
+        // Client removeHero callback (line 106166-106224) expects:
+        //   _changeInfo._items — material refunds
+        //   _addHeroes — array of reborn hero data
+        //   _linkHeroes — linked heroes data (or null)
+        // =============================================
         var response = {
             _changeInfo: buildChangeInfo(changes),
             _addHeroes: addHeroes
@@ -2905,7 +3332,8 @@ function actionReborn(parsed, callback) {
         }
 
         userDataService.saveUserData(userId, gameData).then(function () {
-            logger.info('HERO', 'reborn userId=' + userId + ' reborned ' + heroIds.length + ' heroes');
+            logger.info('HERO', 'reborn userId=' + userId + ' reborned '
+                + heroesToProcess.length + ' heroes, totalDiamondCost=' + totalDiamondCost);
             callback(RH.success(response));
         }).catch(function (saveErr) {
             logger.error('HERO', 'reborn save error: ' + saveErr.message);
@@ -3707,8 +4135,11 @@ function actionHeroBreak(parsed, callback) {
 
         // === VALIDATION ===
 
-        // Check quality (must be purple+)
-        var quality = getHeroQuality(heroData);
+        // [BUG 1 FIX] Use BASE quality from hero.json config, NOT evolveLevel-based.
+        // Client (line 85835): o[r].quality == n.heroLocalAttt.quality
+        // heroLocalAttt.quality is STATIC from hero.json config (line 85402).
+        // getHeroQuality() uses evolveLevel → WRONG for break cost lookup.
+        var quality = getHeroBaseQuality(heroData._heroDisplayId);
         var qIdx = getQualityIndex(quality);
         var minBreakQIdx = QUALITY_INDEX['purple'] || 4;
         if (qIdx < minBreakQIdx) {
@@ -3757,8 +4188,10 @@ function actionHeroBreak(parsed, callback) {
 
         if (isTrainComplete) {
             // === UNLOCK NEXT BREAK LEVEL ===
-            var nextBreakLevel = currentBreakLevel + 1;
-            var breakCost = getSelfBreakCost(quality, nextBreakLevel);
+            // [BUG 4 FIX] Use currentBreakLevel for cost lookup, NOT currentBreakLevel+1.
+            // Client getHeroLimitCurrentLastCostJson (line 85835): breakLevel == n.breakInfo.breakLevel
+            // selfBreakCost entry with breakLevel = X = cost to unlock tier X+1 when at tier X.
+            var breakCost = getSelfBreakCost(quality, currentBreakLevel);
 
             if (!breakCost) {
                 // Already at max break level
@@ -3829,11 +4262,12 @@ function actionHeroBreak(parsed, callback) {
 
                     if (totalPieces < selfPieceNeeded) {
                         // Refund costs
-                        if (breakCost.costNum1 > 0 && breakCost.costID1) {
-                            addItem(gameData, breakCost.costID1, breakCost.costNum1);
-                        }
-                        if (breakCost.costNum2 > 0 && breakCost.costID2) {
-                            addItem(gameData, breakCost.costID2, breakCost.costNum2);
+                        for (var ci = 1; ci <= 5; ci++) {
+                            var refundCostID = breakCost['costID' + ci];
+                            var refundCostNum = breakCost['costNum' + ci];
+                            if (refundCostID && refundCostNum > 0) {
+                                addItem(gameData, refundCostID, refundCostNum);
+                            }
                         }
                         var failAttrs3 = calculateHeroAttrs(heroData, gameData);
                         callback(RH.success({
@@ -3849,25 +4283,69 @@ function actionHeroBreak(parsed, callback) {
                     }
 
                     // Consume self pieces first, then dragon pieces
+                    // [BUG 5 FIX] Dragon pieces are consumed from dragonSoulPieceID constant.
+                    // Client (line 123660): l = s.dragonSoulPieceID
+                    // Client (line 123686): dragonPieceNum: u = selfPieceNeeded - c
                     var selfToUse = Math.min(hasPieces, selfPieceNeeded);
                     var remaining = selfPieceNeeded - selfToUse;
                     var dragonToUse = Math.min(selfPieceNum, remaining);
 
                     if (selfToUse > 0) {
                         changes.push(addItem(gameData, pieceConfig.id, -selfToUse));
+                        addTotalCostEntry(heroData, 'heroBreak', pieceConfig.id, selfToUse);
                     }
                     if (dragonToUse > 0) {
-                        // Dragon pieces consumed from the heroPiece of dragon hero
-                        // For simplicity, deduct from a generic dragon piece item
-                        // In practice, this might be from a different hero's pieces
+                        var dragonSoulPieceID = getConstant('dragonSoulPieceID');
+                        if (dragonSoulPieceID) {
+                            changes.push(addItem(gameData, dragonSoulPieceID, -dragonToUse));
+                            addTotalCostEntry(heroData, 'heroBreak', dragonSoulPieceID, dragonToUse);
+                        }
                     }
                 }
             }
 
-            // Check selfTheRedDevils requirement (for break levels 11-15)
+            // [BUG 6 FIX] Check and consume selfTheRedDevils (red soul item).
+            // Client (line 123675-123681):
+            //   m = HeroCommon.getLocalJsonHero(o.heroDisplayId)
+            //   h = m.redSoulId
+            //   p.selfTheRedDevils > getItemNum(h) → not enough
             if (breakCost.selfTheRedDevils && breakCost.selfTheRedDevils > 0) {
-                // Similar piece check for red devil materials
-                // This uses a different item — implementation depends on game design
+                var heroInfoLocal = getHeroInfo(displayId);
+                if (heroInfoLocal && heroInfoLocal.redSoulId) {
+                    if (!hasItem(gameData, heroInfoLocal.redSoulId, breakCost.selfTheRedDevils)) {
+                        // Refund all previously consumed items
+                        for (var ri = 1; ri <= 5; ri++) {
+                            var rCostID = breakCost['costID' + ri];
+                            var rCostNum = breakCost['costNum' + ri];
+                            if (rCostID && rCostNum > 0) {
+                                addItem(gameData, rCostID, rCostNum);
+                            }
+                        }
+                        var pieceConfigR = getHeroPiece(displayId);
+                        if (pieceConfigR) {
+                            var selfToUseR = Math.min(getItemCount(gameData, pieceConfigR.id), selfPieceNeeded);
+                            if (selfToUseR > 0) addItem(gameData, pieceConfigR.id, selfToUseR);
+                            var remainR = selfPieceNeeded - selfToUseR;
+                            var dragonToUseR = Math.min(selfPieceNum, remainR);
+                            if (dragonToUseR > 0) {
+                                var dragonID = getConstant('dragonSoulPieceID');
+                                if (dragonID) addItem(gameData, dragonID, dragonToUseR);
+                            }
+                        }
+                        var failAttrs6 = calculateHeroAttrs(heroData, gameData);
+                        callback(RH.success({
+                            heroId: heroId,
+                            _breakInfo: heroData._breakInfo,
+                            _baseAttr: failAttrs6._baseAttr,
+                            _totalAttr: failAttrs6._totalAttr,
+                            _changeInfo: buildChangeInfo([]),
+                            _totalCost: buildTotalCostResponse(heroData),
+                            _openType: OPEN_TYPE.TIPS
+                        }));
+                        return;
+                    }
+                    changes.push(addItem(gameData, heroInfoLocal.redSoulId, -breakCost.selfTheRedDevils));
+                }
             }
 
             // Initialize break info if needed
@@ -3876,15 +4354,20 @@ function actionHeroBreak(parsed, callback) {
             }
 
             // Advance break level
-            heroData._breakInfo._level = nextBreakLevel;
+            heroData._breakInfo._level = currentBreakLevel + 1;
 
             logger.info('HERO', 'heroBreak UNLOCK userId=' + userId + ' heroId=' + heroId
-                + ' breakLevel=' + currentBreakLevel + '→' + nextBreakLevel);
+                + ' breakLevel=' + currentBreakLevel + '→' + (currentBreakLevel + 1));
 
         } else {
             // === TRAIN WITHIN CURRENT BREAK LEVEL ===
             var nextTrainLevel = currentTrainLevel + 1;
-            var trainEntry = getSelfBreakEntry(breakType, currentBreakLevel || 1, nextTrainLevel);
+            var effectiveBreakLevel = Math.max(currentBreakLevel, 1);
+
+            // [BUG 3 FIX] Pass breakType2 for heroes with secondary break type.
+            // Client (line 85569): also checks breakType2 from heroLocalAttt config.
+            var breakType2 = heroInfo ? (heroInfo.breakType2 || null) : null;
+            var trainEntry = getSelfBreakEntry(breakType, effectiveBreakLevel, nextTrainLevel, breakType2);
 
             if (!trainEntry) {
                 // No more training nodes
@@ -3904,7 +4387,11 @@ function actionHeroBreak(parsed, callback) {
             // Check training cost (energy stones)
             if (trainEntry.costNum1 > 0 && trainEntry.costID1) {
                 var qualMul = getSelfBreakQualityMul(quality);
-                var adjustedCost = Math.floor((trainEntry.costNum1 || 0) * (qualMul.costPara || 1));
+                // [BUG 2 FIX] Use abilityPara for training cost, NOT costPara.
+                // Client getHeroLimitBreakQualityParm (line 85819-85828) returns abilityPara.
+                // Client setTrainCost (line 126362): costNum1 * breakQualityParm (abilityPara).
+                // Client checkHeroBreakLimitRedPoint (line 85851): costNum1 * abilityPara.
+                var adjustedCost = Math.floor((trainEntry.costNum1 || 0) * (qualMul.abilityPara || 1));
 
                 if (!hasItem(gameData, trainEntry.costID1, adjustedCost)) {
                     var failAttrs4 = calculateHeroAttrs(heroData, gameData);
@@ -4061,8 +4548,8 @@ function actionAutoHeroBreak(parsed, callback) {
             return;
         }
 
-        // Validation
-        var quality = getHeroQuality(heroData);
+        // Validation — [BUG 1 FIX] use BASE quality, same as heroBreak
+        var quality = getHeroBaseQuality(heroData._heroDisplayId);
         var qIdx = getQualityIndex(quality);
         if (qIdx < (QUALITY_INDEX['purple'] || 4)) {
             callback(RH.error(RH.ErrorCode.INVALID, 'Quality too low'));
@@ -4085,6 +4572,7 @@ function actionAutoHeroBreak(parsed, callback) {
         var displayId = heroData._heroDisplayId;
         var heroInfo = getHeroInfo(displayId);
         var breakType = heroInfo ? (heroInfo.breakType || 'break_damageUp') : 'break_damageUp';
+        var breakType2 = heroInfo ? (heroInfo.breakType2 || null) : null;
         var selfBreakPointLevel = getConstant('selfBreakPointLevel') || 21;
 
         var changes = [];
@@ -4102,7 +4590,8 @@ function actionAutoHeroBreak(parsed, callback) {
             if (isTrainComplete) {
                 // Try to unlock next break level
                 var nextBreakLevel = currentBreakLevel + 1;
-                var breakCost = getSelfBreakCost(quality, nextBreakLevel);
+                // [BUG 4 FIX] Use currentBreakLevel for cost lookup (matching client).
+                var breakCost = getSelfBreakCost(quality, currentBreakLevel);
 
                 if (!breakCost) {
                     stoppedReason = 'max';
@@ -4163,7 +4652,8 @@ function actionAutoHeroBreak(parsed, callback) {
                 // Train within current level
                 var nextTrainLevel = currentTrainLevel + 1;
                 var effectiveBreakLevel = Math.max(currentBreakLevel, 1);
-                var trainEntry = getSelfBreakEntry(breakType, effectiveBreakLevel, nextTrainLevel);
+                // [BUG 3 FIX] Pass breakType2 for secondary break type heroes.
+                var trainEntry = getSelfBreakEntry(breakType, effectiveBreakLevel, nextTrainLevel, breakType2);
 
                 if (!trainEntry) {
                     stoppedReason = 'max';
@@ -4171,7 +4661,8 @@ function actionAutoHeroBreak(parsed, callback) {
                 }
 
                 var qualMul = getSelfBreakQualityMul(quality);
-                var adjustedCost = Math.floor((trainEntry.costNum1 || 0) * (qualMul.costPara || 1));
+                // [BUG 2 FIX] Use abilityPara for training cost, NOT costPara.
+                var adjustedCost = Math.floor((trainEntry.costNum1 || 0) * (qualMul.abilityPara || 1));
 
                 if (!hasItem(gameData, trainEntry.costID1, adjustedCost)) {
                     stoppedReason = hasItem(gameData, trainEntry.costID1, 1) ? 'time_bonus' : 'tips';
@@ -4196,6 +4687,13 @@ function actionAutoHeroBreak(parsed, callback) {
                 });
 
                 totalBreaks++;
+
+                // [BUG 4 FIX] Also advance break level after training completion
+                var nextBreakLvl = heroData._breakInfo._level + 1;
+                var nextCheck = getSelfBreakEntry(breakType, nextBreakLvl, 1, breakType2);
+                if (nextCheck && currentTrainLevel + 1 >= selfBreakPointLevel) {
+                    heroData._breakInfo._level = nextBreakLvl;
+                }
             }
         }
 
@@ -4745,17 +5243,19 @@ function actionWakeUp(parsed, callback) {
  *   {
  *     type:"hero", action:"activeSkill",
  *     userId, heroId,
- *     pos: N,                      // potential skill slot (1 or 2)
- *     stype: SkillBasic.POTENTIAL, // skill type = 1
+ *     pos: N,                      // potential skill slot (1, 2, or 3)
+ *     stype: SkillBasic.POTENTIAL, // skill type = 4
  *     version:"1.0"
  *   }
  *
- * CLIENT CALLBACK:
- *   - HerosManager.changeSkillCallBack(t)
+ * CLIENT CALLBACK (line 120803-120807):
+ *   - HerosManager.changeSkillCallBack(t) — line 85437-85440
+ *     → setHeroPotentialSkillState(n, e._potentialLevel) — line 85504-85513
+ *     → setTotalAttrs(e, n)
  *   - UIWindowManager.openHeroAttrChange()
  *
  * POTENTIAL SKILL SYSTEM:
- *   potentialLevel.json: keyed by potentialId (heroDisplayId + "41" or "42")
+ *   potentialLevel.json: keyed by potentialId (heroDisplayId + "41", "42", or "43")
  *   Each entry is an array of level objects:
  *     { level, expID: 133, expNum, goldID: 102, goldNum, heroLevel }
  *
@@ -4765,10 +5265,15 @@ function actionWakeUp(parsed, callback) {
  *     - goldNum: gold needed (item 102)
  *     - heroLevel: minimum hero level required
  *
- *   Key format: heroDisplayId + "41" (path 1) or "42" (path 2)
+ *   Key format: heroDisplayId + "41" (path 1), "42" (path 2), "43" (path 3)
  *   Example: "120141" = hero 1201, potential path 1
  *
- *   Potential data stored on hero: _potentialLevel = { _items: [{ _pos, _level }] }
+ *   Potential data stored on hero: _potentialLevel = { "1": level, "2": level, "3": level }
+ *
+ *   hero.json config fields: potential1, potential2, potential3 (skill IDs)
+ *   Client (line 85510-85512): reads r["potential" + i] for i=1..3
+ *   Client (line 85512): addSkillDataToModel(e, s, t[i], SkillBasic.POTENTIAL)
+ *     where t = _potentialLevel, t[i] = level for slot i
  *
  * @param {object} parsed - Request data
  * @param {function} callback - Response callback
@@ -4786,8 +5291,13 @@ function actionActiveSkill(parsed, callback) {
         callback(RH.error(RH.ErrorCode.LACK_PARAM, 'Missing heroId'));
         return;
     }
-    if (!pos || pos < 1 || pos > 2) {
-        callback(RH.error(RH.ErrorCode.LACK_PARAM, 'Invalid pos (must be 1 or 2)'));
+
+    // [BUG 2 FIX] pos range is 1-3, NOT 1-2.
+    // Client (line 120794): a = n.skills.potentialSkill.indexOf(o) + 1
+    // potentialSkill can have up to 3 entries (hero.json: potential1, potential2, potential3)
+    // potentialLevel.json keys: displayId + "41", "42", "43"
+    if (!pos || pos < 1 || pos > 3) {
+        callback(RH.error(RH.ErrorCode.LACK_PARAM, 'Invalid pos (must be 1, 2, or 3)'));
         return;
     }
 
@@ -4806,20 +5316,32 @@ function actionActiveSkill(parsed, callback) {
         var displayId = heroData._heroDisplayId;
         var level = heroData._heroBaseAttr._level || 1;
 
-        // Initialize potential level structure
-        if (!heroData._potentialLevel) heroData._potentialLevel = {};
-        if (!heroData._potentialLevel._items) heroData._potentialLevel._items = [];
-
-        // Get current level for this skill position
-        var currentLevel = 0;
-        var potItems = heroData._potentialLevel._items;
-        for (var i = 0; i < potItems.length; i++) {
-            if (potItems[i]._pos == pos) {
-                currentLevel = potItems[i]._level || 0;
-                break;
+        // [BUG 1 FIX] _potentialLevel format: { "1": level, "2": level, "3": level }
+        // Client (line 85504-85513): setHeroPotentialSkillState accesses t[i] for i=1..3
+        // Client (line 86691): BattleTeam accesses i[E] for E=1..3
+        // Client (line 85417): SetHeroDataToModel passes _potentialLevel directly
+        if (!heroData._potentialLevel) {
+            heroData._potentialLevel = { "1": 0, "2": 0, "3": 0 };
+        } else if (heroData._potentialLevel._items) {
+            // MIGRATION: Convert old format if present
+            var oldItems = heroData._potentialLevel._items;
+            heroData._potentialLevel = { "1": 0, "2": 0, "3": 0 };
+            if (Array.isArray(oldItems)) {
+                for (var mi = 0; mi < oldItems.length; mi++) {
+                    var posKey = String(oldItems[mi]._pos);
+                    if (posKey === "1" || posKey === "2" || posKey === "3") {
+                        heroData._potentialLevel[posKey] = oldItems[mi]._level || 0;
+                    }
+                }
             }
         }
+        // Ensure all slots exist
+        if (heroData._potentialLevel[String(pos)] == null) {
+            heroData._potentialLevel[String(pos)] = 0;
+        }
 
+        // Get current level for this skill position
+        var currentLevel = heroData._potentialLevel[String(pos)] || 0;
         var nextLevel = currentLevel + 1;
 
         // Get potential level config
@@ -4848,7 +5370,6 @@ function actionActiveSkill(parsed, callback) {
                 _changeInfo: buildChangeInfo([]),
                 _baseAttr: maxPotAttrs._baseAttr,
                 _totalAttr: maxPotAttrs._totalAttr,
-                _totalCost: buildTotalCostResponse(heroData),
                 _openType: OPEN_TYPE.TIPS
             }));
             return;
@@ -4865,7 +5386,6 @@ function actionActiveSkill(parsed, callback) {
                 _changeInfo: buildChangeInfo([]),
                 _baseAttr: failAttrs._baseAttr,
                 _totalAttr: failAttrs._totalAttr,
-                _totalCost: buildTotalCostResponse(heroData),
                 _openType: OPEN_TYPE.TIPS
             }));
             return;
@@ -4874,7 +5394,7 @@ function actionActiveSkill(parsed, callback) {
         // === CHECK AND CONSUME COSTS ===
         var changes = [];
 
-        // Cost 1: potential experience
+        // Cost 1: potential experience (expID: 133 = ITEM.POTENTIAL_EXP)
         if (nextEntry.expID && nextEntry.expNum && nextEntry.expNum > 0) {
             if (!hasItem(gameData, nextEntry.expID, nextEntry.expNum)) {
                 var failAttrs2 = calculateHeroAttrs(heroData, gameData);
@@ -4884,7 +5404,6 @@ function actionActiveSkill(parsed, callback) {
                     _changeInfo: buildChangeInfo([]),
                     _baseAttr: failAttrs2._baseAttr,
                     _totalAttr: failAttrs2._totalAttr,
-                    _totalCost: buildTotalCostResponse(heroData),
                     _openType: hasItem(gameData, nextEntry.expID, 1)
                         ? OPEN_TYPE.TIME_BONUS : OPEN_TYPE.TIPS
                 }));
@@ -4893,7 +5412,7 @@ function actionActiveSkill(parsed, callback) {
             changes.push(addItem(gameData, nextEntry.expID, -nextEntry.expNum));
         }
 
-        // Cost 2: gold
+        // Cost 2: gold (goldID: 102 = ITEM.GOLD)
         if (nextEntry.goldID && nextEntry.goldNum && nextEntry.goldNum > 0) {
             if (!hasItem(gameData, nextEntry.goldID, nextEntry.goldNum)) {
                 // Refund exp if already consumed
@@ -4907,7 +5426,6 @@ function actionActiveSkill(parsed, callback) {
                     _changeInfo: buildChangeInfo([]),
                     _baseAttr: failAttrs3._baseAttr,
                     _totalAttr: failAttrs3._totalAttr,
-                    _totalCost: buildTotalCostResponse(heroData),
                     _openType: hasItem(gameData, nextEntry.goldID, 1)
                         ? OPEN_TYPE.TIME_BONUS : OPEN_TYPE.TIPS
                 }));
@@ -4917,17 +5435,8 @@ function actionActiveSkill(parsed, callback) {
         }
 
         // === UPDATE POTENTIAL LEVEL ===
-        var found = false;
-        for (var k = 0; k < heroData._potentialLevel._items.length; k++) {
-            if (heroData._potentialLevel._items[k]._pos == pos) {
-                heroData._potentialLevel._items[k]._level = nextLevel;
-                found = true;
-                break;
-            }
-        }
-        if (!found) {
-            heroData._potentialLevel._items.push({ _pos: pos, _level: nextLevel });
-        }
+        // [BUG 1 FIX] Set level directly on _potentialLevel[pos], NOT via _items array.
+        heroData._potentialLevel[String(pos)] = nextLevel;
 
         // === BUILD RESPONSE ===
         var attrs = calculateHeroAttrs(heroData, gameData);
@@ -4938,8 +5447,7 @@ function actionActiveSkill(parsed, callback) {
             _potentialLevel: heroData._potentialLevel,
             _changeInfo: buildChangeInfo(changes),
             _baseAttr: attrs._baseAttr,
-            _totalAttr: attrs._totalAttr,
-            _totalCost: buildTotalCostResponse(heroData)
+            _totalAttr: attrs._totalAttr
         };
 
         if (linkHeroes) response._linkHeroes = linkHeroes;
@@ -5806,9 +6314,28 @@ function migrateHeroData(heroData) {
     if (!heroData._superSkillLevel) heroData._superSkillLevel = {};
     if (!heroData._potentialLevel) heroData._potentialLevel = {};
 
-    // Ensure _potentialLevel has _items array
-    if (heroData._potentialLevel && !heroData._potentialLevel._items) {
-        heroData._potentialLevel._items = [];
+    // Ensure _potentialLevel exists with correct format: { "1": level, "2": level, "3": level }
+    // Client (line 85504-85513): setHeroPotentialSkillState accesses t[i] for i=1,2,3
+    // Client (line 86691): BattleTeam accesses i[E] for E=1,2,3
+    if (!heroData._potentialLevel) {
+        heroData._potentialLevel = { "1": 0, "2": 0, "3": 0 };
+    } else if (heroData._potentialLevel._items) {
+        // MIGRATION: Convert old { _items: [{ _pos, _level }] } format to new { "1": level, ... }
+        var oldItems = heroData._potentialLevel._items;
+        heroData._potentialLevel = { "1": 0, "2": 0, "3": 0 };
+        if (Array.isArray(oldItems)) {
+            for (var mi = 0; mi < oldItems.length; mi++) {
+                var posKey = String(oldItems[mi]._pos);
+                if (posKey === "1" || posKey === "2" || posKey === "3") {
+                    heroData._potentialLevel[posKey] = oldItems[mi]._level || 0;
+                }
+            }
+        }
+    } else {
+        // Ensure all 3 slots exist
+        if (heroData._potentialLevel["1"] == null) heroData._potentialLevel["1"] = 0;
+        if (heroData._potentialLevel["2"] == null) heroData._potentialLevel["2"] = 0;
+        if (heroData._potentialLevel["3"] == null) heroData._potentialLevel["3"] = 0;
     }
 
     // Ensure _heroTag is array
