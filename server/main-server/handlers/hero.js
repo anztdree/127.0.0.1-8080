@@ -2190,27 +2190,16 @@ function getLevelUpCost(currentLevel, quality) {
  *   { type:"hero", action:"getAttrs", userId, heros:[heroId,...], version:"1.0" }
  *
  * CLIENT CALLBACK — HerosManager.getAttrsCallBack (line 85141):
- *   - Iterates t._attrs by hero position index
- *   - For each hero: sets _totalAttr and _baseAttr on the hero model
- *   - Response format:
- *     {
- *       _attrs: { [heroId]: { _items: [{ _id, _num }] } },    // total attrs
- *       _baseAttrs: { [heroId]: { _items: [{ _id, _num }] } }  // base attrs
- *     }
+ *   - Iterates t._attrs with `for (var o in t._attrs)`
+ *   - Uses `n.getHero(e[o])` where e=heroIdList (array) and o=iteration key
+ *   - When _attrs is an ARRAY: o="0","1",... → e[0]=heroId[0] (CORRECT)
+ *   - When _attrs is an OBJECT keyed by heroId: o="22" → e["22"]=undefined (BUG!)
  *
- * IMPORTANT: The _attrs and _baseAttrs are indexed by heroId STRING.
- * The client iterates the heroIdList array and accesses response._attrs[o]
- * where o is the index position, BUT the response is actually keyed by heroId.
- * Looking more carefully at the callback:
- *   for (var o in t._attrs) → iterates keys of _attrs object
- *   n.getHero(e[o]) → e is the heroIdList, o is the key from _attrs
- * So _attrs is keyed by heroId (string), and e[o] means heroIdList[heroId] which is wrong.
- * Actually, re-reading: "for (var o in t._attrs)" gives keys which are heroId strings.
- * "n.getHero(e[o])" where e is heroIdList and o is heroId → e[heroId] would be undefined.
- * The actual code likely does: n.getHero(o) or the iteration is different.
- *
- * CORRECT: _attrs and _baseAttrs are keyed by heroId string.
- *   _attrs: { "123": { _items: [...] }, "456": { _items: [...] } }
+ * CRITICAL FIX: _attrs and _baseAttrs MUST be ARRAYS (not objects) to match
+ * the client's e[o] index-based lookup pattern.
+ *   Correct format:
+ *     _attrs: [{ _items: [{ _id, _num }] }, ...],       // indexed by position
+ *     _baseAttrs: [{ _items: [{ _id, _num }] }, ...]     // indexed by position
  *
  * @param {object} parsed - Request data
  * @param {function} callback - Response callback
@@ -2221,7 +2210,7 @@ function actionGetAttrs(parsed, callback) {
 
     // Validate input
     if (!heroIds || !Array.isArray(heroIds) || heroIds.length === 0) {
-        callback(RH.success({ _attrs: {}, _baseAttrs: {} }));
+        callback(RH.success({ _attrs: [], _baseAttrs: [] }));
         return;
     }
 
@@ -2231,12 +2220,16 @@ function actionGetAttrs(parsed, callback) {
         .then(function (gameData) {
             if (!gameData) {
                 logger.warn('HERO', 'getAttrs userId=' + userId + ' user not found');
-                callback(RH.success({ _attrs: {}, _baseAttrs: {} }));
+                callback(RH.success({ _attrs: [], _baseAttrs: [] }));
                 return;
             }
 
-            var attrs = {};
-            var baseAttrs = {};
+            // BUGFIX: Use ARRAYS instead of objects.
+            // Client callback iterates `for (var o in t._attrs)` and uses `e[o]` to look up
+            // the heroId from the original request array. When _attrs is an array,
+            // o="0","1",... which correctly maps to heroIdList[0], heroIdList[1], etc.
+            var attrs = [];
+            var baseAttrs = [];
 
             // Calculate attributes for each requested hero
             for (var i = 0; i < heroIds.length; i++) {
@@ -2245,12 +2238,12 @@ function actionGetAttrs(parsed, callback) {
 
                 if (heroData) {
                     var calculated = calculateHeroAttrs(heroData, gameData);
-                    attrs[hid] = calculated._totalAttr;
-                    baseAttrs[hid] = calculated._baseAttr;
+                    attrs.push(calculated._totalAttr);
+                    baseAttrs.push(calculated._baseAttr);
                 } else {
                     // Hero not found — return empty attrs
-                    attrs[hid] = { _items: [] };
-                    baseAttrs[hid] = { _items: [] };
+                    attrs.push({ _items: [] });
+                    baseAttrs.push({ _items: [] });
                 }
             }
 
@@ -2258,7 +2251,7 @@ function actionGetAttrs(parsed, callback) {
         })
         .catch(function (err) {
             logger.error('HERO', 'getAttrs error userId=' + userId + ': ' + err.message);
-            callback(RH.success({ _attrs: {}, _baseAttrs: {} }));
+            callback(RH.success({ _attrs: [], _baseAttrs: [] }));
         });
 }
 
