@@ -220,7 +220,9 @@ function generateNewUserData(userId, nickName, serverId) {
         weapon: { _items: {} },
 
         // genki (line 77705): genkiDataModel.deserialize(e.genki)
-        genki: null,
+        // Guarded: e.genki && t.genkiDataModel.deserialize(e.genki)
+        // GenkiItem reads: _level, _heroId, _heroDisplayId, _timeType, _finishTime
+        genki: {_items: []},
 
         // heros (line 77687): HerosManager.readByData(e.heros)
         // Reads e.heros._heros as {[heroId]: {hero data}}
@@ -230,7 +232,8 @@ function generateNewUserData(userId, nickName, serverId) {
         superSkill: { _skills: {} },
 
         // heroSkin (line 77686): HeroSkinModel.setSkinsWithServerData(e.heroSkin)
-        heroSkin: null,
+        // Guarded: e.heroSkin &&  ... reads _skins, _curSkin
+        heroSkin: {_skins: {}, _curSkin: {}},
 
         // scheduleInfo (line 58004-58006): AllRefreshCount.initData(e.scheduleInfo)
         // ALL fields below are read from e.scheduleInfo in initData().
@@ -337,40 +340,49 @@ function generateNewUserData(userId, nickName, serverId) {
         },
 
         // checkin (line 77702-77703): WelfareInfoManager.setSignInInfo(e.checkin)
-        checkin: null,
+        // Guarded: e.checkin && WelfareInfoManager.setSignInInfo(e.checkin)
+        checkin: {_activeItem: [], _curCycle: 1, _maxActiveDay: 1, _lastActiveDate: ''},
 
         // monthCard (line 77651): WelfareInfoManager.setMonthCardInfo(e.monthCard)
-        monthCard: null,
+        // Guarded: e.monthCard &&  ... CardItem reads _endTime
+        monthCard: {_id: '', _card: {}},
 
         // recharge (line 77652): WelfareInfoManager.setRechargeInfo(e.recharge)
-        recharge: null,
+        // Guarded: e.recharge &&  ... iterates _haveBought
+        recharge: {_id: '', _haveBought: {}},
 
         // vipLog: WelfareInfoManager.setVipLogList(e.vipLog)
-        vipLog: null,
+        // Guarded: e.vipLog &&  ... iterates array of SummonLog
+        vipLog: [],
 
         // cardLog: WelfareInfoManager.setMonthCardLogList(e.cardLog)
-        cardLog: null,
+        // Guarded: e.cardLog &&  ... iterates array of CardLog
+        cardLog: [],
 
         // timeBonusInfo: TimeLimitGiftBagManager.setTimeLimitGiftBag(e.timeBonusInfo)
-        timeBonusInfo: null,
+        // Guarded: e.timeBonusInfo &&  ... BonusItem reads _endTime, _giftID, _isBuy, _buyRemian, _thingsId
+        timeBonusInfo: {_id: '', _timeBonus: {}},
 
         // userDownloadReward: contains _isClick, _haveGotDlReward, _isBind, _haveGotBindReward
-        userDownloadReward: null,
+        // Guarded: e.userDownloadReward &&  ... _isClick and _haveGotDlReward use || !1 fallback
+        userDownloadReward: {_isClick: false, _haveGotDlReward: false, _isBind: false, _haveGotBindReward: false},
 
         // channelSpecial (line 77689): WelfareInfoManager.channelSpecial = e.channelSpecial
-        channelSpecial: null,
+        // Guarded: e.channelSpecial &&  ... reads _honghuUrl, _honghuUrlStartTime, _honghuUrlEndTime
+        channelSpecial: {_show: false, _vip: 0, _hideHeroes: [], _honghuUrl: '', _honghuUrlStartTime: 0, _honghuUrlEndTime: 0},
 
         // hideHeroes: WelfareInfoManager.setHideHeroes(e.hideHeroes)
-        hideHeroes: null,
+        // Guarded: e.hideHeroes &&  ... iterates array
+        hideHeroes: [],
 
         // enableShowQQ, showQQVip, showQQ, showQQImg1, showQQImg2, showQQUrl
         // QQ platform-specific fields
         enableShowQQ: false,
         showQQVip: false,
         showQQ: false,
-        showQQImg1: null,
-        showQQImg2: null,
-        showQQUrl: null,
+        showQQImg1: '',
+        showQQImg2: '',
+        showQQUrl: '',
 
         // ==========================================
         // GUILD / TEAM FIELDS
@@ -383,19 +395,22 @@ function generateNewUserData(userId, nickName, serverId) {
         userGuildPub: null,
 
         // guildLevel (line 77716): TeamInfoManager.setMyTeamLevel(e.guildLevel)
-        guildLevel: null,
+        guildLevel: 0,
 
         // guildTreasureMatchRet: GuildTreasureManager.setTreasureMatchState()
-        guildTreasureMatchRet: null,
+        guildTreasureMatchRet: 0,
 
         // guildName (line): TeamInfoManager.setTeamName(e.guildName)
-        guildName: null,
+        // Direct assignment: this.myTeamInfo._name = e
+        guildName: '',
 
         // guildActivePoints: TeamInfoManager.setActivePoints(e.guildActivePoints)
-        guildActivePoints: null,
+        // Guarded: e.guildActivePoints &&  ... iterates {[type]: number}
+        guildActivePoints: {},
 
         // teamTraining: TeamTrainingManager.saveTeamTraining(e.teamTraining)
-        teamTraining: null,
+        // Guarded: e.teamTraining &&  ... reads _levels, _unlock, _version
+        teamTraining: {_levels: {}, _unlock: false, _version: ''},
 
         // ==========================================
         // ARENA / PVP FIELDS
@@ -403,11 +418,13 @@ function generateNewUserData(userId, nickName, serverId) {
 
         // _arenaTeam (line 77656): AltarInfoManger.setArenaTeamInfo(e._arenaTeam)
         // NOTE: Leading underscore - client reads e._arenaTeam directly
-        _arenaTeam: null,
+        // Guarded: e._arenaTeam && AltarInfoManger.setArenaTeamInfo(e._arenaTeam)
+        _arenaTeam: {},
 
         // _arenaSuper (line 77657): AltarInfoManger.setArenaSuperInfo(e._arenaSuper)
         // NOTE: Leading underscore - client reads e._arenaSuper directly
-        _arenaSuper: null,
+        // Guarded: e._arenaSuper && AltarInfoManger.setArenaSuperInfo(e._arenaSuper)
+        _arenaSuper: [],
 
         // lastTeam (line 77661): reads e.lastTeam._lastTeamInfo -> firstLoginSetMyTeam()
         // Line 62326-62342: firstLoginSetMyTeam iterates keys, creates LastTeamInfo per type
@@ -435,57 +452,68 @@ function generateNewUserData(userId, nickName, serverId) {
         // ==========================================
 
         // expedition (line 77669): ExpeditionManager.setExpeditionModel(e.expedition)
-        expedition: null,
+        // Guarded: e.expedition &&  ... reads _passLesson, _machines, _collection, _teams, _times
+        expedition: {_passLesson: 0, _machines: {}, _collection: [], _teams: {}, _times: 10},
 
         // teamDungeon: TeamworkManager.setLoginInfo(e.teamDungeon)
-        teamDungeon: null,
+        // Guarded: e.teamDungeon &&  ... reads _myTeam, _canCreateTeamTime, _nextCanJoinTime
+        teamDungeon: {_myTeam: '', _canCreateTeamTime: 0, _nextCanJoinTime: 0},
 
         // teamServerHttpUrl: TeamworkManager.teamServerHttpUrl
-        // From ts.loginInfo.serverItem.dungeonurl (not from enterGame response)
-        teamServerHttpUrl: null,
+        // Guarded: e.teamServerHttpUrl &&  ... string URL
+        teamServerHttpUrl: '',
 
         // teamDungeonOpenTime: TeamworkManager.teamDungeonOpenTime
-        teamDungeonOpenTime: null,
+        // Guarded: e.teamDungeonOpenTime != null
+        teamDungeonOpenTime: 0,
 
         // teamDungeonTask: TeamworkManager.teamDungeonTask.deserialize(e.teamDungeonTask)
-        teamDungeonTask: null,
+        // Guarded: e.teamDungeonTask &&  ... reads _achievement, _daily, _dailyRefreshTime
+        teamDungeonTask: {_achievement: {}, _daily: {}, _dailyRefreshTime: 0},
 
         // teamDungeonSplBcst: SetTeamDungeonBroadcast(e.teamDungeonSplBcst, true)
-        teamDungeonSplBcst: null,
+        // Guarded: e.teamDungeonSplBcst &&  ... iterates object
+        teamDungeonSplBcst: {},
 
         // teamDungeonNormBcst: SetTeamDungeonBroadcast(e.teamDungeonNormBcst, false)
-        teamDungeonNormBcst: null,
+        // Guarded: e.teamDungeonNormBcst &&  ... iterates object
+        teamDungeonNormBcst: {},
 
         // teamDungeonHideInfo: TeamworkManager.setTeamDungeonHideInfo(e.teamDungeonHideInfo)
-        teamDungeonHideInfo: null,
+        // Guarded: e.teamDungeonHideInfo &&  ... object
+        teamDungeonHideInfo: {},
 
         // teamDungeonInvitedFriends: TeamworkManager.teamDungeonInvitedFriends
-        teamDungeonInvitedFriends: null,
+        // Guarded: e.teamDungeonInvitedFriends &&  ... array of user IDs
+        teamDungeonInvitedFriends: [],
 
         // myTeamServerSocketUrl: ts.loginInfo.serverItem.dungeonurl
-        // NOTE: This comes from loginInfo, NOT enterGame response
-        // But client may still read it from response, include as null
-        myTeamServerSocketUrl: null,
+        // Guarded: e.myTeamServerSocketUrl &&  ... string URL
+        myTeamServerSocketUrl: '',
 
         // ==========================================
         // TRIAL / TOWER FIELDS
         // ==========================================
 
         // templeLess: TrialManager.setTempleLess(e.templeLess)
-        templeLess: null,
+        // Guarded: e.templeLess != null
+        templeLess: 0,
 
         // timeTrial: SpaceTrialManager.setSpaceTrialModel(e.timeTrial, e.timeTrialNextOpenTime)
-        timeTrial: null,
+        // Guarded: e.timeTrial &&  ... reads _levelStars, _totalStars, _haveTimes, _startTime
+        timeTrial: {_levelStars: {}, _totalStars: 0, _haveTimes: 0, _startTime: 0, _openDays: ''},
 
         // timeTrialNextOpenTime: (see above)
-        timeTrialNextOpenTime: null,
+        // Guarded: e.timeTrialNextOpenTime != null
+        timeTrialNextOpenTime: 0,
 
         // gravity: TrialManager.setGravityTrialInfo(e) -- reads e.gravity from full response
-        gravity: null,
+        // Guarded: e.gravity &&  ... GravityTrialModel reads _id, _haveTimes, _timesStartRecover, _lastLess, _lastTime
+        gravity: {_id: '', _haveTimes: 0, _timesStartRecover: 0, _lastLess: 0, _lastTime: 0},
 
         // littleGame: LittleGameManager.saveData(e.littleGame)
-        // Reads _gotBattleReward, _gotChapterReward, _clickTime
-        littleGame: null,
+        // Guarded: e.littleGame &&  ... reads _gotBattleReward, _gotChapterReward, _clickTime
+        littleGame: {_gotBattleReward: {}, _gotChapterReward: {}, _clickTime: 0},
 
         // cellgameHaveSetHero: scheduleInfo._cellgameHaveSetHero = e.cellgameHaveSetHero
         // Top-level boolean field
@@ -496,34 +524,46 @@ function generateNewUserData(userId, nickName, serverId) {
         // Source: UserDataParser reads e.globalWarBuffTag etc. directly
         // ==========================================
 
-        globalWarBuffTag: null,
-        globalWarLastRank: null,
-        globalWarBuff: null,
-        globalWarBuffEndTime: null,
+        // Guarded: read by setOnHook() as e.globalWarBuffTag etc.
+        globalWarBuffTag: '',
+        globalWarLastRank: {},
+        globalWarBuff: 0,
+        globalWarBuffEndTime: 0,
 
         // ==========================================
         // BALL WAR FIELDS
         // ==========================================
 
-        userBallWar: null,
-        ballWarState: null,
-        ballBroadcast: null,
-        ballWarInfo: null,
+        // userBallWar: TeamInfoManager.UserBallWar = e.userBallWar
+        // Guarded: e.userBallWar &&
+        userBallWar: {_times: 0, _fieldId: '', _nextCanFightTime: 0, _history: {}, _score: 0, _rank: 0},
+        // ballWarState: TeamInfoManager.BallWarState = e.ballWarState
+        ballWarState: 0,
+        // ballBroadcast: TeamInfoManager.setBallWarBrodecast(e.ballBroadcast)
+        // Guarded: e.ballBroadcast &&  ... treats as array
+        ballBroadcast: [],
+        // ballWarInfo: GuildBallWarInfo.deserialize(e.ballWarInfo)
+        // Guarded: e.ballWarInfo &&  ... Serializable: _signed, _fieldId, _point, _topMsg
+        ballWarInfo: {_signed: false, _fieldId: '', _point: 0, _topMsg: ''},
 
         // ==========================================
         // TOP BATTLE FIELDS
         // ==========================================
 
-        topBattleInfo: null,
-        userTopBattle: null,
+        // topBattleInfo: TopBattleManager.setTopBattleLoginInfo(e) reads e.topBattleInfo
+        // Guarded: e.topBattleInfo &&
+        topBattleInfo: {_stage: 0, _season: 0, _stageFinishTime: 0, _areaId: 0, _point: 0, topBattleInfo: null, topUserInfo: {}, lastChampion: null},
+        // userTopBattle: TopBattleManager.setTopBattleLoginInfo(e) reads e.userTopBattle
+        // Guarded: e.userTopBattle &&
+        userTopBattle: {_id: '', _teams: {}, _teamTag: '', _records: [], _history: [], _bet: {}, _gotRankReward: []},
 
         // summonLog (line 61545-61551): SummonSingleton.setSummomLogList(e)
-        // Reads e.summonLog -> array of SummonLog objects
-        summonLog: null,
+        // Guarded: e.summonLog &&  ... iterates array of SummonLog objects
+        summonLog: [],
 
         // blacklist (line 58622-58625): BroadcastSingleton.setBlacklistPlayerInfo(e)
-        // Reads e.blacklist -> array of player info objects
-        blacklist: null,
+        // Guarded: e.blacklist &&  ... iterates array
+        blacklist: [],
 
         // ==========================================
         // MISC GAME FIELDS
@@ -539,80 +579,102 @@ function generateNewUserData(userId, nickName, serverId) {
         dragonEquiped: {},
 
         // timesInfo (line 77653): TimesInfoSingleton.initData(e.timesInfo)
-        timesInfo: null,
+        // Guarded: e.timesInfo &&  ... reads templeTimes, mineSteps, karinFeet, mahaTimes, etc.
+        timesInfo: {templeTimes: 10, mineSteps: 0, karinFeet: 5, mahaTimes: 0, marketRefreshTimes: 0, mahaGoldBuyCount: 0, treasureTimes: 0, mahaInviteCount: 0, mahaRecoverBuyCount: 0, mahaRecoverTimes: 0},
 
         // guide (line 77654): GuideInfoManager.setGuideInfo(e.guide)
-        guide: null,
+        // Guarded: e.guide &&  ... reads _id, _steps
+        guide: {_id: '', _steps: {}},
 
         // timeMachine (line 77655): TimeLeapSingleton.initData(e.timeMachine)
-        timeMachine: null,
+        // Guarded: e.timeMachine &&  ... TimeMachineItem reads _level, _heroId, _heroDisplayId, _timeType, _finishTime
+        timeMachine: {_items: {}},
 
         // gemstone: EquipInfoManager.saveGemStone(e) reads e.gemstone._items
-        gemstone: null,
+        // Guarded: e.gemstone &&  ... iterates e.gemstone._items with for(var n in ...)
+        gemstone: {_items: {}},
 
         // resonance (line 77675): HerosManager.setResonanceModel(e.resonance)
-        resonance: null,
+        // Guarded: e.resonance &&  ... ResonanceModel: _id, _diamondCabin, _cabins, _buySeatCount, _totalTalent, _unlockSpecial
+        resonance: {_id: '', _diamondCabin: 0, _cabins: {}, _buySeatCount: 0, _totalTalent: 0, _unlockSpecial: false},
 
         // fastTeam (line 77676): HerosManager.saveLoginFastTeam(e.fastTeam)
-        fastTeam: null,
+        // Guarded: e.fastTeam &&  ... iterates e._teamInfo with for(var n in ...)
+        // FastTeam constructor: team={}, superSkill=[], name=""
+        fastTeam: {_teamInfo: {}},
 
         // battleMedal (line 77672): BattleMedalManager.setBattleMedal(e.battleMedal)
-        battleMedal: null,
+        // Guarded: e.battleMedal &&
+        battleMedal: {_battleMedalId: '', _cycle: 1, _level: 0, _curExp: 0, _openSuper: false, _skillLevel: 0, _haveUseTimes: 0, _buyTimes: 0, _totalMedal: 0, _buyMedal: 0, _todayGetMedal: 0},
 
         // retrieve: GetBackReourceManager.setRetrieveModel(e.retrieve)
-        retrieve: null,
+        // Guarded: e.retrieve &&
+        retrieve: {_finishDungeons: {}, _calHangupTime: 0, _retrieveHangupTime: 0, _dungeonBuyTime: 0, _haveRetrieveDungeons: {}},
 
         // training: PadipataInfoManager.setPadipataModel(e.training)
-        training: null,
+        // Guarded: e.training &&
+        training: {_type: 0, _cfgId: 0, _times: 10, _timesStartRecover: 0, _recoverTime: 0, _padipataHeroList: {}, _isFinish: false, _lastTime: 0},
 
         // warInfo: GlobalWarManager.setWarLoginInfo(e.warInfo)
+        // Guarded: e.warInfo &&
         warInfo: null,
 
         // userWar: GlobalWarManager.setUserWarModel(e.userWar)
-        userWar: null,
+        // Guarded: e.userWar &&
+        userWar: {_session: 0, _worldId: 0, _areaId: 0, _auditionWinCount: 0, _bet: {}, _auditionPoint: 0, _auditionMaxPoint: 0, _auditionBattleTimes: 0, _isChampion: false},
 
         // headEffect: new HeadEffectModel; r.deserialize(e.headEffect)
-        headEffect: null,
+        // Guarded: e.headEffect &&
+        headEffect: {_curBox: 0, _curEffect: 0, _effects: []},
 
         // questionnaires: UserInfoSingleton.setQuestData(e.questionnaires)
-        questionnaires: null,
+        // Guarded: e.questionnaires &&
+        questionnaires: {},
 
         // YouTuberRecruit: contains _hidden field
-        YouTuberRecruit: null,
+        // Guarded: e.YouTuberRecruit &&
+        YouTuberRecruit: {_id: 'YouTuberRecruitPlan', _image: '', _reward: {}, _jumpLink: '', _hidden: true},
 
         // userYouTuberRecruit: YouTuberModel.initUserInfo(e.userYouTuberRecruit)
-        userYouTuberRecruit: null,
+        // Guarded: e.userYouTuberRecruit &&
+        userYouTuberRecruit: {_hasJoin: false, _gotReward: false, _joinTime: 0},
 
         // forbiddenChat: BroadcastSingleton.setUserBidden(e.forbiddenChat)
-        forbiddenChat: null,
+        // Guarded: e.forbiddenChat &&
+        forbiddenChat: {users: [], finishTime: {}},
 
         // shopNewHeroes: ShopInfoManager.shopNewHeroes = e.shopNewHeroes
-        shopNewHeroes: null,
+        // Direct assignment (not guarded, but object is safe)
+        shopNewHeroes: {},
 
         // ==========================================
         // SERVER INFO FIELDS
         // ==========================================
 
         // serverVersion: UserInfoSingleton.serverVersion = e.serverVersion
-        serverVersion: null,
+        // Set by enterGame handler from configModule.config.version
+        serverVersion: '',
 
         // serverOpenDate (line 77724): UserInfoSingleton.setServerOpenDate(e.serverOpenDate)
         serverOpenDate: now,
 
         // heroImageVersion: UserInfoSingleton.heroImageVersion = e.heroImageVersion
-        heroImageVersion: null,
+        heroImageVersion: 0,
 
         // superImageVersion: UserInfoSingleton.superImageVersion = e.superImageVersion
-        superImageVersion: null,
+        superImageVersion: 0,
 
         // onlineBulletin: BulletinSingleton.setBulletInfo(e.onlineBulletin)
-        onlineBulletin: null,
+        // Guarded: e.onlineBulletin &&
+        onlineBulletin: [],
 
         // karinStartTime: TowerDataManager.setKarinTime(e.karinStartTime, e.karinEndTime)
-        karinStartTime: null,
+        // Set by enterGame handler from server config
+        karinStartTime: 0,
 
         // karinEndTime: (see above)
-        karinEndTime: null,
+        // Set by enterGame handler from server config
+        karinEndTime: 0,
     };
 }
 
