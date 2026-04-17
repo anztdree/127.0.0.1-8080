@@ -1584,96 +1584,137 @@ function calculateHeroAttrs(heroData, gameData) {
     // === STEP 12: EnergyMax from hero.json ===
     var heroEnergyMax = (heroInfo && heroInfo.energyMax) ? heroInfo.energyMax : 0;
 
-    // === Build _baseAttr._items (numeric IDs, NO talent on hp/attack) ===
-    var baseItems = [];
-    baseItems.push({ _id: 0, _num: Math.round(baseHP) });       // hp (WITHOUT talent)
-    baseItems.push({ _id: 1, _num: Math.round(baseAttack) });    // attack (WITHOUT talent)
-    baseItems.push({ _id: 2, _num: Math.round(baseArmor) });     // armor
-    baseItems.push({ _id: 3, _num: Math.round(baseSpeed) });     // speed
-    baseItems.push({ _id: 30, _num: Math.round(totalTalent * 100) / 100 });  // talent
-    baseItems.push({ _id: 41, _num: heroEnergyMax });            // energyMax
+    // === Build _baseAttr._items — Object keyed by string ID ===
+    // HAR format: {"0": {_id:0, _num:...}, "1": {_id:1, _num:...}, ...}
+    // Client setBaseAttr iterates with for(var a in n) — works with both Array and Object.
+    // Original server sends ALL 35 IDs (0-15, 23-41), even when 0.
+    // IDs 16-22 are NEVER in _baseAttrs (only in _attrs per HAR analysis of 26 heroes).
+    var baseObj = {};
 
-    // === Build _totalAttr._items (all non-zero attributes) ===
-    // [BUG 1 FIX] Add hero.json base stats to totalAttr.
-    // Client makeHeroBasicAttr (line 78577) adds these from hero.json config:
-    //   hit, dodge, block, damageReduce, armorBreak, controlResist,
-    //   skillDamage, criticalDamage, blockEffect, critical, criticalResist,
-    //   trueDamage, healPlus, healerPlus, talent
-    // These are STATIC values from the hero template, added directly to totalAttr.
-    var totalDict = {};
-    totalDict['hp'] = totalHP;
-    totalDict['attack'] = totalAttack;
-    totalDict['armor'] = totalArmor;
-    totalDict['speed'] = totalSpeed;
-    totalDict['power'] = zPower;
-    totalDict['energyMax'] = heroEnergyMax;
+    // IDs 0-3: Core base stats (hp/attack WITHOUT talent multiplier)
+    baseObj['0'] = { _id: 0, _num: Math.round(baseHP) };
+    baseObj['1'] = { _id: 1, _num: Math.round(baseAttack) };
+    baseObj['2'] = { _id: 2, _num: Math.round(baseArmor) };
+    baseObj['3'] = { _id: 3, _num: Math.round(baseSpeed) };
 
-    // Add static base stats from hero.json config
-    if (heroInfo) {
-        var BASE_STAT_FIELDS = [
-            'hit', 'dodge', 'block', 'damageReduce', 'armorBreak',
-            'controlResist', 'skillDamage', 'criticalDamage', 'blockEffect',
-            'critical', 'criticalResist', 'trueDamage', 'healPlus', 'healerPlus'
-        ];
-        for (var bsi = 0; bsi < BASE_STAT_FIELDS.length; bsi++) {
-            var bsf = BASE_STAT_FIELDS[bsi];
-            var bsv = heroInfo[bsf];
-            if (bsv != null && bsv !== 0) {
-                addAttrToDict(totalDict, bsf, bsv);
-            }
-        }
-        // Talent is handled separately (included in baseItems and multiplied into hp/attack)
-        // But also added to totalAttr for display
-        if (heroInfo.talent != null && heroInfo.talent !== 0) {
-            addAttrToDict(totalDict, 'talent', totalTalent);
+    // IDs 4-15: Combat stats from hero.json (hit, dodge, block, etc.)
+    // hero.json doesn't have these fields for basic heroes — always 0.
+    // Using ABILITY_NAME for correct numeric ID mapping (not sequential index).
+    var BASE_COMBAT_FIELDS = [
+        'hit', 'dodge', 'block', 'blockEffect',
+        'skillDamage', 'critical', 'criticalResist',
+        'criticalDamage', 'armorBreak', 'damageReduce',
+        'controlResist', 'trueDamage'
+    ];
+    for (var bci = 0; bci < BASE_COMBAT_FIELDS.length; bci++) {
+        var bcf = BASE_COMBAT_FIELDS[bci];
+        var bcId = ABILITY_NAME[bcf];
+        if (bcId !== undefined) {
+            baseObj[String(bcId)] = {
+                _id: bcId,
+                _num: (heroInfo && heroInfo[bcf]) ? heroInfo[bcf] : 0
+            };
         }
     }
 
-    // Add passive attributes (except hp/attack/armor which are already included)
-    var passKeys = Object.keys(passiveAttrs);
-    for (var pk2 = 0; pk2 < passKeys.length; pk2++) {
-        var pkey = passKeys[pk2];
-        if (pkey === 'hp' || pkey === 'attack' || pkey === 'armor') continue;
-        addAttrToDict(totalDict, pkey, passiveAttrs[pkey]);
+    // IDs 23-41: Extended base stats (all 0 for basic heroes, except talent & energyMax)
+    for (var bext = 23; bext <= 41; bext++) {
+        var bextName = ATTR_ID_NAME[bext] || '';
+        var bextVal = 0;
+        if (heroInfo && bextName) bextVal = heroInfo[bextName] || 0;
+        if (bext === 30) bextVal = Math.round(totalTalent * 100) / 100;  // talent
+        if (bext === 41) bextVal = heroEnergyMax;                        // energyMax
+        baseObj[String(bext)] = { _id: bext, _num: bextVal };
     }
 
-    // Add break attributes (except hp/attack/armor which are already included)
-    var breakKeys = Object.keys(breakAttrs);
-    for (var bk = 0; bk < breakKeys.length; bk++) {
-        var bkey = breakKeys[bk];
-        if (bkey === 'hp' || bkey === 'attack' || bkey === 'armor') continue;
-        addAttrToDict(totalDict, bkey, breakAttrs[bkey]);
-    }
+    // === Build _totalAttr._items — Object keyed by string ID ===
+    // HAR has ALL 42 IDs (0-41) in _attrs for every hero, even when value is 0.
+    // Client setTotalAttrs iterates with for(var c in o) — works with Object format.
+    var totalObj = {};
 
-    // Convert totalDict to _items array with numeric IDs
-    var totalItems = [];
-    var totalDictKeys = Object.keys(totalDict);
-    for (var ti = 0; ti < totalDictKeys.length; ti++) {
-        var tName = totalDictKeys[ti];
-        var tVal = totalDict[tName];
-        if (tVal == null || tVal === 0) continue;
-        var tId = ABILITY_NAME[tName];
-        if (tId !== undefined) {
-            totalItems.push({ _id: tId, _num: Math.round(tVal * 100) / 100 });
+    // IDs 0-3: Total core stats (hp/attack WITH talent multiplier)
+    totalObj['0'] = { _id: 0, _num: totalHP };
+    totalObj['1'] = { _id: 1, _num: totalAttack };
+    totalObj['2'] = { _id: 2, _num: totalArmor };
+    totalObj['3'] = { _id: 3, _num: totalSpeed };
+
+    // IDs 4-15: Combat stats (hero.json base + passive + break bonuses)
+    for (var tci = 0; tci < BASE_COMBAT_FIELDS.length; tci++) {
+        var tcf = BASE_COMBAT_FIELDS[tci];
+        var tcId = ABILITY_NAME[tcf];
+        if (tcId !== undefined) {
+            var tcVal = ((heroInfo && heroInfo[tcf]) ? heroInfo[tcf] : 0)
+                     + (passiveAttrs[tcf] || 0)
+                     + (breakAttrs[tcf] || 0);
+            totalObj[String(tcId)] = { _id: tcId, _num: Math.round(tcVal * 100) / 100 };
         }
+    }
+
+    // ID 16: Energy — hero starting energy for battle. Always 50 per HAR (all 26 heroes).
+    totalObj['16'] = { _id: 16, _num: 50 };
+
+    // IDs 17-20: Percentage stats (from passive skills, usually 0)
+    var PCT_STAT_FIELDS = ['hpPercent', 'armorPercent', 'attackPercent', 'speedPercent'];
+    for (var pi = 0; pi < PCT_STAT_FIELDS.length; pi++) {
+        var pcf = PCT_STAT_FIELDS[pi];
+        var pcId = ABILITY_NAME[pcf];
+        if (pcId !== undefined) {
+            totalObj[String(pcId)] = {
+                _id: pcId,
+                _num: Math.round((passiveAttrs[pcf] || 0) * 100) / 100
+            };
+        }
+    }
+
+    // ID 21: Power (combat rating / zPower)
+    totalObj['21'] = { _id: 21, _num: zPower };
+
+    // ID 22: orghp — effective HP after talent, always equals totalHP per HAR
+    totalObj['22'] = { _id: 22, _num: totalHP };
+
+    // IDs 23-41: Extended total stats (hero.json base + passive + break)
+    for (var text = 23; text <= 41; text++) {
+        var textName = ATTR_ID_NAME[text] || '';
+        var textVal = 0;
+        if (textName) {
+            textVal = ((heroInfo && heroInfo[textName]) ? heroInfo[textName] : 0)
+                    + (passiveAttrs[textName] || 0)
+                    + (breakAttrs[textName] || 0);
+        }
+        if (text === 30) textVal = Math.round(totalTalent * 100) / 100;  // talent
+        if (text === 41) textVal = heroEnergyMax;                        // energyMax
+        totalObj[String(text)] = { _id: text, _num: Math.round(textVal * 100) / 100 };
     }
 
     return {
-        _baseAttr: { _items: baseItems },
-        _totalAttr: { _items: totalItems }
+        _baseAttr: { _items: baseObj },
+        _totalAttr: { _items: totalObj }
     };
 }
 
 /**
  * Generate empty attribute response.
  * Used as default/fallback when hero data is unavailable.
+ * Returns Object format matching HAR: all IDs present with _num: 0.
+ * _baseAttrs: 35 IDs (0-15, 23-41) — IDs 16-22 excluded per HAR.
+ * _attrs: 42 IDs (0-41) — all present.
  *
- * @returns {object} { _baseAttr: { _items: [] }, _totalAttr: { _items: [] } }
+ * @returns {object} { _baseAttr: { _items: {...} }, _totalAttr: { _items: {...} } }
  */
 function emptyAttrs() {
+    var baseObj = {};
+    // IDs 0-15
+    for (var i = 0; i <= 15; i++) baseObj[String(i)] = { _id: i, _num: 0 };
+    // IDs 23-41
+    for (var j = 23; j <= 41; j++) baseObj[String(j)] = { _id: j, _num: 0 };
+
+    var totalObj = {};
+    // IDs 0-41 (all 42)
+    for (var k = 0; k <= 41; k++) totalObj[String(k)] = { _id: k, _num: 0 };
+
     return {
-        _baseAttr: { _items: [] },
-        _totalAttr: { _items: [] }
+        _baseAttr: { _items: baseObj },
+        _totalAttr: { _items: totalObj }
     };
 }
 
@@ -2359,14 +2400,17 @@ function getLevelUpCost(currentLevel, quality) {
  * CLIENT CALLBACK — HerosManager.getAttrsCallBack (line 85141):
  *   - Iterates t._attrs with `for (var o in t._attrs)`
  *   - Uses `n.getHero(e[o])` where e=heroIdList (array) and o=iteration key
- *   - When _attrs is an ARRAY: o="0","1",... → e[0]=heroId[0] (CORRECT)
- *   - When _attrs is an OBJECT keyed by heroId: o="22" → e["22"]=undefined (BUG!)
+ *   - _attrs is an ARRAY of hero attr objects — o="0","1",... maps correctly
  *
- * CRITICAL FIX: _attrs and _baseAttrs MUST be ARRAYS (not objects) to match
- * the client's e[o] index-based lookup pattern.
- *   Correct format:
- *     _attrs: [{ _items: [{ _id, _num }] }, ...],       // indexed by position
- *     _baseAttrs: [{ _items: [{ _id, _num }] }, ...]     // indexed by position
+ * RESPONSE FORMAT (verified from HAR — 26 heroes analyzed):
+ *   _attrs: [{ _items: { "0":{_id:0,_num:...}, "1":{_id:1,_num:...}, ... } }, ...]
+ *   _baseAttrs: [{ _items: { "0":{_id:0,_num:...}, ... } }, ...]
+ *
+ *   _items is an OBJECT keyed by string ID (NOT an array).
+ *   _attrs._items has 42 IDs (0-41) for every hero.
+ *   _baseAttrs._items has 35 IDs (0-15, 23-41) — IDs 16-22 excluded per HAR.
+ *
+ *   ID 16 (energy) = always 50, ID 21 (power) = zPower, ID 22 (orghp) = totalHP.
  *
  * @param {object} parsed - Request data
  * @param {function} callback - Response callback
@@ -2408,9 +2452,10 @@ function actionGetAttrs(parsed, callback) {
                     attrs.push(calculated._totalAttr);
                     baseAttrs.push(calculated._baseAttr);
                 } else {
-                    // Hero not found — return empty attrs
-                    attrs.push({ _items: [] });
-                    baseAttrs.push({ _items: [] });
+                    // Hero not found — return empty attrs (Object format, all zeros)
+                    var ea = emptyAttrs();
+                    attrs.push(ea._totalAttr);
+                    baseAttrs.push(ea._baseAttr);
                 }
             }
 
