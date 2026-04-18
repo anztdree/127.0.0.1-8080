@@ -623,28 +623,39 @@ function getWishMaxVersion() {
  * errorDefine.json → ERROR_SUMMON_REPEAT_GUIDE (10052, isKick=1)
  *   Server must track guide summon to prevent duplicate predetermined summons.
  */
-var GUIDE_HERO_MAP = {
-    /* sType: { displayId, quality } */
-};
-
-(function() {
+/**
+ * Get the predetermined guide hero for a given sType.
+ *
+ * IMPORTANT — LAZY LOOKUP (not at module load time):
+ * GameData.load() is called AFTER require() in main-server/index.js.
+ * The old IIFE ran at require() time when constant.json was not yet loaded,
+ * so GUIDE_HERO_MAP stayed empty {} and guide summons fell through to random gacha.
+ * Fix: lookup constant.json on each request — by the time a client connects,
+ * all JSON data is guaranteed to be loaded.
+ *
+ * constant.json → constants[1]:
+ *   tutorialNormalHero: 1206 (blue)  — COMMON guide summon
+ *   tutorialHighHero:   1309 (purple) — SUPER guide summon
+ *
+ * @param {number} sType - SummonType (1=COMMON, 3=SUPER)
+ * @returns {{ displayId: number, quality: string }|null}
+ */
+function getGuideHero(sType) {
     var constants = GameData.get('constant');
-    if (constants && constants[1]) {
-        var c = constants[1];
-        if (c.tutorialNormalHero) {
-            GUIDE_HERO_MAP[SUMMON_TYPE.COMMON] = {
-                displayId: c.tutorialNormalHero,
-                quality: 'blue'
-            };
-        }
-        if (c.tutorialHighHero) {
-            GUIDE_HERO_MAP[SUMMON_TYPE.SUPER] = {
-                displayId: c.tutorialHighHero,
-                quality: 'purple'
-            };
-        }
+    if (!constants || !constants[1]) {
+        logger.warn('SUMMON', 'getGuideHero: constant.json not loaded or missing [1]');
+        return null;
     }
-})();
+    var c = constants[1];
+    if (sType === SUMMON_TYPE.COMMON && c.tutorialNormalHero) {
+        return { displayId: c.tutorialNormalHero, quality: 'blue' };
+    }
+    if (sType === SUMMON_TYPE.SUPER && c.tutorialHighHero) {
+        return { displayId: c.tutorialHighHero, quality: 'purple' };
+    }
+    logger.warn('SUMMON', 'getGuideHero: no guide hero defined for sType=' + sType);
+    return null;
+}
 
 /**
  * Build a predetermined guide hero object.
@@ -888,10 +899,26 @@ async function handleSummonOneFree(socket, parsed, callback) {
         }
 
         // --- GUIDE SUMMON: isGuide=true → predetermined hero ---
+        // BUG FIX #1: GUIDE_HERO_MAP was populated via IIFE at require() time, but
+        //   GameData.load() runs AFTER require() → constant.json not loaded yet → map empty.
+        //   Fix: use getGuideHero(sType) which does lazy lookup at request time.
+        // BUG FIX #2: _guideSummonDone was a single boolean, but tutorial has TWO guide summons
+        //   (COMMON=1206 blue + SUPER=1309 purple). Fix: track per sType.
         if (isGuide) {
-            var guideHero = GUIDE_HERO_MAP[sType];
-            if (guideHero && !userData.summon._guideSummonDone) {
-                // First guide summon: return predetermined hero
+            var guideHero = getGuideHero(sType);
+
+            // Ensure _guideSummonDone is an object (backward compat: if old boolean true, convert)
+            if (userData.summon._guideSummonDone === true) {
+                userData.summon._guideSummonDone = { 1: true }; // old format: only COMMON was done
+            }
+            if (!userData.summon._guideSummonDone) {
+                userData.summon._guideSummonDone = {};
+            }
+
+            var guideAlreadyDone = !!userData.summon._guideSummonDone[String(sType)];
+
+            if (guideHero && !guideAlreadyDone) {
+                // First guide summon for THIS sType: return predetermined hero
                 var guideObj = buildGuideHero(guideHero.displayId, guideHero.quality);
 
                 // Add hero to collection
@@ -908,8 +935,8 @@ async function handleSummonOneFree(socket, parsed, callback) {
                 var guideTypeKey = String(sType);
                 userData.summon._summonTimes[guideTypeKey] = (userData.summon._summonTimes[guideTypeKey] || 0) + 1;
 
-                // Mark guide summon as done — prevent future predetermined summons
-                userData.summon._guideSummonDone = true;
+                // Mark guide summon as done for THIS sType only
+                userData.summon._guideSummonDone[String(sType)] = true;
 
                 // Save
                 try {
@@ -931,11 +958,12 @@ async function handleSummonOneFree(socket, parsed, callback) {
                     ', sType=' + sType + ', hero=' + guideHero.displayId);
                 return;
             }
-            else if (userData.summon._guideSummonDone) {
-                // Guide already completed — proceed as normal summon below.
+            else if (guideAlreadyDone) {
+                // This sType guide already completed — proceed as normal summon below.
                 // Do NOT return error 10052 (isKick=1 would disconnect the client).
                 // Just log and fall through to normal summon.
-                logger.info('SUMMON', 'summonOneFree: guide already done, falling through to normal summon userId=' + userId);
+                logger.info('SUMMON', 'summonOneFree: guide sType=' + sType +
+                    ' already done, falling through to normal summon userId=' + userId);
             }
         }
 
