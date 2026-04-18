@@ -244,6 +244,45 @@ async function enterGame(socket, parsed, callback) {
             }
         }
 
+        // FIX: Validate giftInfo._onlineGift format
+        // Client WelfareInfoManager.setOnlineGift(e) reads e._curId and e._nextTime.
+        // If _onlineGift is not an object (e.g., was 0 from old default), client crashes.
+        // This also fixes the Home.setOnLineGift() → onlineBonus[n].nextID TypeError.
+        if (playerData.giftInfo) {
+            var og = playerData.giftInfo._onlineGift;
+            if (!og || typeof og !== 'object' || typeof og._curId !== 'number') {
+                var oldVal = 0;
+                if (typeof og === 'number' && og > 0) {
+                    oldVal = og; // Preserve old numeric value as _curId
+                }
+                logger.warn('USER', 'enterGame: invalid giftInfo._onlineGift format for userId=' + userId +
+                    ' (was: ' + JSON.stringify(og) + '), resetting to { _curId: ' + oldVal + ', _nextTime: 0 }');
+                playerData.giftInfo._onlineGift = { _curId: oldVal, _nextTime: 0 };
+
+                // If this is an existing player with corrupted data, set first tier's nextTime
+                if (oldVal === 0 && !isNewPlayer) {
+                    try {
+                        var onlineBonusConfigs = require('../../shared/gameData/loader').get('onlineBonus');
+                        if (onlineBonusConfigs && onlineBonusConfigs['1']) {
+                            playerData.giftInfo._onlineGift._nextTime = now + (onlineBonusConfigs['1'].time * 1000);
+                        }
+                    } catch (e) {}
+                }
+            } else {
+                // Object is valid — ensure _nextTime is reasonable
+                // If _nextTime is 0 and _curId is 0, set the first tier timer
+                if (og._curId === 0 && og._nextTime === 0) {
+                    try {
+                        var onlineBonusConfigs2 = require('../../shared/gameData/loader').get('onlineBonus');
+                        if (onlineBonusConfigs2 && onlineBonusConfigs2['1']) {
+                            og._nextTime = now + (onlineBonusConfigs2['1'].time * 1000);
+                            logger.info('USER', 'enterGame: set first online bonus timer for userId=' + userId);
+                        }
+                    } catch (e) {}
+                }
+            }
+        }
+
         callback(RH.success(playerData));
 
         // FIX 16: Set socket._userId after enterGame so other handlers can use it
