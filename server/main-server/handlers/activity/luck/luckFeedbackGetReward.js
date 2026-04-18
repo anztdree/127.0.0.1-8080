@@ -2,18 +2,17 @@
 
 /**
  * =====================================================
- *  activity/luck/normalLuck.js
+ *  activity/luck/luckFeedbackGetReward.js
  *  Super Warrior Z Game Server — Main Server
  *
- *  ACTION: normalLuck
- *  DESC: Normal luck draw (1x or 10x)
+ *  ACTION: luckFeedbackGetReward
+ *  DESC: Claim luck feedback compensation reward
  *  TYPE: WRITE
  *
  *  CLIENT REQUEST:
- *    { type:"activity", action:"normalLuck", actId, userId, times, costType, version }
+ *    { type:"activity", action:"luckFeedbackGetReward", actId, userId, version }
  *
- *  CLIENT SOURCE: ActivityNormalLuck (line 61903, 61925)
- *  CUSTOM RESPONSE: _addTotal[] or _addHeroes[], _energy, _canFreeTime
+ *  CLIENT SOURCE: receiveTwoBtnTap() (line 97379)
  *
  *  STATUS: TODO
  * =====================================================
@@ -24,7 +23,7 @@ var logger = require('../../../../shared/utils/logger');
 
 function handle(socket, parsed, callback) {
     var userId = parsed.userId;
-    logger.info('ACTIVITY', 'normalLuck' + ' userId=' + userId);
+    logger.info('ACTIVITY', 'luckFeedbackGetReward' + ' userId=' + userId);
 
     // TODO: Implement business logic
 
