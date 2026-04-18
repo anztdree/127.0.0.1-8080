@@ -222,12 +222,28 @@ async function enterGame(socket, parsed, callback) {
         }
 
         // =============================================
-        // Step 6: Send response to client
+        // Step 6: Validate & send response to client
         // =============================================
         // CRITICAL: Response format must match UserDataParser.saveUserData() expectations.
         // The response IS the full player state object — NOT wrapped in a container.
         // Client does: UserDataParser.saveUserData(response)
         // which reads response.currency, response.user, response.heros, etc. directly.
+        //
+        // SAFETY: Validate hangup._curLess is a valid lesson ID.
+        // Client OnHookSingleton accesses lesson[lastSection] without null guard.
+        // An invalid _curLess → lastSection → lesson[invalid].nextID → TypeError crash.
+        if (playerData.hangup) {
+            var lessonConfigs = null;
+            try { lessonConfigs = require('../../shared/gameData/loader').get('lesson'); } catch (e) {}
+            var curLess = playerData.hangup._curLess;
+            if (!curLess || !lessonConfigs || !lessonConfigs[String(curLess)]) {
+                var safeDefault = DefaultData.GAME_CONSTANTS.startLesson;
+                logger.warn('USER', 'enterGame: invalid hangup._curLess=' + curLess +
+                    ' for userId=' + userId + ', resetting to ' + safeDefault);
+                playerData.hangup._curLess = safeDefault;
+            }
+        }
+
         callback(RH.success(playerData));
 
         // FIX 16: Set socket._userId after enterGame so other handlers can use it
