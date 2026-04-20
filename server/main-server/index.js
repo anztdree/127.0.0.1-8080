@@ -86,7 +86,7 @@ var TEA = require('../shared/tea');
 // =============================================
 var Notifications = require('./notifications');
 var Scheduler = require('./scheduler');
-var ActivityManager = require('./activity');
+var ActivityManager = require('../shared/activityManager');
 var Rooms = require('./rooms');
 
 // =============================================
