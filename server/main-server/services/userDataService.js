@@ -12,13 +12,14 @@
  *    - Deep clone on every read to prevent cache mutation
  *    - Cache invalidation support for staleness tracking
  *    - Partial field updates with updateField()
+ *    - Cache keyed by userId_serverId (multi-server safe)
  *
  *  Usage:
  *    var userDataService = require('./services/userDataService');
- *    var data = await userDataService.loadUserData(1001);
- *    await userDataService.saveUserData(1001, data);
+ *    var data = await userDataService.loadUserData(1001, 1);
+ *    await userDataService.saveUserData(1001, data, 1);
  *    await userDataService.updateField(1001, 'gold', 5000);
- *    var cached = userDataService.getCachedUserData(1001);
+ *    var cached = userDataService.getCachedUserData(1001, 1);
  * =====================================================
  */
 
@@ -39,20 +40,36 @@ var CACHE_MAX_SIZE = 1000;
 
 /**
  * In-memory cache for user game_data.
- * Key: userId (number), Value: gameData (object)
+ * Key: "userId_serverId" (string), Value: gameData (object)
  *
  * Uses JavaScript Map which maintains insertion order,
  * allowing LRU eviction by deleting the oldest key.
- * @type {Map<number, object>}
+ *
+ * IMPORTANT: Cache key MUST include serverId because the same userId
+ * can have different game_data on different servers. Without this,
+ * a user switching servers would get stale data from the wrong server.
+ *
+ * @type {Map<string, object>}
  */
 var _cache = new Map();
 
 /**
- * Set of userIds whose cache entries are marked as stale.
+ * Set of cache keys whose entries are marked as stale.
  * Next loadUserData() call for these users will fetch from DB.
- * @type {Set<number>}
+ * @type {Set<string>}
  */
 var _staleSet = new Set();
+
+/**
+ * Build composite cache key from userId and serverId.
+ * @private
+ * @param {string|number} userId
+ * @param {number} serverId
+ * @returns {string}
+ */
+function _cacheKey(userId, serverId) {
+    return userId + '_' + (serverId || 1);
+}
 
 /**
  * Load user game_data from the database.
@@ -76,22 +93,23 @@ var _staleSet = new Set();
  *   console.log(data.level, data.gold, data.heroList);
  */
 function loadUserData(userId, serverId) {
-    serverId = serverId || 1; // Default server ID
+    serverId = serverId || 1;
+    var cacheKey = _cacheKey(userId, serverId);
     // Return cached data if available and not stale
-    if (_cache.has(userId) && !_staleSet.has(userId)) {
+    if (_cache.has(cacheKey) && !_staleSet.has(cacheKey)) {
         // Move to end of Map (LRU: most recently used)
-        var cached = _cache.get(userId);
-        _cache.delete(userId);
-        _cache.set(userId, cached);
+        var cached = _cache.get(cacheKey);
+        _cache.delete(cacheKey);
+        _cache.set(cacheKey, cached);
 
-        console.log('[UserDataService] Cache hit for userId=' + userId);
+        console.log('[UserDataService] Cache hit for userId=' + userId + ' serverId=' + serverId);
         return Promise.resolve(helpers.deepClone(cached));
     }
 
     // Clear stale flag if set (we're about to fetch fresh data)
-    _staleSet.delete(userId);
+    _staleSet.delete(cacheKey);
 
-    console.log('[UserDataService] Loading game_data from DB for userId=' + userId);
+    console.log('[UserDataService] Loading game_data from DB for userId=' + userId + ' serverId=' + serverId);
 
     // FIX 2: Query user_data table (NOT users table) with server_id filter
     return DB.query('SELECT game_data FROM user_data WHERE user_id = ? AND server_id = ?', [userId, serverId])
@@ -120,9 +138,9 @@ function loadUserData(userId, serverId) {
 
             // Store in cache
             _evictIfNeeded();
-            _cache.set(userId, mergedData);
+            _cache.set(cacheKey, mergedData);
 
-            console.log('[UserDataService] Loaded and cached game_data for userId=' + userId);
+            console.log('[UserDataService] Loaded and cached game_data for userId=' + userId + ' serverId=' + serverId);
             return helpers.deepClone(mergedData);
         })
         .catch(function (err) {
@@ -149,15 +167,16 @@ function loadUserData(userId, serverId) {
  *   await userDataService.saveUserData(1001, data);
  */
 function saveUserData(userId, gameData, serverId) {
-    serverId = serverId || 1; // Default server ID
+    serverId = serverId || 1;
+    var cacheKey = _cacheKey(userId, serverId);
     if (!gameData || typeof gameData !== 'object') {
-        console.error('[UserDataService] Invalid gameData provided for userId=' + userId);
+        console.error('[UserDataService] Invalid gameData provided for userId=' + userId + ' serverId=' + serverId);
         return Promise.reject(new Error('Invalid gameData: must be a non-null object'));
     }
 
     var jsonData = JSON.stringify(gameData);
 
-    console.log('[UserDataService] Saving game_data to DB for userId=' + userId +
+    console.log('[UserDataService] Saving game_data to DB for userId=' + userId + ' serverId=' + serverId +
         ' (size: ' + jsonData.length + ' bytes)');
 
     // FIX 2: UPDATE user_data table (NOT users table) with server_id filter
@@ -166,13 +185,13 @@ function saveUserData(userId, gameData, serverId) {
             if (result && result.affectedRows > 0) {
                 // Update cache
                 _evictIfNeeded();
-                _cache.set(userId, helpers.deepClone(gameData));
-                _staleSet.delete(userId);
+                _cache.set(cacheKey, helpers.deepClone(gameData));
+                _staleSet.delete(cacheKey);
 
-                console.log('[UserDataService] Saved and cached game_data for userId=' + userId);
+                console.log('[UserDataService] Saved and cached game_data for userId=' + userId + ' serverId=' + serverId);
                 return true;
             } else {
-                console.warn('[UserDataService] No rows affected when saving for userId=' + userId);
+                console.warn('[UserDataService] No rows affected when saving for userId=' + userId + ' serverId=' + serverId);
                 return false;
             }
         })
@@ -191,24 +210,26 @@ function saveUserData(userId, gameData, serverId) {
  * Use this for high-frequency reads where slight staleness is acceptable.
  * For guaranteed fresh data, use loadUserData() instead.
  *
- * @param {number} userId - The user's unique ID
+ * @param {number|string} userId - The user's unique ID
+ * @param {number} [serverId=1] - The server ID
  * @returns {object|null} Deep cloned game_data, or null if not cached
  *
  * @example
- *   var data = userDataService.getCachedUserData(1001);
+ *   var data = userDataService.getCachedUserData(1001, 1);
  *   if (data) {
  *       console.log('Cached level:', data.level);
  *   }
  */
-function getCachedUserData(userId) {
-    if (!_cache.has(userId) || _staleSet.has(userId)) {
+function getCachedUserData(userId, serverId) {
+    var cacheKey = _cacheKey(userId, serverId);
+    if (!_cache.has(cacheKey) || _staleSet.has(cacheKey)) {
         return null;
     }
 
     // Move to end of Map (LRU: most recently used)
-    var cached = _cache.get(userId);
-    _cache.delete(userId);
-    _cache.set(userId, cached);
+    var cached = _cache.get(cacheKey);
+    _cache.delete(cacheKey);
+    _cache.set(cacheKey, cached);
 
     // NEVER return cache reference directly — always deep clone
     return helpers.deepClone(cached);
@@ -220,16 +241,18 @@ function getCachedUserData(userId) {
  * Removes the user's game_data from the in-memory cache entirely.
  * Use this on disconnect or when you know the data is no longer needed.
  *
- * @param {number} userId - The user's unique ID
+ * @param {number|string} userId - The user's unique ID
+ * @param {number} [serverId=1] - The server ID
  *
  * @example
  *   // On socket disconnect
- *   userDataService.clearCache(userId);
+ *   userDataService.clearCache(userId, serverId);
  */
-function clearCache(userId) {
-    _cache.delete(userId);
-    _staleSet.delete(userId);
-    console.log('[UserDataService] Cache cleared for userId=' + userId);
+function clearCache(userId, serverId) {
+    var cacheKey = _cacheKey(userId, serverId);
+    _cache.delete(cacheKey);
+    _staleSet.delete(cacheKey);
+    console.log('[UserDataService] Cache cleared for userId=' + userId + ' serverId=' + (serverId || 1));
 }
 
 /**
@@ -240,16 +263,18 @@ function clearCache(userId) {
  * This is more efficient than clearCache when the user is likely
  * to reconnect soon.
  *
- * @param {number} userId - The user's unique ID
+ * @param {number|string} userId - The user's unique ID
+ * @param {number} [serverId=1] - The server ID
  *
  * @example
- *   // External data modification detected
- *   userDataService.invalidateCache(userId);
+ *   // On socket disconnect — pass serverId from socket._serverId
+ *   userDataService.invalidateCache(userId, serverId);
  */
-function invalidateCache(userId) {
-    if (_cache.has(userId)) {
-        _staleSet.add(userId);
-        console.log('[UserDataService] Cache invalidated for userId=' + userId);
+function invalidateCache(userId, serverId) {
+    var cacheKey = _cacheKey(userId, serverId);
+    if (_cache.has(cacheKey)) {
+        _staleSet.add(cacheKey);
+        console.log('[UserDataService] Cache invalidated for userId=' + userId + ' serverId=' + (serverId || 1));
     }
 }
 
@@ -275,24 +300,26 @@ function invalidateCache(userId) {
  *   await userDataService.updateField(1001, 'gold', 5000);
  *   await userDataService.updateField(1001, 'level', 25);
  */
-function updateField(userId, field, value) {
-    console.log('[UserDataService] Updating field "' + field + '" for userId=' + userId);
+function updateField(userId, field, value, serverId) {
+    serverId = serverId || 1;
+    console.log('[UserDataService] Updating field "' + field + '" for userId=' + userId + ' serverId=' + serverId);
 
-    return loadUserData(userId)
+    return loadUserData(userId, serverId)
         .then(function (gameData) {
             if (!gameData) {
-                throw new Error('User data not found for userId=' + userId);
+                throw new Error('User data not found for userId=' + userId + ' serverId=' + serverId);
             }
 
             // Update the field
             gameData[field] = value;
 
             // Save to DB (this also updates cache)
-            return saveUserData(userId, gameData);
+            return saveUserData(userId, gameData, serverId);
         })
         .then(function () {
             // Return updated cached data
-            return helpers.deepClone(_cache.get(userId));
+            var cacheKey = _cacheKey(userId, serverId);
+            return helpers.deepClone(_cache.get(cacheKey));
         });
 }
 
@@ -339,7 +366,7 @@ function _evictIfNeeded() {
         var firstKey = _cache.keys().next().value;
         _cache.delete(firstKey);
         _staleSet.delete(firstKey);
-        console.log('[UserDataService] LRU eviction: removed userId=' + firstKey);
+        console.log('[UserDataService] LRU eviction: removed cacheKey=' + firstKey);
     }
 }
 
