@@ -1,14 +1,17 @@
 /**
  * ============================================================================
- *  SDK Server v3 — Constants & Configuration
+ *  SDK Server — Constants & Configuration
  *  ============================================================================
  *
- *  Standalone config — NO dependency on shared/ folder.
- *  All values verified against:
+ *  Semua konfigurasi SDK server dalam satu file.
+ *  Nilai default diselaraskan dengan:
  *    - sdk.js (client): APP_ID '288', CHANNEL 'ppgame'
- *    - index.html: getSdkLoginInfo() expects exact field names
- *    - main.min.js: sdkLoginSuccess() flow expects exact values
- *    - Existing data/users.json: all 15 users have sdk='ppgame', appId='288'
+ *    - data/users.json (existing data): sdk 'ppgame', appId '288'
+ *    - data/sessions.json (existing data): 7 hari expiry
+ *
+ *  CRITICAL FIX dari existing index.js:
+ *    - DEFAULT_SDK_CHANNEL: 'en' → 'ppgame' (fix S1)
+ *    - DEFAULT_APP_ID: '1' → '288' (fix S2)
  *
  * ============================================================================
  */
@@ -16,41 +19,42 @@
 var path = require('path');
 
 module.exports = {
-
     // =============================================
     // SERVER
     // =============================================
 
-    /** Port — Express HTTP server */
-    PORT: parseInt(process.env.SDK_PORT) || 9999,
+    /** Port SDK server — Express HTTP */
+    PORT: process.env.PORT || 9999,
 
-    /** Host — 0.0.0.0 for LAN access, 127.0.0.1 for local only */
-    HOST: process.env.SDK_HOST || '0.0.0.0',
-
-    /** Data directory — absolute path */
+    /** Base directory untuk data files */
     DATA_DIR: path.join(__dirname, '..', 'data'),
 
-    /** Dev mode — verbose logging */
-    IS_DEV: process.argv.indexOf('--dev') !== -1,
-
     // =============================================
-    // SDK — Must match sdk.js SDK_CONFIG exactly
+    // SDK CHANNEL & APP ID
     // =============================================
 
     /**
-     * SDK channel.
-     * HARUS 'ppgame' — sdk.js hardcodes this, main.min.js uses it.
-     * index.html line 53: window["sdkChannel"] = "ppgame"
-     * main.min.js line 88564: o.sdk
-     * main.min.js: ts.loginUserInfo.sdk = o.sdk
+     * Default SDK channel untuk user baru.
+     * HARUS 'ppgame' — sesuai sdk.js SDK_CONFIG.CHANNEL
+     * dan semua existing user di data/users.json.
+     *
+     * Nilai ini dikirim ke login-server sebagai:
+     *   - fromChannel (di getServerList)
+     *   - channelCode (di loginGame response)
+     *
+     * main.min.js ts.loginUserInfo.sdk = o.sdk (dari getSdkLoginInfo)
      */
     DEFAULT_SDK_CHANNEL: 'ppgame',
 
     /**
-     * App ID.
-     * HARUS '288' — sdk.js hardcodes this.
-     * sdk.js: SDK_CONFIG.APP_ID = '288'
-     * main.min.js line 52484: ReportSdkInfoXX uses appId
+     * Default App ID.
+     * HARUS '288' — sesuai sdk.js SDK_CONFIG.APP_ID
+     * dan semua existing user di data/users.json yang punya field appId.
+     *
+     * Digunakan di:
+     *   - ReportSdkInfoXX (main.min.js line 52484)
+     *   - login-server subChannel field
+     *   - analytics event appId field
      */
     DEFAULT_APP_ID: '288',
 
@@ -58,75 +62,133 @@ module.exports = {
     // CRYPTO
     // =============================================
 
-    /** Sign secret — sha256(userId + loginToken + SIGN_SECRET).substring(0, 32) */
+    /**
+     * Secret key untuk generate sign (signature).
+     * Format: sha256(userId + loginToken + SIGN_SECRET).substring(0, 32)
+     *
+     * Digunakan oleh:
+     *   - ts.loginUserInfo.sign (main.min.js line 88571)
+     *   - ReportToSdkCommon sign field (main.min.js line 52504)
+     */
     SIGN_SECRET: 'sdk_sign_secret_2024',
 
-    /** PBKDF2-SHA512 config */
+    /** PBKDF2 iterations untuk password hashing */
     HASH_ITERATIONS: 10000,
+
+    /** PBKDF2 key length (bytes) */
     HASH_KEY_LENGTH: 64,
+
+    /** PBKDF2 hash algorithm */
     HASH_ALGORITHM: 'sha512',
 
-    /** Salt: 32 bytes → 64-char hex */
+    /** Salt length (bytes, akan di-encode jadi hex string) */
     SALT_LENGTH: 32,
 
-    /** Security: 16 bytes → 32-char hex */
+    /** Security code length (bytes, hex string) */
     SECURITY_LENGTH: 16,
-
-    /** Token random: 24 bytes → 48-char hex (token total = 57 chars) */
-    TOKEN_RANDOM_BYTES: 24,
-
-    /** Order random: 4 bytes → 8-char hex */
-    ORDER_RANDOM_BYTES: 4,
 
     // =============================================
     // SESSION
     // =============================================
 
-    /** Session duration: 7 days */
+    /** Session duration: 7 hari (ms) — sesuai existing data/sessions.json */
     SESSION_DURATION_MS: 7 * 24 * 60 * 60 * 1000,
 
-    /** Cleanup interval: every 30 min */
+    /** Cleanup interval untuk expired sessions (ms) — setiap 30 menit */
     SESSION_CLEANUP_INTERVAL_MS: 30 * 60 * 1000,
 
     // =============================================
     // RATE LIMITING
     // =============================================
 
+    /** Rate limit config per endpoint type */
     RATE_LIMITS: {
-        LOGIN:    { maxRequests: 10, windowMs: 60000 },
-        REGISTER: { maxRequests: 5,  windowMs: 60000 },
-        GUEST:    { maxRequests: 10, windowMs: 60000 },
-        PAYMENT:  { maxRequests: 20, windowMs: 60000 },
-        REPORT:   { maxRequests: 60, windowMs: 60000 },
-        GENERAL:  { maxRequests: 30, windowMs: 60000 }
+        /** Login — 10 request / 60 detik per IP */
+        LOGIN: { maxRequests: 10, windowMs: 60000 },
+
+        /** Register — 5 request / 60 detik per IP */
+        REGISTER: { maxRequests: 5, windowMs: 60000 },
+
+        /** Guest — 10 request / 60 detik per IP */
+        GUEST: { maxRequests: 10, windowMs: 60000 },
+
+        /** Payment — 20 request / 60 detik per IP */
+        PAYMENT: { maxRequests: 20, windowMs: 60000 },
+
+        /** Report/Analytics — 60 request / 60 detik per IP */
+        REPORT: { maxRequests: 60, windowMs: 60000 },
+
+        /** General API — 30 request / 60 detik per IP */
+        GENERAL: { maxRequests: 30, windowMs: 60000 }
     },
 
+    /** Rate limit store cleanup interval (ms) — setiap 5 menit */
     RATE_LIMIT_CLEANUP_MS: 5 * 60 * 1000,
+
+    /** Rate limit stale entry threshold (ms) — 10 menit */
     RATE_LIMIT_STALE_MS: 10 * 60 * 1000,
 
     // =============================================
     // ANALYTICS
     // =============================================
 
+    /** Maksimal events sebelum rotation */
     MAX_ANALYTICS_EVENTS: 50000,
+
+    /** Persentase events yang di-archive saat rotation (80%) */
     ANALYTICS_ARCHIVE_PERCENT: 0.8,
+
+    /** Analytics rotation interval (ms) — setiap 30 menit */
     ANALYTICS_ROTATION_INTERVAL_MS: 30 * 60 * 1000,
+
+    /** Analytics archive subdirectory */
     ANALYTICS_ARCHIVE_DIR: 'archive',
 
     // =============================================
-    // USER VALIDATION
+    // USER
     // =============================================
 
+    /** Username minimum length */
     USERNAME_MIN_LENGTH: 3,
+
+    /** Username maximum length */
     USERNAME_MAX_LENGTH: 20,
+
+    /** Password minimum length */
     PASSWORD_MIN_LENGTH: 4,
+
+    /** Password maximum length */
     PASSWORD_MAX_LENGTH: 32,
+
+    /** Karakter yang diizinkan untuk username: alphanumeric + underscore */
     USERNAME_PATTERN: /^[a-zA-Z0-9_]+$/,
 
     // =============================================
-    // CORS & EXPRESS
+    // LOGIN TOKEN FORMAT
     // =============================================
 
+    /**
+     * Login token format: timestamp_base36 + '_' + random_hex
+     * Contoh: "mnvwij4q_7b367e2dbeb88523dd136e33a3b7b809c25d71e282f1466c"
+     * (dari data/sessions.json existing)
+     */
+    TOKEN_RANDOM_BYTES: 24,
+
+    // =============================================
+    // ORDER ID FORMAT
+    // =============================================
+
+    /**
+     * Order ID format: ORD + padded_num + '_' + timestamp_base36 + '_' + random_hex
+     * Contoh: ORD000001_mnvwiabc_7b367e2d
+     */
+    ORDER_RANDOM_BYTES: 4,
+
+    // =============================================
+    // CORS
+    // =============================================
+
+    /** CORS configuration */
     CORS: {
         origin: '*',
         methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
@@ -136,7 +198,9 @@ module.exports = {
             'X-Session-ID',
             'X-SDK-AppId',
             'X-SDK-Version',
-            'X-Request-ID'
+            'X-Request-ID',
+            'X-Login-Token',
+            'X-User-Id'
         ],
         exposedHeaders: ['Content-Type', 'X-SDK-Channel', 'X-RateLimit-Remaining'],
         credentials: false,
@@ -145,5 +209,13 @@ module.exports = {
         optionsSuccessStatus: 204
     },
 
-    BODY_LIMIT: '5mb'
+    // =============================================
+    // EXPRESS
+    // =============================================
+
+    /** JSON body size limit */
+    BODY_LIMIT: '5mb',
+
+    /** XHR timeout (ms) — reference untuk dokumentasi, tidak dipakai server-side */
+    REQUEST_TIMEOUT_MS: 30000
 };
