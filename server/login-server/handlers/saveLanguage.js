@@ -24,7 +24,7 @@ async function saveLanguage(payload, callback) {
         await UserManager.saveLanguage(userid, language, sdk || '', appid || '');
     }
 
-    if (callback) callback(success({}));
+    if (callback) callback(success({errorCode: 0}));
 }
 
 module.exports = { saveLanguage };
