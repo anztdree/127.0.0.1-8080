@@ -1,71 +1,122 @@
 /**
  * ============================================================================
- *  SDK Server v3 — Logger Utility
- *  ============================================================================
+ * SDK Server — Logger Utility (Natural Implementation)
+ * ============================================================================
  *
- *  Simple, zero-dependency logger with timestamp and color.
- *  No external logging library needed for a private server.
+ * Simple, zero-dependency logger with timestamp and color.
+ * 
+ * Natural approach:
+ * - No external logging library
+ * - Standardized format
+ * - Color support (TTY only)
+ * - Development mode filtering
  *
  * ============================================================================
  */
 
-var CONSTANTS = require('../config/constants');
+const CONSTANTS = require('../config/constants');
 
-/**
- * Log level colors (ANSI escape codes).
- * Only used when IS_DEV = true or stdout is TTY.
- */
-var COLORS = {
-    INFO:  '\x1b[36m',   // cyan
-    WARN:  '\x1b[33m',   // yellow
-    ERROR: '\x1b[31m',   // red
-    DEBUG: '\x1b[90m',   // gray
+/** ANSI Colors */
+const COLORS = {
+    INFO: '\x1b[36m',    // Cyan
+    WARN: '\x1b[33m',    // Yellow
+    ERROR: '\x1b[31m',   // Red
+    DEBUG: '\x1b[90m',   // Gray
+    SUCCESS: '\x1b[32m', // Green
     RESET: '\x1b[0m'
 };
 
-var useColors = CONSTANTS.IS_DEV || process.stdout.isTTY;
+/** Use colors only in development or when stdout is TTY */
+const useColors = CONSTANTS.IS_DEV || process.stdout.isTTY;
 
 /**
- * Format timestamp for log prefix.
- * @returns {string} ISO-like timestamp: "2026-04-21 10:30:45"
+ * Format timestamp for log prefix
+ * @returns {string} Format: "2026-04-21 10:30:45"
  */
 function timestamp() {
-    var d = new Date();
-    var pad = function (n) { return String(n).padStart(2, '0'); };
-    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) +
-        ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
+    const d = new Date();
+    const pad = n => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 }
 
 /**
- * Build log prefix with timestamp and level.
- * @param {string} level - "INFO", "WARN", "ERROR", "DEBUG"
- * @returns {string}
+ * Build log prefix
+ * @param {string} level - Log level
+ * @returns {string} Formatted prefix
  */
 function prefix(level) {
     if (useColors) {
-        return COLORS[level] + '[' + timestamp() + '] [' + level + ']' + COLORS.RESET;
+        const color = COLORS[level] || COLORS.RESET;
+        return `${color}[${timestamp()}] [${level}]${COLORS.RESET}`;
     }
-    return '[' + timestamp() + '] [' + level + ']';
+    return `[${timestamp()}] [${level}]`;
 }
 
-var logger = {
-    info: function (tag, msg, data) {
-        console.log(prefix('INFO'), '[' + tag + ']', msg, data !== undefined ? data : '');
+// =============================================
+// LOGGER
+// =============================================
+
+const logger = {
+    /**
+     * Log info message
+     * @param {string} tag - Component tag
+     * @param {string} message - Log message
+     * @param {*} data - Optional data
+     */
+    info(tag, message, data) {
+        const msg = data !== undefined ? `${message} ${JSON.stringify(data)}` : message;
+        console.log(prefix('INFO'), `[${tag}]`, msg);
     },
 
-    warn: function (tag, msg, data) {
-        console.warn(prefix('WARN'), '[' + tag + ']', msg, data !== undefined ? data : '');
+    /**
+     * Log warning message
+     * @param {string} tag - Component tag
+     * @param {string} message - Log message
+     * @param {*} data - Optional data
+     */
+    warn(tag, message, data) {
+        const msg = data !== undefined ? `${message} ${JSON.stringify(data)}` : message;
+        console.warn(prefix('WARN'), `[${tag}]`, msg);
     },
 
-    error: function (tag, msg, data) {
-        console.error(prefix('ERROR'), '[' + tag + ']', msg, data !== undefined ? data : '');
+    /**
+     * Log error message
+     * @param {string} tag - Component tag
+     * @param {string} message - Log message
+     * @param {*} data - Optional data
+     */
+    error(tag, message, data) {
+        const msg = data !== undefined ? `${message} ${JSON.stringify(data)}` : message;
+        console.error(prefix('ERROR'), `[${tag}]`, msg);
     },
 
-    debug: function (tag, msg, data) {
+    /**
+     * Log debug message (development only)
+     * @param {string} tag - Component tag
+     * @param {string} message - Log message
+     * @param {*} data - Optional data
+     */
+    debug(tag, message, data) {
         if (CONSTANTS.IS_DEV) {
-            console.log(prefix('DEBUG'), '[' + tag + ']', msg, data !== undefined ? data : '');
+            const msg = data !== undefined ? `${message} ${JSON.stringify(data)}` : message;
+            console.log(prefix('DEBUG'), `[${tag}]`, msg);
         }
+    },
+
+    /**
+     * Log success message
+     * @param {string} tag - Component tag
+     * @param {string} message - Log message
+     * @param {*} data - Optional data
+     */
+    success(tag, message, data) {
+        const msg = data !== undefined ? `${message} ${JSON.stringify(data)}` : message;
+        console.log(prefix('SUCCESS'), `[${tag}]`, msg);
     }
 };
+
+// =============================================
+// EXPORT
+// =============================================
 
 module.exports = logger;

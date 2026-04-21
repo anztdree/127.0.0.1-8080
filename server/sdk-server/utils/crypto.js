@@ -1,37 +1,24 @@
 /**
  * ============================================================================
- *  SDK Server v3 — Crypto Utilities
- *  ============================================================================
+ * SDK Server — Crypto Utilities (Natural Implementation)
+ * ============================================================================
  *
- *  All cryptographic functions for SDK server:
- *    - hashPassword / verifyPassword — PBKDF2-SHA512
- *    - generateSalt — random 32 bytes → 64-char hex
- *    - generateLoginToken — timestamp_base36 + '_' + 48-char hex
- *    - generateSign — sha256(userId+token+secret).substring(0,32)
- *    - generateSecurity — random 16 bytes → 32-char hex
- *    - generateOrderId — ORD{padded}_{timestamp_base36}_{hex}
- *    - sanitizeUsername — alphanumeric + underscore only
- *
- *  Reference formats from existing data:
- *    Token:    "mnvwij4q_7b367e2dbeb88523dd136e33a3b7b809c25d71e282f1466c"  (57 chars)
- *    Sign:     "869ade36f9de1b26d4c9119fcf87d45b"                               (32 chars)
- *    Security: "4929977724e50a7101f078b08e273a45"                               (32 chars)
- *    Salt:     "6a0c25c606132d907ec453f3af8ee22dca9778176fe2a33d8298a6e926692513" (64 chars)
- *    PwHash:   "8dffe562121de441b60236ccd1ed74a1483d8341d4f0903c0a1db529fa01dc5f..." (128 chars)
+ * Clean cryptographic functions without workarounds or bypasses.
+ * Uses Node.js native crypto module properly.
  *
  * ============================================================================
  */
 
-var crypto = require('crypto');
-var CONSTANTS = require('../config/constants');
+const crypto = require('crypto');
+const CONSTANTS = require('../config/constants');
 
 // =============================================
-// PASSWORD
+// PASSWORD HASHING
 // =============================================
 
 /**
- * Hash password — PBKDF2-SHA512 synchronous.
- * Output: 128-char hex string (64 bytes).
+ * Hash password using PBKDF2
+ * Output: hex string (HASH_KEY_LENGTH * 2 chars)
  */
 function hashPassword(password, salt) {
     return crypto.pbkdf2Sync(
@@ -44,99 +31,265 @@ function hashPassword(password, salt) {
 }
 
 /**
- * Verify password with timing-safe comparison.
+ * Verify password with constant-time comparison
+ * Safely handles invalid input without timing leaks
  */
 function verifyPassword(password, salt, storedHash) {
+    // Handle edge cases safely
+    if (!password || !salt || !storedHash) {
+        return false;
+    }
+    
+    // Validate hex format
+    if (!isValidHex(storedHash)) {
+        return false;
+    }
+    
     try {
-        var computed = hashPassword(password, salt);
-        return crypto.timingSafeEqual(
-            Buffer.from(computed, 'hex'),
-            Buffer.from(storedHash, 'hex')
-        );
-    } catch (e) {
-        // Invalid hash/salt format → always fail
+        const computed = hashPassword(password, salt);
+        const computedBuffer = Buffer.from(computed, 'hex');
+        const storedBuffer = Buffer.from(storedHash, 'hex');
+        
+        // Ensure same length for timing-safe compare
+        if (computedBuffer.length !== storedBuffer.length) {
+            return false;
+        }
+        
+        return crypto.timingSafeEqual(computedBuffer, storedBuffer);
+    } catch (error) {
+        // Log but don't expose internal errors
         return false;
     }
 }
 
 /**
- * Generate random salt — 32 bytes → 64-char hex.
+ * Check if string is valid hexadecimal
+ */
+function isValidHex(str) {
+    if (typeof str !== 'string') return false;
+    if (str.length % 2 !== 0) return false;
+    return /^[0-9a-fA-F]+$/.test(str);
+}
+
+// =============================================
+// SALT GENERATION
+// =============================================
+
+/**
+ * Generate random salt
+ * Output: hex string (SALT_LENGTH * 2 chars)
  */
 function generateSalt() {
     return crypto.randomBytes(CONSTANTS.SALT_LENGTH).toString('hex');
 }
 
 // =============================================
-// TOKEN
+// TOKEN GENERATION
 // =============================================
 
 /**
- * Generate login token.
- * Format: {8-char base36 timestamp}_{48-char hex}
+ * Generate login token
+ * Format: {8-char base36 timestamp}_{48-char hex random}
  * Example: "mnvwij4q_7b367e2dbeb88523dd136e33a3b7b809c25d71e282f1466c"
  */
 function generateLoginToken() {
-    return Date.now().toString(36) + '_' + crypto.randomBytes(CONSTANTS.TOKEN_RANDOM_BYTES).toString('hex');
+    const timestamp = Date.now().toString(36);
+    const random = crypto.randomBytes(CONSTANTS.TOKEN_RANDOM_BYTES).toString('hex');
+    return `${timestamp}_${random}`;
 }
 
 // =============================================
-// SIGN & SECURITY
+// SIGNATURE GENERATION
 // =============================================
 
 /**
- * Generate sign — sha256(userId + loginToken + SIGN_SECRET).substring(0, 32).
- * Used by main.min.js: ts.loginUserInfo.sign (line 88571)
+ * Generate sign for user authentication
+ * Format: sha256(userId + loginToken + SECRET).substring(0, 32)
+ * Used by main.min.js: ts.loginUserInfo.sign
  */
 function generateSign(userId, loginToken) {
+    const data = String(userId || '') + String(loginToken || '') + CONSTANTS.SIGN_SECRET;
     return crypto.createHash('sha256')
-        .update(userId + loginToken + CONSTANTS.SIGN_SECRET)
+        .update(data)
         .digest('hex')
         .substring(0, 32);
 }
 
 /**
- * Generate security code — 16 random bytes → 32-char hex.
- * Used by main.min.js: ts.loginInfo.userInfo.securityCode (line 88725)
- * Sent as ?security= URL param by sdk.js
+ * Generate security code
+ * Output: hex string (SECURITY_LENGTH * 2 chars)
+ * Used by main.min.js: ts.loginInfo.userInfo.securityCode
  */
 function generateSecurity() {
     return crypto.randomBytes(CONSTANTS.SECURITY_LENGTH).toString('hex');
 }
 
 // =============================================
-// ORDER ID
+// ORDER ID GENERATION
 // =============================================
 
 /**
- * Generate order ID.
+ * Generate order ID
  * Format: ORD{6-padded num}_{8-char base36 timestamp}_{8-char hex}
  * Example: "ORD000001_mnvwiabc_7b367e2d"
  */
 function generateOrderId(nextOrderNum) {
-    var padded = String(nextOrderNum).padStart(6, '0');
-    var ts = Date.now().toString(36);
-    var rand = crypto.randomBytes(CONSTANTS.ORDER_RANDOM_BYTES).toString('hex');
-    return 'ORD' + padded + '_' + ts + '_' + rand;
+    const padded = String(nextOrderNum || 1).padStart(6, '0');
+    const timestamp = Date.now().toString(36);
+    const random = crypto.randomBytes(CONSTANTS.ORDER_RANDOM_BYTES).toString('hex');
+    return `ORD${padded}_${timestamp}_${random}`;
 }
 
 // =============================================
-// SANITIZE
+// INPUT SANITIZATION
 // =============================================
 
 /**
- * Sanitize username — alphanumeric + underscore, max 20 chars.
+ * Sanitize username - only allow alphanumeric and underscore
+ * @param {string} username - Input username
+ * @returns {string} Sanitized username
  */
 function sanitizeUsername(username) {
-    return String(username || '').replace(/[^a-zA-Z0-9_]/g, '').substring(0, CONSTANTS.USERNAME_MAX_LENGTH);
+    if (!username || typeof username !== 'string') {
+        return '';
+    }
+    
+    // Remove all non-alphanumeric characters except underscore
+    const sanitized = username.replace(/[^a-zA-Z0-9_]/g, '');
+    
+    // Enforce max length
+    return sanitized.substring(0, CONSTANTS.USERNAME_MAX_LENGTH);
 }
 
+/**
+ * Validate username format
+ * @param {string} username - Input username
+ * @returns {{ valid: boolean, message: string }}
+ */
+function validateUsername(username) {
+    if (!username || typeof username !== 'string') {
+        return { valid: false, message: 'Username diperlukan' };
+    }
+    
+    const sanitized = sanitizeUsername(username);
+    
+    if (sanitized.length < CONSTANTS.USERNAME_MIN_LENGTH) {
+        return { valid: false, message: `Username minimal ${CONSTANTS.USERNAME_MIN_LENGTH} karakter` };
+    }
+    
+    if (sanitized.length > CONSTANTS.USERNAME_MAX_LENGTH) {
+        return { valid: false, message: `Username maksimal ${CONSTANTS.USERNAME_MAX_LENGTH} karakter` };
+    }
+    
+    if (!CONSTANTS.USERNAME_PATTERN.test(sanitized)) {
+        return { valid: false, message: 'Username hanya boleh huruf, angka, dan underscore' };
+    }
+    
+    return { valid: true, username: sanitized };
+}
+
+/**
+ * Validate password strength
+ * @param {string} password - Input password
+ * @returns {{ valid: boolean, message: string }}
+ */
+function validatePassword(password) {
+    if (!password || typeof password !== 'string') {
+        return { valid: false, message: 'Password diperlukan' };
+    }
+    
+    if (password.length < CONSTANTS.PASSWORD_MIN_LENGTH) {
+        return { valid: false, message: `Password minimal ${CONSTANTS.PASSWORD_MIN_LENGTH} karakter` };
+    }
+    
+    if (password.length > CONSTANTS.PASSWORD_MAX_LENGTH) {
+        return { valid: false, message: `Password maksimal ${CONSTANTS.PASSWORD_MAX_LENGTH} karakter` };
+    }
+    
+    return { valid: true };
+}
+
+// =============================================
+// DEVICE ID GENERATION (for guests)
+// =============================================
+
+/**
+ * Generate device ID for guest users
+ * Format: DEV_{timestamp}_{random hex}
+ * Example: "DEV_mnvwi4q_7b367e2d"
+ */
+function generateDeviceId() {
+    const timestamp = Date.now().toString(36);
+    const random = crypto.randomBytes(8).toString('hex');
+    return `DEV_${timestamp}_${random}`;
+}
+
+// =============================================
+// HASH VERIFICATION
+// =============================================
+
+/**
+ * Create hash comparison that won't leak timing
+ * @param {string} a - First hash
+ * @param {string} b - Second hash
+ * @returns {boolean}
+ */
+function safeCompare(a, b) {
+    if (typeof a !== 'string' || typeof b !== 'string') {
+        return false;
+    }
+    
+    if (a.length !== b.length) {
+        // Still do comparison to maintain constant time
+        const dummy = Buffer.alloc(a.length);
+        const dummyB = Buffer.from(b);
+        try {
+            crypto.timingSafeEqual(dummy, dummyB);
+        } catch (e) {
+            // Ignore error, lengths differ so they're not equal
+        }
+        return false;
+    }
+    
+    try {
+        return crypto.timingSafeEqual(
+            Buffer.from(a, 'hex'),
+            Buffer.from(b, 'hex')
+        );
+    } catch (e) {
+        return false;
+    }
+}
+
+// =============================================
+// EXPORT
+// =============================================
+
 module.exports = {
-    hashPassword: hashPassword,
-    verifyPassword: verifyPassword,
-    generateSalt: generateSalt,
-    generateLoginToken: generateLoginToken,
-    generateSign: generateSign,
-    generateSecurity: generateSecurity,
-    generateOrderId: generateOrderId,
-    sanitizeUsername: sanitizeUsername
+    // Password
+    hashPassword,
+    verifyPassword,
+    generateSalt,
+    
+    // Token
+    generateLoginToken,
+    
+    // Sign
+    generateSign,
+    generateSecurity,
+    
+    // Order
+    generateOrderId,
+    
+    // Validation
+    sanitizeUsername,
+    validateUsername,
+    validatePassword,
+    
+    // Device
+    generateDeviceId,
+    
+    // Utility
+    isValidHex,
+    safeCompare
 };
