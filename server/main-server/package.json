@@ -1,14 +1,21 @@
 {
   "name": "main-server",
-  "version": "1.0.0",
-  "description": "Super Warrior Z - Main Game Server (Standalone v1)",
+  "version": "1.1.0",
+  "description": "Super Warrior Z — Main Game Server (Port 8001, Socket.IO v2, TEA enabled)",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js"
+    "start": "node index.js",
+    "dev":   "node index.js --dev"
+  },
+  "engines": {
+    "node": ">=14.0.0"
   },
   "dependencies": {
-    "socket.io": "^2.5.1",
-    "mysql2": "^3.6.0",
-    "lz-string": "^1.5.0"
-  }
+    "dotenv":    "^16.4.5",
+    "lz-string": "^1.5.0",
+    "mariadb":   "^3.3.1",
+    "socket.io": "^2.5.1"
+  },
+  "keywords": ["super-warrior-z", "main-server", "game"],
+  "license": "MIT"
 }
