@@ -1,21 +1,30 @@
 /**
  * ============================================================================
- * Login Server — saveUserEnterInfo Handler
+ * Login Server — saveUserEnterInfo Handler  [FIXED v2.1]
  * ============================================================================
  *
- * Client code (main.min.js line 77373-77389):
- * reportToLoginEnterInfo() — called AFTER enterGame succeeds on main-server
- * Callback: ts.loginClient.destroy() — disconnects login socket
+ * Client request — called AFTER enterGame succeeds on main-server:
+ *   {
+ *     type:         "User",
+ *     action:       "SaveUserEnterInfo",
+ *     accountToken: userId,
+ *     channelCode:  string,
+ *     subChannel:   string,
+ *     createTime:   number,
+ *     userLevel:    number,
+ *     version:      "1.0"
+ *   }
  *
- * Request:
- * { type:"User", action:"SaveUserEnterInfo",
- *   accountToken: userId, channelCode, subChannel, version:"1.0",
- *   createTime, userLevel, heroLevel }
+ * HAR-verified response:
+ *   41:433[{"ret":0,"data":"{\"errorCode\":0}"}]
  *
- * NATURAL IMPLEMENTATION:
- * - Analytics only
- * - Always return success (client disconnects socket on response)
- * - Callback can be null (no response expected)
+ * Callback behaviour:
+ *   After this callback fires, client calls ts.loginClient.destroy()
+ *   → disconnects login socket (so this is the LAST action on login-server).
+ *
+ * FIXES:
+ *   - Added errorCode: 0 to response data (matches HAR)
+ *   - forceCompress=false (small payload)
  *
  * ============================================================================
  */
@@ -25,26 +34,30 @@ const logger = require('../utils/logger');
 
 /**
  * Handle SaveUserEnterInfo action
- * 
- * @param {Object} payload - Request payload
- * @param {Function} callback - Socket.IO callback (can be null)
+ *
+ * @param {Object}   payload  - Request payload
+ * @param {Function} callback - Socket.IO callback (may be null)
  */
 function saveUserEnterInfo(payload, callback) {
-    const accountToken = payload.accountToken;
-    const userLevel = payload.userLevel;
-    const heroLevel = payload.heroLevel;
-    const channelCode = payload.channelCode;
-    const subChannel = payload.subChannel;
+  const accountToken = payload.accountToken;
+  const userLevel    = payload.userLevel;
+  const heroLevel    = payload.heroLevel;
+  const channelCode  = payload.channelCode;
+  const subChannel   = payload.subChannel;
+  const createTime   = payload.createTime;
 
-    logger.info('saveUserEnterInfo', 
-        `accountToken=${accountToken}, level=${userLevel}, heroLevel=${heroLevel}`);
+  logger.info('saveUserEnterInfo',
+    `accountToken=${accountToken}, level=${userLevel}, heroLevel=${heroLevel || '-'}, ` +
+    `channel=${channelCode}, sub=${subChannel}`
+  );
 
-    // Analytics logging (could be extended to DB)
-    // For now, just log the data
+  // Analytics only — log to console/DB if needed
+  // After this response, client destroys the login socket
 
-    if (callback) {
-        callback(success({}));
-    }
+  if (callback) {
+    // HAR: {"errorCode":0}
+    callback(success({ errorCode: 0 }, false));
+  }
 }
 
 module.exports = { saveUserEnterInfo };

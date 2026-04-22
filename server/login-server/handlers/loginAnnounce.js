@@ -1,18 +1,21 @@
 /**
  * ============================================================================
- * Login Server — loginAnnounce Handler
+ * Login Server — loginAnnounce Handler  [FIXED v2.1]
  * ============================================================================
  *
- * Client request (main.min.js line 88769-88772):
- * { type: "User", action: "LoginAnnounce" }
+ * Client request:
+ *   { type: "User", action: "LoginAnnounce" }
  *
- * Client response handler (line 88773-88790):
- * t.data = parsed response.data → array of notices
- * Each notice: { text: {lang: string}, title: {lang: string}, version, orderNo, alwaysPopup }
+ * HAR-verified response:
+ *   53:431[{"ret":0,"data":"{\"data\":[],\"errorCode\":0}"}]
  *
- * NATURAL IMPLEMENTATION:
- * - Returns empty array by default (disabled)
- * - Can be extended to load from JSON file or database
+ *   So data object must be: { data: [], errorCode: 0 }
+ *   (previously was { data: [] } — missing errorCode)
+ *
+ * Client response handler:
+ *   t.data = parsed response.data → array of notices
+ *   Each notice: { text: {lang: string}, title: {lang: string},
+ *                  version, orderNo, alwaysPopup }
  *
  * ============================================================================
  */
@@ -23,28 +26,29 @@ const CONSTANTS = require('../config/constants');
 
 /**
  * Handle LoginAnnounce action
- * 
+ *
  * @param {Function} callback - Socket.IO callback
  */
 function loginAnnounce(callback) {
-    if (!CONSTANTS.ANNOUNCE_ENABLED) {
-        logger.debug('loginAnnounce', 'Disabled, returning empty');
-        
-        if (callback) {
-            callback(success({ data: [] }));
-        }
-        return;
-    }
-
-    // TODO: Load announces from JSON file or database
-    // For now, return empty
-    const announces = [];
-
-    logger.info('loginAnnounce', `Returning ${announces.length} announce(s)`);
+  if (!CONSTANTS.ANNOUNCE_ENABLED) {
+    logger.debug('loginAnnounce', 'Disabled, returning empty');
 
     if (callback) {
-        callback(success({ data: announces }));
+      // HAR shows: {"data":[],"errorCode":0}
+      callback(success({ data: [], errorCode: 0 }, false));
     }
+    return;
+  }
+
+  // TODO: Load announces from JSON file or database
+  // Format: [{ text: { en: "msg" }, title: { en: "title" }, version: 1, orderNo: 1, alwaysPopup: false }]
+  const announces = [];
+
+  logger.info('loginAnnounce', `Returning ${announces.length} announce(s)`);
+
+  if (callback) {
+    callback(success({ data: announces, errorCode: 0 }, false));
+  }
 }
 
 module.exports = { loginAnnounce };
