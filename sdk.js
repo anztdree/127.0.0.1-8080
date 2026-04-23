@@ -1,13 +1,13 @@
 /**
  * ============================================================================
- *  SDK.js v4 — PPGAME SDK Client + Server (Standalone)
+ *  SDK.js v4.1 — PPGAME SDK Client + Server (Standalone)
  *  Super Warrior Z (Dragon Ball Z) — Private Server
  * ============================================================================
  *
  *  Engine     : Egret (WebGL)
  *  Resolution : 750 x 1334
  *  SDK Type   : PPGAME (Standalone — no external server needed)
- *  Version    : 4.0.0
+ *  Version    : 4.1.0
  *
  *  ARCHITECTURE:
  *  ───────────────────────────────────────────────────────────────────────────
@@ -49,9 +49,9 @@
  *    - window.PPGAME_SDK        → debug interface
  *    - 20+ window.* variables   → config values for main.min.js
  *
- *  LOGIN FLOW:
+ *  LOGIN FLOW (Guest Only):
  *    sdk.js loads → check URL params → no params? show login UI →
- *    user login → SERVER handler authenticates → returns login data →
+ *    user clicks GUEST LOGIN → SERVER handler creates/finds guest →
  *    redirect ?sdk=X&logintoken=X&nickname=X&userid=X&sign=X&security=X →
  *    page reload → params detected → skip login UI → game loads →
  *    main.min.js calls getSdkLoginInfo() → sdkLoginSuccess()
@@ -112,16 +112,12 @@
 
         // API endpoints — kept for compatibility with original flow
         API: {
-            AUTH_LOGIN: '/api/auth/login',
             AUTH_GUEST: '/api/auth/guest',
-            AUTH_REGISTER: '/api/auth/register',
             AUTH_LOGOUT: '/api/auth/logout',
             PAYMENT_CREATE: '/api/payment/create',
             PAYMENT_VERIFY: '/api/payment/verify',
-            PAYMENT_CALLBACK: '/api/payment/callback',
             REPORT_EVENT: '/api/report/event',
             REPORT_BATCH: '/api/report/batch',
-            USER_INFO: '/api/user/info',
             USER_LANGUAGE: '/api/user/language'
         }
     };
@@ -456,35 +452,6 @@
         // ─── USER operations ───────────────────────────────────────────
 
         /**
-         * Find a user by username.
-         * @param {string} username
-         * @returns {Object|null} User record or null
-         */
-        findUserByUsername: function (username) {
-            var users = this._readTable('users');
-            var uname = username.toLowerCase();
-            for (var i = 0; i < users.length; i++) {
-                if (users[i].username && users[i].username.toLowerCase() === uname) {
-                    return users[i];
-                }
-            }
-            return null;
-        },
-
-        /**
-         * Find a user by userId.
-         * @param {string} userId
-         * @returns {Object|null}
-         */
-        findUserByUserId: function (userId) {
-            var users = this._readTable('users');
-            for (var i = 0; i < users.length; i++) {
-                if (users[i].userId === userId) return users[i];
-            }
-            return null;
-        },
-
-        /**
          * Find a user by deviceId (guest login).
          * @param {string} deviceId
          * @returns {Object|null}
@@ -498,8 +465,8 @@
         },
 
         /**
-         * Create a new user record.
-         * @param {Object} userData - {username, password, deviceId, channel, appId}
+         * Create a new guest user record.
+         * @param {Object} userData - {deviceId, channel, appId}
          * @returns {Object} The created user record (with generated fields)
          */
         createUser: function (userData) {
@@ -514,22 +481,19 @@
             var now = Date.now();
             var user = {
                 userId: String(maxId),
-                username: userData.username || null,
-                password: userData.password || null,
                 deviceId: userData.deviceId || null,
-                nickname: userData.username || ('Player' + maxId),
+                nickname: 'Player' + maxId,
                 channel: userData.channel || SDK_CONFIG.CHANNEL,
                 appId: userData.appId || SDK_CONFIG.APP_ID,
                 createdAt: now,
                 lastLoginAt: now,
                 loginCount: 1,
-                // Token will be generated on login
                 loginToken: null
             };
 
             users.push(user);
             this._writeTable('users', users);
-            sdkLog('debug', 'DB', 'Created user: ' + user.userId + ' (' + (user.username || user.deviceId) + ')');
+            sdkLog('debug', 'DB', 'Created user: ' + user.userId + ' (' + user.deviceId + ')');
             return user;
         },
 
@@ -604,112 +568,6 @@
     // ========================================================================
 
     var ServerHandlers = {};
-
-    /**
-     * POST /api/auth/login
-     * Authenticate user by username + password.
-     *
-     * Request: { username, password, channel, appId, timestamp }
-     * Response: { success: true, data: { userId, nickname, loginToken, sdk, sessionId, sign, security } }
-     */
-    ServerHandlers[SDK_CONFIG.API.AUTH_LOGIN] = function (data) {
-        sdkLog('info', 'Server:Auth', 'Login request', { username: data.username });
-
-        // Validate required fields
-        if (!data.username || !data.password) {
-            return { success: false, message: 'Username and password are required' };
-        }
-
-        // Find user
-        var user = MockDB.findUserByUsername(data.username);
-        if (!user) {
-            return { success: false, message: 'User not found. Please register first.' };
-        }
-
-        // Verify password (plaintext comparison, matching original SDK behavior)
-        if (user.password !== data.password) {
-            return { success: false, message: 'Incorrect password' };
-        }
-
-        // Update login info and get fresh token
-        user = MockDB.updateUserLogin(user.userId);
-        var loginToken = user.loginToken;
-
-        // Generate sign and security codes
-        var sign = simpleHash(user.userId + loginToken);
-        var security = simpleHash(loginToken + SDK_CONFIG.APP_ID);
-
-        sdkLog('info', 'Server:Auth', 'Login success', { userId: user.userId, nickname: user.nickname });
-
-        return {
-            success: true,
-            data: {
-                userId: user.userId,
-                nickname: user.nickname,
-                loginToken: loginToken,
-                sdk: user.channel || SDK_CONFIG.CHANNEL,
-                sessionId: generateUniqueId(),
-                sign: sign,
-                security: security
-            }
-        };
-    };
-
-    /**
-     * POST /api/auth/register
-     * Register a new user account. Auto-login on success.
-     *
-     * Request: { username, password, channel, appId, timestamp }
-     * Response: same as login
-     */
-    ServerHandlers[SDK_CONFIG.API.AUTH_REGISTER] = function (data) {
-        sdkLog('info', 'Server:Auth', 'Register request', { username: data.username });
-
-        // Validate
-        if (!data.username || !data.password) {
-            return { success: false, message: 'Username and password are required' };
-        }
-        if (data.username.length < 3) {
-            return { success: false, message: 'Username must be at least 3 characters' };
-        }
-        if (data.password.length < 3) {
-            return { success: false, message: 'Password must be at least 3 characters' };
-        }
-
-        // Check if username already exists
-        if (MockDB.findUserByUsername(data.username)) {
-            return { success: false, message: 'Username already exists' };
-        }
-
-        // Create user
-        var user = MockDB.createUser({
-            username: data.username,
-            password: data.password,
-            channel: data.channel || SDK_CONFIG.CHANNEL,
-            appId: data.appId || SDK_CONFIG.APP_ID
-        });
-
-        // Generate token
-        user = MockDB.updateUserLogin(user.userId);
-        var loginToken = user.loginToken;
-        var sign = simpleHash(user.userId + loginToken);
-        var security = simpleHash(loginToken + SDK_CONFIG.APP_ID);
-
-        sdkLog('info', 'Server:Auth', 'Register success', { userId: user.userId });
-
-        return {
-            success: true,
-            data: {
-                userId: user.userId,
-                nickname: user.nickname,
-                loginToken: loginToken,
-                sdk: user.channel || SDK_CONFIG.CHANNEL,
-                sessionId: generateUniqueId(),
-                sign: sign,
-                security: security
-            }
-        };
-    };
 
     /**
      * POST /api/auth/guest
@@ -1311,79 +1169,19 @@
         var form = document.createElement('div');
         form.setAttribute('style', 'width:320px;max-width:85%;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:16px;padding:32px 24px;backdrop-filter:blur(10px)');
 
-        // ── Username field ──
-        var ug = document.createElement('div');
-        ug.setAttribute('style', 'margin-bottom:16px');
-        var ul = document.createElement('label');
-        ul.textContent = 'Username';
-        ul.setAttribute('style', 'display:block;font-size:12px;color:#8888aa;margin-bottom:6px;text-transform:uppercase;letter-spacing:1px');
-        ug.appendChild(ul);
-        var ui = document.createElement('input');
-        ui.type = 'text';
-        ui.id = 'ppgame-username';
-        ui.placeholder = 'Enter username';
-        ui.setAttribute('style', 'width:100%;padding:12px 16px;border:1px solid rgba(255,255,255,0.15);border-radius:8px;background:rgba(0,0,0,0.3);color:#fff;font-size:16px;outline:none;box-sizing:border-box;transition:border-color 0.3s');
-        ui.onfocus = function () { this.style.borderColor = '#ffd700'; };
-        ui.onblur = function () { this.style.borderColor = 'rgba(255,255,255,0.15)'; };
-        ug.appendChild(ui);
-        form.appendChild(ug);
-
-        // ── Password field ──
-        var pg = document.createElement('div');
-        pg.setAttribute('style', 'margin-bottom:24px');
-        var pl = document.createElement('label');
-        pl.textContent = 'Password';
-        pl.setAttribute('style', 'display:block;font-size:12px;color:#8888aa;margin-bottom:6px;text-transform:uppercase;letter-spacing:1px');
-        pg.appendChild(pl);
-        var pi = document.createElement('input');
-        pi.type = 'password';
-        pi.id = 'ppgame-password';
-        pi.placeholder = 'Enter password';
-        pi.setAttribute('style', 'width:100%;padding:12px 16px;border:1px solid rgba(255,255,255,0.15);border-radius:8px;background:rgba(0,0,0,0.3);color:#fff;font-size:16px;outline:none;box-sizing:border-box;transition:border-color 0.3s');
-        pi.onfocus = function () { this.style.borderColor = '#ffd700'; };
-        pi.onblur = function () { this.style.borderColor = 'rgba(255,255,255,0.15)'; };
-        pg.appendChild(pi);
-        form.appendChild(pg);
-
         // ── Error message area ──
         var err = document.createElement('div');
         err.id = 'ppgame-login-error';
-        err.setAttribute('style', 'color:#ff6b6b;font-size:13px;text-align:center;margin-bottom:12px;min-height:20px');
+        err.setAttribute('style', 'color:#ff6b6b;font-size:13px;text-align:center;margin-bottom:24px;min-height:20px');
         form.appendChild(err);
 
-        // ── LOGIN button ──
-        var lb = document.createElement('button');
-        lb.textContent = 'LOGIN';
-        lb.id = 'ppgame-login-btn';
-        lb.setAttribute('style', 'width:100%;padding:14px;border:none;border-radius:8px;background:linear-gradient(135deg,#ffd700,#ff8c00);color:#000;font-size:18px;font-weight:bold;letter-spacing:2px;cursor:pointer;transition:transform 0.2s,box-shadow 0.2s');
-        lb.onmouseenter = function () { this.style.transform = 'translateY(-2px)'; this.style.boxShadow = '0 6px 20px rgba(255,215,0,0.3)'; };
-        lb.onmouseleave = function () { this.style.transform = 'translateY(0)'; this.style.boxShadow = 'none'; };
-        lb.onclick = function () { handleLoginClick(); };
-        form.appendChild(lb);
-
-        // ── Register link ──
-        var rl = document.createElement('div');
-        rl.setAttribute('style', 'text-align:center;margin-top:12px');
-        var rb = document.createElement('span');
-        rb.textContent = "Don't have an account? Register";
-        rb.setAttribute('style', 'color:#8888cc;font-size:13px;cursor:pointer;text-decoration:underline');
-        rb.onclick = function () { handleRegisterClick(); };
-        rl.appendChild(rb);
-        form.appendChild(rl);
-
-        // ── OR divider ──
-        var div = document.createElement('div');
-        div.setAttribute('style', 'display:flex;align-items:center;margin:24px 0;color:#555;font-size:12px');
-        div.innerHTML = '<div style="flex:1;height:1px;background:rgba(255,255,255,0.1)"></div><div style="padding:0 12px">OR</div><div style="flex:1;height:1px;background:rgba(255,255,255,0.1)"></div>';
-        form.appendChild(div);
-
-        // ── GUEST LOGIN button ──
+        // ── GUEST LOGIN button (primary) ──
         var gb = document.createElement('button');
         gb.textContent = 'GUEST LOGIN';
         gb.id = 'ppgame-guest-btn';
-        gb.setAttribute('style', 'width:100%;padding:12px;border:1px solid rgba(255,255,255,0.2);border-radius:8px;background:transparent;color:#aaa;font-size:14px;letter-spacing:2px;cursor:pointer;transition:all 0.3s');
-        gb.onmouseenter = function () { this.style.borderColor = '#8888cc'; this.style.color = '#ccc'; };
-        gb.onmouseleave = function () { this.style.borderColor = 'rgba(255,255,255,0.2)'; this.style.color = '#aaa'; };
+        gb.setAttribute('style', 'width:100%;padding:16px;border:none;border-radius:12px;background:linear-gradient(135deg,#ffd700,#ff8c00);color:#000;font-size:18px;font-weight:bold;letter-spacing:3px;cursor:pointer;transition:transform 0.2s,box-shadow 0.2s');
+        gb.onmouseenter = function () { this.style.transform = 'translateY(-2px)'; this.style.boxShadow = '0 6px 24px rgba(255,215,0,0.4)'; };
+        gb.onmouseleave = function () { this.style.transform = 'translateY(0)'; this.style.boxShadow = 'none'; };
         gb.onclick = function () { handleGuestLoginClick(); };
         form.appendChild(gb);
         overlay.appendChild(form);
@@ -1391,15 +1189,11 @@
         // ── Version footer ──
         var ver = document.createElement('div');
         ver.setAttribute('style', 'position:absolute;bottom:20px;color:#444;font-size:11px;text-align:center');
-        ver.textContent = 'PPGAME SDK v4.0.0 | Channel: ' + SDK_CONFIG.CHANNEL.toUpperCase();
+        ver.textContent = 'PPGAME SDK v4.1.0 | Channel: ' + SDK_CONFIG.CHANNEL.toUpperCase();
         overlay.appendChild(ver);
 
         document.body.appendChild(overlay);
         _state.loginUIVisible = true;
-
-        // Keyboard shortcuts: Enter to login/submit
-        pi.addEventListener('keyup', function (e) { if (e.key === 'Enter' || e.keyCode === 13) handleLoginClick(); });
-        ui.addEventListener('keyup', function (e) { if (e.key === 'Enter' || e.keyCode === 13) pi.focus(); });
     }
 
     /**
@@ -1420,88 +1214,16 @@
     }
 
     /**
-     * Enable or disable login/guest buttons during authentication.
+     * Enable or disable guest button during authentication.
      */
     function setLoginButtonsDisabled(disabled) {
-        var lb = document.getElementById('ppgame-login-btn');
         var gb = document.getElementById('ppgame-guest-btn');
-        if (lb) {
-            lb.disabled = disabled;
-            lb.style.opacity = disabled ? '0.5' : '1';
-            lb.style.pointerEvents = disabled ? 'none' : 'auto';
-            lb.textContent = disabled ? 'LOGGING IN...' : 'LOGIN';
-        }
         if (gb) {
             gb.disabled = disabled;
             gb.style.opacity = disabled ? '0.5' : '1';
             gb.style.pointerEvents = disabled ? 'none' : 'auto';
             gb.textContent = disabled ? 'CONNECTING...' : 'GUEST LOGIN';
         }
-    }
-
-    /**
-     * Handle LOGIN button click.
-     * Validates input → sends auth request → handles success/failure.
-     */
-    function handleLoginClick() {
-        var uInput = document.getElementById('ppgame-username');
-        var pInput = document.getElementById('ppgame-password');
-        var username = uInput ? uInput.value.trim() : '';
-        var password = pInput ? pInput.value.trim() : '';
-
-        // Validation
-        if (!username) { setLoginError('Please enter your username'); uInput && uInput.focus(); return; }
-        if (!password) { setLoginError('Please enter your password'); pInput && pInput.focus(); return; }
-        if (username.length < 3) { setLoginError('Username must be at least 3 characters'); return; }
-        if (password.length < 3) { setLoginError('Password must be at least 3 characters'); return; }
-
-        setLoginError('');
-        setLoginButtonsDisabled(true);
-
-        sendHttpRequest('POST', SDK_CONFIG.API.AUTH_LOGIN,
-            { username: username, password: password, channel: SDK_CONFIG.CHANNEL, appId: SDK_CONFIG.APP_ID, timestamp: formatDate() },
-            function (response) {
-                sdkLog('info', 'Auth', 'Login OK: ' + username);
-                handleLoginSuccess(response);
-            },
-            function (error) {
-                sdkLog('error', 'Auth', 'Login failed: ' + error);
-                setLoginError(error);
-                setLoginButtonsDisabled(false);
-            }
-        );
-    }
-
-    /**
-     * Handle REGISTER link click.
-     * Same validation as login, calls register endpoint.
-     * On success, auto-login via handleLoginSuccess().
-     */
-    function handleRegisterClick() {
-        var uInput = document.getElementById('ppgame-username');
-        var pInput = document.getElementById('ppgame-password');
-        var username = uInput ? uInput.value.trim() : '';
-        var password = pInput ? pInput.value.trim() : '';
-
-        if (!username || !password) { setLoginError('Enter username and password to register'); return; }
-        if (username.length < 3) { setLoginError('Username must be at least 3 characters'); return; }
-        if (password.length < 3) { setLoginError('Password must be at least 3 characters'); return; }
-
-        setLoginError('');
-        setLoginButtonsDisabled(true);
-
-        sendHttpRequest('POST', SDK_CONFIG.API.AUTH_REGISTER,
-            { username: username, password: password, channel: SDK_CONFIG.CHANNEL, appId: SDK_CONFIG.APP_ID, timestamp: formatDate() },
-            function (response) {
-                sdkLog('info', 'Auth', 'Register OK, auto-login: ' + username);
-                handleLoginSuccess(response);
-            },
-            function (error) {
-                sdkLog('error', 'Auth', 'Register failed: ' + error);
-                setLoginError(error);
-                setLoginButtonsDisabled(false);
-            }
-        );
     }
 
     /**
@@ -2161,7 +1883,7 @@
      */
     function initializeSDK() {
         _state.isInitialized = true;
-        sdkLog('info', 'Init', 'PPGAME SDK v4.0.0 (Standalone)');
+        sdkLog('info', 'Init', 'PPGAME SDK v4.1.0 (Standalone)');
         sdkLog('info', 'Init', 'Channel: ' + SDK_CONFIG.CHANNEL + ' | App: ' + SDK_CONFIG.APP_ID);
 
         // Step 1: Restore session info from localStorage
@@ -2282,6 +2004,6 @@
     // Run initialization
     initializeSDK();
 
-    sdkLog('info', 'SDK', 'PPGAME SDK v4.0.0 loaded successfully');
+    sdkLog('info', 'SDK', 'PPGAME SDK v4.1.0 loaded successfully');
 
 })();
