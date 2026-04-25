@@ -141,7 +141,7 @@ var stmtSaveEnterInfo = db.prepare(
 //   serverList[].offlineReason — line 138057
 var DEFAULT_SERVER = {
     serverId: '1',
-    name: 'Server 1',
+    name: 'Original 1',
     url: 'http://127.0.0.1:8001',
     chaturl: 'http://127.0.0.1:8002',
     dungeonurl: 'http://127.0.0.1:8003',
@@ -219,6 +219,7 @@ function process(socket, msg, callback) {
             case 'SaveLanguage':      return saveLanguage(socket, msg, callback);
             case 'SaveUserEnterInfo': return saveUserEnterInfo(socket, msg, callback);
             case 'getNotice':         return getNotice(socket, msg, callback);
+            case 'LoginAnnounce':     return loginAnnounce(socket, msg, callback);
             default:
                 console.log('[HANDLER] Unknown action: ' + action);
                 if (callback) err(5);
@@ -501,6 +502,21 @@ function saveUserEnterInfo(socket, msg, callback) {
     }
 
     // Client doesn't process response data — line 114458-114459
+    if (callback) callback(ok({}));
+}
+
+/**
+ * ── LoginAnnounce ────────────────────────────────────────────────────────
+ * Login announcement / bulletin
+ *
+ * Request: { type:'User', action:'LoginAnnounce', ... }
+ *
+ * NOTE: This action is NOT found in main.min(unminfy).js source code.
+ * It may come from a SDK login path, custom JS extension, or analytics module.
+ * Since no evidence exists for request/response format, return empty success.
+ */
+function loginAnnounce(socket, msg, callback) {
+    console.log('[LoginAnnounce]');
     if (callback) callback(ok({}));
 }
 
