@@ -147,6 +147,7 @@ function tRow(cells) {
 // ============================================================
 
 var sessions = {};
+var onlineUsers = {};  // userId → socketId (for push notifications)
 
 function sessCreate(socketId, ip, transport) {
     var s = {
@@ -169,6 +170,34 @@ function sessCreate(socketId, ip, transport) {
     return s;
 }
 
+/**
+ * notifyUser — send a push notification to a specific online user.
+ *
+ * @param {string} userId  - Target user ID
+ * @param {object} payload - Data object (will be LZ-compressed inside buildNotifyResponse)
+ * @returns {boolean} true if the user was online and notified
+ *
+ * Payload format for 'userMessage' push (client line 114053-114060):
+ *   { action: 'userMessage', friendId, msg: { _time, _context }, userInfo: { _serverId, _oriServerId, _userId, _nickName, ... } }
+ *
+ * NOTE: userInfo fields use _-prefixed keys. Client UserSimpleInfo.deserialize()
+ *       strips the _ prefix (e.g. _nickName → this.nickName).
+ *       Arrays/objects are SKIPPED by isCommonType() — only string/number/boolean.
+ */
+function notifyUser(userId, payload) {
+    var socketId = onlineUsers[userId];
+    if (!socketId) return false;
+
+    var targetSocket = io.sockets.connected[socketId];
+    if (!targetSocket || !targetSocket.connected) {
+        delete onlineUsers[userId];
+        return false;
+    }
+
+    targetSocket.emit('Notify', buildNotifyResponse(payload));
+    return true;
+}
+
 // ============================================================
 // RESPONSE BUILDERS
 // ============================================================
@@ -188,6 +217,25 @@ function buildErrorResponse(errorCode) {
         ret: errorCode || 1,
         data: '',
         compress: false,
+        serverTime: Date.now(),
+        server0Time: new Date().getTimezoneOffset() * 60 * 1000
+    };
+}
+
+/**
+ * buildNotifyResponse — for push notifications via socket.emit('Notify', ...)
+ *
+ * Client expects (startListenNotify, line 114211-114238):
+ *   t.ret === 'SUCCESS' (STRING, not number!)
+ *   t.compress === true
+ *   t.data = LZString.compressToUTF16(JSON.stringify(payload))
+ *   Client then: JSON.parse(LZString.decompressFromUTF16(t.data)) → dispatches to ts.notifyData(o)
+ */
+function buildNotifyResponse(data) {
+    return {
+        ret: 'SUCCESS',
+        data: LZString.compressToUTF16(JSON.stringify(data)),
+        compress: true,
         serverTime: Date.now(),
         server0Time: new Date().getTimezoneOffset() * 60 * 1000
     };
@@ -741,7 +789,9 @@ io.on('connection', function (socket) {
             buildErrorResponse: buildErrorResponse,
             crypto: crypto,
             config: config,
-            _logNickName: null
+            _logNickName: null,
+            notifyUser: notifyUser,
+            onlineUsers: onlineUsers
         };
 
         var startTime = Date.now();
@@ -769,10 +819,13 @@ io.on('connection', function (socket) {
                 sess.actions[action] = { idx: idx, status: ret === 0 ? 'ok' : 'error', time: elapsed };
                 if (sess.actionOrder.indexOf(action) === -1) sess.actionOrder.push(action);
 
-                // Track userId/nickName from enterGame
+                // Track userId/nickName from enterGame + register online for push
                 if (action === 'enterGame' && ret === 0 && decompressed) {
                     sess.userId = decompressed.user ? decompressed.user._id : null;
                     sess.nickName = decompressed.user ? decompressed.user._nickName : null;
+                    if (sess.userId) {
+                        onlineUsers[sess.userId] = socket.id;
+                    }
                 }
 
                 callback(result);
@@ -797,6 +850,10 @@ io.on('connection', function (socket) {
         sess.disconnectTime = Date.now();
         sess.disconnectReason = reason;
         logDisc(sess);
+        // Remove from onlineUsers (only if this socket still owns the userId)
+        if (sess.userId && onlineUsers[sess.userId] === socket.id) {
+            delete onlineUsers[sess.userId];
+        }
         setTimeout(function () { delete sessions[socket.id]; }, 2000);
     });
 });
