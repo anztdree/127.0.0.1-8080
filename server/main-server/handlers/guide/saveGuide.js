@@ -13,31 +13,43 @@
  *   Fail    → Logger.serverDebugLog('失败')
  *   Callback does NOT read response data — only cares about ret code.
  *
+ * Client enterGame loads guide (line 120569-120575):
+ *   GuideInfoManager.setGuideInfo(e.guide)
+ *   → reads e._id, iterates e._steps → copies to local guideInfo._steps
+ *
  * Implementation: save guide progress to userJson module 'guide'.
- *   { guideType: step }
+ *   Structure: { _id: userId, _steps: { "<guideType>": stepId } }
  */
 
 module.exports = {
     execute: function (data, socket, ctx) {
         return new Promise(function (resolve) {
-            var userId = data.userId;
-            if (!userId) return resolve(ctx.buildErrorResponse(1));
+            try {
+                var userId = data.userId;
+                if (!userId) return resolve(ctx.buildErrorResponse(1));
 
-            var guideType = data.guideType;
-            var step = data.step;
+                var guideType = data.guideType;
+                var step = data.step;
 
-            // Load existing guide data
-            var guideData = ctx.db.getJsonModule(userId, 'guide') || {};
+                // Load existing guide data
+                var guideData = ctx.db.getJsonModule(userId, 'guide') || {};
 
-            // Update step for this guideType
-            if (guideType !== undefined && guideType !== null) {
-                guideData[String(guideType)] = step;
+                // Update step inside _steps — NOT at root level!
+                // Client setGuideInfo (line 120574): for (var n in e._steps)
+                // Root-level keys are NEVER read by client.
+                if (guideType !== undefined && guideType !== null) {
+                    if (!guideData._steps) guideData._steps = {};
+                    guideData._steps[String(guideType)] = step;
+                }
+
+                // Save back
+                ctx.db.setJsonModule(userId, 'guide', guideData);
+
+                resolve(ctx.buildResponse({}));
+            } catch (err) {
+                console.error('[guide/saveGuide] Error:', err);
+                resolve(ctx.buildErrorResponse(1));
             }
-
-            // Save back
-            ctx.db.setJsonModule(userId, 'guide', guideData);
-
-            resolve(ctx.buildResponse({}));
         });
     }
 };
