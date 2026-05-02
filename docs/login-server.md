@@ -194,7 +194,7 @@ Socket di-destroy baik SaveUserEnterInfo success MAUPUN error.
 Socket tetap hidup dari GetServerList sampai SaveUserEnterInfo selesai. Selama itu, action berikut BISA dikirim:
 - `GetServerList` — bisa multiple kali (refreshServerList)
 - `SaveLanguage` — bisa dipanggil kapan saja dari languageBtnTap
-- `getNotice` — dipanggil setelah GetServerList
+- `LoginAnnounce` — dipanggil setelah GetServerList
 - `SaveHistory` — dipanggil saat user klik Start
 - `SaveUserEnterInfo` — dipanggil setelah enterGame Main-Server success → destroy
 
