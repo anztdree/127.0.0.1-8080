@@ -5,6 +5,7 @@
 > **Sumber:** `main.min(unminfy).js` (244,761 baris, ~10.5MB) + `resource/json/` (471 file)
 > **Repo:** https://github.com/anztdree/127.0.0.1-8000
 > **Metode:** Zero stub, zero override, zero force, zero dummy, zero assumption — setiap detail didokumentasi dari source code
+> **Versi:** 4.0 — Foundation Revision: totalProps._items EKSPLISIT (bukan kosong!), Database satu-tabel-per-fitur, JSON Loader 471 file ke memory, New User Constants dari constant.json, Cascade Failure Analysis
 
 ---
 
@@ -19,6 +20,16 @@
 7. [Database Schema](#7-database-schema)
 8. [Complete Handler Catalog](#8-complete-handler-catalog)
 9. [Cross-Reference: Handler ↔ Resource/JSON](#9-cross-reference-handler--resourcejson)
+10. [enterGame Response — Struktur Data Lengkap](#10-entergame-response--struktur-data-lengkap)
+11. [Battle System — Arsitektur Lengkap](#11-battle-system--arsitektur-lengkap)
+12. [Daily Reset & Server Time](#12-daily-reset--server-time)
+13. [Feature Unlock System (OpenLimit)]#13-feature-unlock-system-openlimit)
+14. [Tutorial/Guide System](#14-tutorialguide-system)
+15. [Complete Handler Catalog — Summary Table](#15-complete-handler-catalog--summary-table)
+16. [Notify System — Expanded](#16-notify-system--expanded)
+17. [Implementation Priority](#17-implementation-priority)
+18. [Key Statistics](#18-key-statistics)
+19. [Fondasi Implementasi](#19-fondasi-implementasi)
 
 ---
 
@@ -125,21 +136,132 @@ Jika terputus lebih dari `maxReconnectWaitTime` (600000ms = 10 menit), client me
 Semua server menggunakan **satu event Socket.IO** untuk request/response:
 
 ```javascript
-// Client → Server
+// Client → Server (Line 82528)
 socket.emit('handler.process', requestObject, callbackFunction)
 
 // Server → Client (via callbackFunction)
 callbackFunction(responseObject)
 ```
 
-### 2.2 Notify Event (Server → Client Push)
+**TIDAK ADA WRAPPER** — request object dikirim langsung, tanpa envelope tambahan.
+**TIDAK ADA SESSION TOKEN** per-request — socket sudah authenticated via TEA handshake.
+**userId** ditambahkan manual di setiap call site dari `UserInfoSingleton.getInstance().userId`.
+
+### 2.2 processHandler — Client-Side Request Pipeline (Line 113843)
+
+```javascript
+t.prototype.processHandler = function (e, t, n, o) {
+    // e = request object, t = success callback, n = error callback, o = skip error tips
+
+    var a = setTimeout(function () {
+        ts.openWindow('LoadingPanel', { parent: 'Tips' });    // Loading setelah 600ms
+    }, 600);
+
+    var r = setTimeout(function () {
+        ts.normalErrorMsg('Network timeout');                  // Timeout setelah 10 detik
+    }, 10000);
+
+    var i = function (response) {
+        clearTimeout(a); clearTimeout(r); ts.closeWindow('LoadingPanel');
+        if (0 === response.ret) {
+            var data = response.data;                          // String!
+            if (response.compress) data = LZString.decompressFromUTF16(data);
+            if (response.serverTime) ServerTime.getInstance().updateServerTime(response.serverTime, response.server0Time);
+            if ('70001' == data) { ts.reportBattlleLog(); return; }
+            var parsed = JSON.parse(data);                     // Parse string → object
+            t && t(parsed);                                    // Callback dengan parsed data
+        } else {
+            if ('22' == response.ret) ts.reportBattlleLog();
+            if ('38' == response.ret) TSBrowser.executeFunction('reload'); // Force reload
+            if (!o) ErrorHandler.ShowErrorTips(response.ret, n);
+            else n && n(response);
+        }
+    };
+    this.mainClient.sendToServer(e, i);
+};
+```
+
+**Timeline UX:**
+- T+0ms: Request dikirim
+- T+600ms: Loading panel muncul
+- T+10000ms: Timeout error
+
+### 2.3 totalProps._items — Struktur Data Item (Line 114912)
+
+```javascript
+// Server mengirim:
+totalProps: {
+    _items: {
+        "0": { "_id": 101, "_num": 500 },     // Diamond
+        "1": { "_id": 102, "_num": 10000 },    // Gold
+        "2": { "_id": 104, "_num": 1 },        // Player Level
+        "3": { "_id": 106, "_num": 0 }         // VIP Level
+    }
+}
+
+// Client memproses (setBackpack, Line 114912):
+e.setBackpack = function (e) {
+    var t = ItemsCommonSingleton.getInstance(), n = e.totalProps._items;
+    for (var o in n) {
+        var a = n[o]._id, r = n[o]._num;
+        t.setItem(a, r);
+        a == PLAYERLEVELID && NewOpenSystemManager.getInstance().setLastUserLevel(r);
+    }
+    UserInfoSingleton.getInstance().heroBackPack = e.backpackLevel;
+}
+
+// Internal storage: items[itemId] = num (flat number dictionary)
+// getItemNum(itemId) → returns 0 jika item tidak ada (BUKAN undefined)
+```
+
+**PENTING:**
+- Key `_items` adalah dictionary dengan key numerik string (`"0"`, `"1"`, dll)
+- Setiap entry punya `{ _id: number, _num: number }`
+- `_id` = item ID constant, `_num` = jumlah
+- Jika item tidak ada di `_items`, `getItemNum()` mengembalikan `0`
+- Item dengan `_num = 0` TIDAK bisa dibedakan dari item yang tidak ada — keduanya return `0`
+- **Untuk new user:** `{ _items: {} }` SALAH — HARUS EKSPLISIT! Lihat Section 19.3 untuk detail lengkap cascade failure
+
+### 2.3a totalProps._items — BUKAN Kosong untuk New User (KRITIS!)
+
+**KOREKSI V4:** Sebelumnya dinyatakan `{ _items: {} }` cukup untuk new user. Ini **SALAH** berdasarkan analisis mendalam dari `main.min(unminfy).js`.
+
+**Bukti Cascade Failure jika _items kosong:**
+
+1. **`setLastUserLevel()` TIDAK PERNAH dipanggil** — PLAYERLEVELID (104) tidak ada di _items, loop `for...in` tidak iterasi, `NewOpenSystemManager.lastUserLevel` tetap `undefined`
+
+2. **`getUserLevel()` return 0** — `ItemsCommonSingleton.getItemNum(PLAYERLEVELID)` return 0 karena item 104 tidak ada di dict. Level 0 = semua fitur terkunci.
+
+3. **Semua OpenLimit check GAGAL** — `open.json` memerlukan `dependOnPara >= 1` untuk fitur paling dasar (levelUp, weakUp, skill, equip, summon, chat, mainTask, market, blacksmith, welfare). Level 0 = semua fitur terkunci = game bricked.
+
+4. **`setItem(104, 1)` pertama kali menghasilkan NaN** — `n.items[104]` adalah `undefined`, sehingga `levelDiff = 1 - undefined = NaN`. `NaN > 0` = `false`, jadi event level-up pertama (SDK tracking) gagal silent.
+
+5. **`o[s].level > undefined` = `false`** — Pada level-up window close, perbandingan `o[s].level > lastUserLevel` gagal untuk semua entry jika `lastUserLevel` undefined. Tidak ada "new system unlocked" notification yang muncul.
+
+**New user _items yang BENAR** (detail lengkap di Section 19.3):
+
+```javascript
+totalProps: {
+    _items: {
+        "0": { "_id": 104, "_num": 1 },    // PLAYERLEVELID = 1 (WAJIB! dari constant.startUserLevel)
+        "1": { "_id": 103, "_num": 0 },    // PLAYEREXPERIENCEID = 0
+        "2": { "_id": 101, "_num": 0 },    // DIAMONDID = 0
+        "3": { "_id": 102, "_num": 0 },    // GOLDID = 0
+        "4": { "_id": 106, "_num": 0 },    // PLAYERVIPLEVELID = 0
+        "5": { "_id": 105, "_num": 0 },    // PLAYERVIPEXPERIENCEID = 0
+        "6": { "_id": 107, "_num": 0 }     // PLAYERVIPEXPALLID = 0
+    }
+}
+```
+
+**Sumber:** `constant.json` key `"1"` → `startUserLevel: 1`, `startUserExp: 0`, `startDiamond: 0`, `startGold: 0`
 
 ```javascript
 // Server push notifikasi
 socket.on('Notify', function(data) { ... })
 ```
 
-### 2.3 Verify Event (TEA Handshake)
+### 2.5 Verify Event (TEA Handshake)
 
 ```javascript
 // Server mengirim challenge
@@ -275,6 +397,57 @@ processHandler(request, successCallback, errorCallback, skipErrorTips) {
 
 12. Mulai mendengarkan Notify events di semua socket aktif
 ```
+
+### 3.1a Post-EnterGame Request Sequence — KRITIS UNTUK SERVER
+
+> **PENTING:** Setelah enterGame response dikirim, client SEGERA memproses data dan menembakkan request tambahan. Server HARUS mendukung handler-handler ini segera setelah enterGame berhasil.
+
+```
+T+0ms   enterGame response diterima client
+        ├── saveUserData(e) — parse semua 76 field
+        │   ├── SELAMA saveUserData, request ini DIHANTAM OTOMATIS:
+        │   │   ├── user.getBulletinBrief              ← REQUEST auto (L121084)
+        │   │   ├── teamDungeonTeam.queryTodayMap      ← REQUEST auto via HTTP (L136688)
+        │   │   ├── teamDungeonTeam.queryRobot         ← REQUEST auto via HTTP (L136696)
+        │   │   ├── teamDungeonGame.queryMyRecord      ← REQUEST auto (L136765)
+        │   │   ├── friend.friendServerAction/queryFriends  ← REQUEST auto (L136232)
+        │   │   └── friend.friendServerAction/queryBlackList ← REQUEST auto (L136245)
+        │   └── (selesai saveUserData)
+        ├── reportToLoginEnterInfo → User.SaveUserEnterInfo ke login-server
+        ├── ts.chatData = {}
+        └── Mulai registChat polling (setiap 3 detik)
+
+T+0ms   loginSuccessCallBack → runScene('OverScene', FIRSTENTER)
+        OverScene mulai load resource group 'firstEnter'
+
+T+~3s   registChat fires → {type:'user', action:'registChat'}
+        (retry setiap 3s sampai sukses, max 15x)
+
+T+~5-10s Resource loading selesai → onResourceLoadComplete:
+        ├── heroImage.getAll          ← REQUEST (L236709)
+        └── (on response) hero.getAttrs  ← REQUEST (L236693)
+            └── (on response) userMsg.getMsgList ← REQUEST (L236726)
+                └── (on response) entrust.getInfo ← REQUEST (jika unlocked)
+                    └── goGuideHome → runScene('Home')
+
+T+~5-10s (parallel) registChat sukses → connect Chat-Server
+        ├── chat.login               ← REQUEST ke chat-server
+        └── chat.join ×4 rooms       ← REQUEST ke chat-server
+            (world, guild, teamDungeon, team)
+```
+
+**Handler WAJIB siap setelah enterGame:**
+
+| Prioritas | Handler | Type | Action | Trigger |
+|-----------|---------|------|--------|---------|
+| 🔴 P1 | `user.getBulletinBrief` | user | getBulletinBrief | Auto di saveUserData |
+| 🔴 P1 | `user.registChat` | user | registChat | Auto polling 3s |
+| 🟡 P2 | `heroImage.getAll` | heroImage | getAll | OverScene load |
+| 🟡 P2 | `hero.getAttrs` | hero | getAttrs | Setelah heroImage |
+| 🟡 P2 | `userMsg.getMsgList` | userMsg | getMsgList | Setelah hero.getAttrs |
+| 🟢 P3 | `teamDungeonGame.queryMyRecord` | teamDungeonGame | queryMyRecord | Auto di saveUserData |
+| 🟢 P3 | `friend.queryFriends` | friend | friendServerAction | Auto di saveUserData |
+| 🟢 P3 | `friend.queryBlackList` | friend | friendServerAction | Auto di saveUserData |
 
 ### 3.2 Struktur Login UserInfo
 
@@ -3122,3 +3295,1381 @@ Activity handler menangani **101 aksi** untuk berbagai event/activity dalam game
 
 
 *Analisa ini dihasilkan dari main.min(unminfy).js (244,761 baris, 10.5MB) dan resource/json/ (471 file) — Semua data diekstrak langsung dari source code. Zero asumsi, zero stub, zero override, zero dummy.*
+
+---
+
+## 10. enterGame Response — Struktur Data Lengkap
+
+> **KRITIS:** Ini adalah handler paling penting di Main-Server. Tanpa response yang benar, game TIDAK bisa masuk.
+
+### 10.1 Request
+
+```javascript
+{
+    type: 'user',
+    action: 'enterGame',
+    loginToken: string,        // dari ts.loginInfo.userInfo.loginToken
+    userId: string,            // dari ts.loginInfo.userInfo.userId
+    serverId: number,          // parseInt(ts.loginInfo.serverItem.serverId)
+    version: '1.0',
+    language: string,          // ToolCommon.getLanguage()
+    gameVersion: string        // ToolCommon.getClientVer()
+}
+```
+
+### 10.2 Response — Top-Level Fields (70+ field) — SEMUA WAJIB
+
+> **PRINSIP KERJA:** Tidak ada kata "opsional" di enterGame response. Setiap field MILIK enterGame dan WAJIB dikirim server.
+> `if (e.fieldName)` di client adalah **defensive guard**, BUKAN izin untuk tidak mengirim.
+> Jika field tidak dikirim, singleton tidak di-init dan bisa menyebabkan **silent error** di fitur lain yang bergantung padanya.
+
+Diproses oleh `UserDataParser.saveUserData()` (line 114793). Setiap field diproses oleh singleton manager yang berbeda:
+
+| # | Field | Consumer Singleton | Default Value (New User) | Deskripsi |
+|---|-------|-------------------|--------------------------|-----------|
+| 1 | `currency` | `ts.currency` | `"USD"` | Kode mata uang |
+| 2 | `newUser` | `loginSuccessCallBack` | `true`/`false` | Flag user baru (trigger CreateRole SDK event) |
+| 3 | `user` | `UserInfoSingleton.setUserInfo` | Lihat 10.3 | Data identitas user |
+| 4 | `hangup` | `OnHookSingleton.setOnHook` | Lihat 10.4 | Data progress idle/hangup |
+| 5 | `summon` | `SummonSingleton.setSummon` | Lihat 10.5 | Data sistem summon/gacha |
+| 6 | `totalProps` | `ItemsCommonSingleton.setBackpack` | `{ _items: { "0":{"_id":104,"_num":1}, "1":{"_id":103,"_num":0}, "2":{"_id":101,"_num":0}, "3":{"_id":102,"_num":0}, "4":{"_id":106,"_num":0}, "5":{"_id":105,"_num":0}, "6":{"_id":107,"_num":0} } }` | Semua item/inventaris — EKSPLISIT! Bukan kosong! |
+| 7 | `backpackLevel` | `UserInfoSingleton.heroBackPack` | `1` | Level kapasitas backpack |
+| 8 | `heros` | `HerosManager.readByData` | `{ _heros: [] }` | Semua data hero |
+| 9 | `scheduleInfo` | `AllRefreshCount.initData` | Lihat 10.7 | Counter reset harian |
+| 10 | `imprint` | `SignInfoManager.setSign` | `{ _items: {} }` | Data signet/imprint |
+| 11 | `equip` | `EquipInfoManager.readByData` | `{ _suits: {} }` | Data equipment |
+| 12 | `weapon` | `EquipInfoManager.readByData` | `{ _items: {} }` | Data senjata |
+| 13 | `genki` | `EquipInfoManager.readByData` | `{ _items: [], _curSmeltNormalExp: 0, _curSmeltSuperExp: 0 }` | Data genki |
+| 14 | `dungeon` | `CounterpartSingleton.setCounterpart` | `{ _dungeons: {} }` | Progress dungeon |
+| 15 | `superSkill` | `SuperSkillSingleton.initSuperSkill` | `{ _skills: {} }` | Data super skill |
+| 16 | `heroSkin` | `HerosManager.setSkinData` | `{ _skins: {}, _curSkin: {} }` | Data skin hero |
+| 17 | `summonLog` | `SummonSingleton.setSummomLogList` | `[]` | Log summon history |
+| 18 | `curMainTask` | `UserInfoSingleton.setMianTask` | `{}` | Task utama saat ini |
+| 19 | `checkin` | `WelfareInfoManager.setSignInInfo` | `{ _id: '', _activeItem: [], _curCycle: 1, _maxActiveDay: 0, _lastActiveDate: 0 }` | Data sign-in harian |
+| 20 | `channelSpecial` | `WelfareInfoManager.channelSpecial` | `{}` | Spesial per channel |
+| 21 | `dragonEquiped` | `ItemsCommonSingleton.initDragonBallEquip` | `{}` | Status dragon ball equip |
+| 22 | `vipLog` | `WelfareInfoManager.setVipLogList` | `[]` | Log VIP |
+| 23 | `cardLog` | `WelfareInfoManager.setMonthCardLogList` | `[]` | Log month card |
+| 24 | `guide` | `GuideInfoManager.setGuideInfo` | `{ _id: '', _steps: {} }` | Progress tutorial |
+| 25 | `guildName` | `TeamInfoManager.setTeamName` | `""` | Nama guild |
+| 26 | `clickSystem` | `UserClickSingleton` | `{ _clickSys: { "1": false, "2": false } }` | Tracking klik sistem |
+| 27 | `giftInfo` | `WelfareInfoManager` | Lihat 10.10 | Info hadiah/reward |
+| 28 | `monthCard` | `WelfareInfoManager.setMonthCardInfo` | `{ _id: '', _card: {} }` | Data month card |
+| 29 | `recharge` | `WelfareInfoManager.setRechargeInfo` | `{ _id: '', _haveBought: {} }` | Data recharge |
+| 30 | `timesInfo` | `TimesInfoSingleton.initData` | Lihat 10.11 | Info times/recovery — ⚠️ KRITIS |
+| 31 | `userDownloadReward` | `UserInfoSingleton` | `{ _isClick: false, _haveGotDlReward: false, _isBind: false, _haveGotBindReward: false }` | Model download reward |
+| 32 | `timeMachine` | `TimeLeapSingleton.initData` | `{ _items: {} }` | Data time machine |
+| 33 | `_arenaTeam` | `AltarInfoManger.setArenaTeamInfo` | `[]` | Tim arena (5 slot) |
+| 34 | `_arenaSuper` | `AltarInfoManger.setArenaSuperInfo` | `[]` | Super skill arena |
+| 35 | `timeBonusInfo` | `TimeLimitGiftBagManager` | `{ _id: '', _timeBonus: {} }` | Time-limited gift bags |
+| 36 | `onlineBulletin` | `BulletinSingleton.setBulletInfo` | `[]` | Bulletin online |
+| 37 | `karinStartTime` | `TowerDataManager.setKarinTime` | `0` | Waktu mulai Karin Tower |
+| 38 | `karinEndTime` | `TowerDataManager.setKarinTime` | `0` | Waktu selesai Karin Tower |
+| 39 | `serverVersion` | `UserInfoSingleton.serverVersion` | `"1.0"` | Versi server |
+| 40 | `serverOpenDate` | `UserInfoSingleton.setServerOpenDate` | `0` | Tanggal buka server |
+| 41 | `lastTeam` | `UserInfoSingleton.firstLoginSetMyTeam` | `{ _lastTeamInfo: {} }` | Tim terakhir dipakai |
+| 42 | `training` | `PadipataInfoManager.setPadipataModel` | `{ _id: '', _type: 0, _times: 0, _timesStartRecover: 0, _cfgId: 0 }` | Data training |
+| 43 | `warInfo` | `GlobalWarManager.setWarLoginInfo` | `{}` | Info global war |
+| 44 | `userWar` | `GlobalWarManager.setUserWarModel` | `{}` | Model user war |
+| 45 | `serverId` | `UserInfoSingleton.setServerId` | `<actual serverId>` | Server ID — ⚠️ WAJIB kirim nilai asli |
+| 46 | `headEffect` | `UserInfoSingleton.headEffect` | `{ _effects: [] }` | Efek kepala |
+| 47 | `userBallWar` | `TeamInfoManager.UserBallWar` | `{}` | Data dragon ball war |
+| 48 | `ballWarState` | `TeamInfoManager.BallWarState` | `0` | State ball war |
+| 49 | `ballBroadcast` | `TeamInfoManager.setBallWarBrodecast` | `[]` | Broadcast ball war |
+| 50 | `ballWarInfo` | `TeamInfoManager` (GuildBallWarInfo) | `{ _topMsg: '', _point: 0, _signed: false, _fieldId: '' }` | Info ball war |
+| 51 | `guildActivePoints` | `TeamInfoManager.setActivePoints` | `{}` | Poin aktivitas guild |
+| 52 | `expedition` | `ExpeditionManager.setExpeditionModel` | `{}` | Data expedition |
+| 53 | `timeTrial` | `SpaceTrialManager.setSpaceTrialModel` | Lihat 10.12 | Data space trial |
+| 54 | `timeTrialNextOpenTime` | `SpaceTrialManager` | `0` | Waktu buka time trial |
+| 55 | `retrieve` | `GetBackReourceManager.setRetrieveModel` | `null` | Data retrieve resource |
+| 56 | `battleMedal` | `BattleMedalManager.setBattleMedal` | Lihat 10.13 — ⚠️ KRITIS | Data battle medal |
+| 57 | `shopNewHeroes` | `ShopInfoManager.shopNewHero` | `{}` | Flag new hero di shop |
+| 58 | `teamDungeon` | `TeamworkManager.setLoginInfo` | `{ _myTeam: '', _canCreateTeamTime: 0, _nextCanJoinTime: 0 }` | Data team dungeon |
+| 59 | `teamServerHttpUrl` | `TeamworkManager.teamServerHttpUrl` | `""` | URL team server |
+| 60 | `teamDungeonOpenTime` | `TeamworkManager` | `0` | Waktu buka team dungeon |
+| 61 | `teamDungeonTask` | `TeamworkManager` | `{ _achievement: {}, _dailyRefreshTime: 0, _daily: {} }` | Task team dungeon |
+| 62 | `gemstone` | `EquipInfoManager.saveGemStone` | `{ _items: {} }` | Data gemstone |
+| 63 | `questionnaires` | `UserInfoSingleton.setQuestData` | `{}` | Data kuesioner |
+| 64 | `resonance` | `HerosManager.setResonanceModel` | `{ _id: '', _diamondCabin: 0, _cabins: {}, _buySeatCount: 0, _totalTalent: 0, _unlockSpecial: false }` | Data resonance |
+| 65 | `fastTeam` | `HerosManager.saveLoginFastTeam` | `{ _teamInfo: {} }` | Preset tim cepat |
+| 66 | `blacklist` | `BroadcastSingleton.setBlacklistPlayerInfo` | `[]` | Daftar blacklist |
+| 67 | `forbiddenChat` | `BroadcastSingleton.setUserBidden` | `{ users: [], finishTime: {} }` | Info chat ban |
+| 68 | `gravity` | `TrialManager.setGravityTrialInfo` | `{ gravity: { _id: '', _haveTimes: 0, _timesStartRecover: 0, _lastLess: 0, _lastTime: 0 } }` | Data gravity trial |
+| 69 | `littleGame` | `LittleGameManager.saveData` | `{ _gotBattleReward: {}, _gotChapterReward: {}, _clickTime: 0 }` | Data mini-game |
+| 70 | `userTopBattle` | `TopBattleManager` | `{ _id: '', _teams: {}, _teamTag: '', _records: [], _history: [], _gotRankReward: [] }` | Data top battle |
+| 71 | `topBattleInfo` | `TopBattleManager` | `{}` | Info top battle |
+| 72 | `globalWarBuffTag` | `OnHookSingleton.setGlobalWarBuffTag` | `""` | Tag buff global war |
+| 73 | `globalWarLastRank` | `OnHookSingleton.setGlobalWarLastRank` | `{}` | Ranking global war |
+| 74 | `globalWarBuff` | `OnHookSingleton.globalWarBuff` | `0` | Buff global war |
+| 75 | `globalWarBuffEndTime` | `OnHookSingleton.globalWarBuffEndTime` | `0` | Waktu berakhir buff |
+| 76 | `broadcastRecord` | `ts.chatJoinRecord` | `[]` | Record broadcast chat |
+
+### 10.2a Field Berisiko Jika Tidak Dikirim (Silent Error Analysis)
+
+> Walaupun client punya `if (e.fieldName)` guard, berikut field yang bisa menyebabkan **silent error** jika tidak dikirim:
+
+| Field | Risiko | Detail |
+|-------|--------|--------|
+| `timesInfo` | ⚠️ **NaN BUG** | `TimesInfoSingleton` cascade ke `TrialManager`, `MahaAdventureSingleton`, `TheWildAdventureManager`, `TowerDataManager`. Tanpa init, perhitungan waktu bisa `NaN` |
+| `serverId` | ⚠️ **UNDEFINED** | `getServerId()` dipanggil di banyak tempat. `undefined` bisa error di string concatenation |
+| `serverOpenDate` | ⚠️ **UNDEFINED** | Beberapa fitur cek server age dari tanggal ini |
+| `battleMedal` | ⚠️ **CRASH** | Kode pasca-login akses `_battleMedal.nextRefreshTime` tanpa null check |
+| `curMainTask` | ⚠️ **NULL** | `_mainTask` jadi `null`, beberapa handler akses propertinya |
+| `scheduleInfo` | ⚠️ **KRITIS** | Counter harian TIDAK ter-init, semua fitur dengan daily reset gagal |
+| `karinStartTime`/`karinEndTime` | ⚠️ **UNDEFINED** | `getTowerLeftDay()` menghitung dari undefined → NaN tampilan |
+
+### 10.3 Nested: `user` Object (UserInfoSingleton)
+
+| Field | Singleton Property | Type |
+|-------|-------------------|------|
+| `_id` | `userId` | string |
+| `_pwd` | `userPassward` | string |
+| `_nickName` | `userNickName` | string |
+| `_headImage` | `userHeadImage` | string |
+| `_lastLoginTime` | `userLastLoginTime` | number |
+| `_createTime` | `createTime` | number |
+| `_bulletinVersions` | `bulletinVersions` | object |
+| `_oriServerId` | `oriServerId` | number |
+| `_nickChangeTimes` | `nickChangeTimes` | number |
+
+### 10.4 Nested: `hangup` Object (OnHookSingleton)
+
+| Field | Singleton Property | Type |
+|-------|-------------------|------|
+| `_curLess` | `lastSection` | number |
+| `_maxPassLesson` | `maxPassLesson` | number |
+| `_haveGotChapterReward` | `haveGotChapterReward` | object |
+| `_maxPassChapter` | `maxPassChapter` | number |
+| `_clickGlobalWarBuffTag` | `clickGlobalWarBuffTag` | string |
+| `_buyFund` | `buyFund` | boolean |
+| `_haveGotFundReward` | `haveGotFundReward` | object |
+
+### 10.5 Nested: `summon` Object (SummonSingleton)
+
+| Field | Singleton Property | Type |
+|-------|-------------------|------|
+| `_energy` | `energy` | number |
+| `_wishList` | `WishList` | array |
+| `_wishVersion` | `WishVersion` | number |
+| `_canCommonFreeTime` | `canCommonFreeTime` | number |
+| `_canSuperFreeTime` | `canSuperFreeTime` | number |
+| `_summonTimes` | `_summonTimes` | object |
+
+### 10.6 Nested: `totalProps` Object (ItemsCommonSingleton)
+
+```javascript
+totalProps._items: { [key: string]: { _id: number, _num: number } }
+```
+
+Item ID khusus:
+- ID 104 (PLAYERLEVELID) → level pemain
+- ID 103 (PLAYEREXPERIENCEID) → exp pemain
+- ID 106 (PLAYERVIPLEVELID) → level VIP
+- ID 105 (PLAYERVIPEXPERIENCEID) → exp VIP
+- ID 101 (DIAMONDID) → diamond
+- ID 102 (GOLDID) → gold
+
+### 10.7 Nested: `scheduleInfo` Object (AllRefreshCount) — Detail Lengkap
+
+| Field | Type | Default | Deskripsi |
+|-------|------|---------|-----------|
+| `_marketDiamondRefreshCount` | number | 0 | Jumlah refresh market pakai diamond |
+| `_vipMarketDiamondRefreshCount` | number | 0 | Jumlah refresh VIP market pakai diamond |
+| `_arenaAttackTimes` | number | 0 | Sisa serangan arena hari ini |
+| `_arenaBuyTimesCount` | number | 0 | Jumlah beli extra arena |
+| `_snakeResetTimes` | number | 0 | Jumlah reset snake dungeon |
+| `_snakeSweepCount` | number | 0 | Jumlah sweep snake dungeon |
+| `_cellGameHaveGotReward` | boolean | true | Reward Cell Game sudah diambil |
+| `_cellGameHaveTimes` | number | 0 | Sisa attempt Cell Game |
+| `_cellgameHaveSetHero` | boolean | false | Hero Cell Game sudah diset |
+| `_strongEnemyTimes` | number | 0 | Sisa attempt Strong Enemy |
+| `_strongEnemyBuyCount` | number | 0 | Jumlah beli extra Strong Enemy |
+| `_karinBattleTimes` | number | 0 | Sisa attempt Karin Tower |
+| `_karinBuyBattleTimesCount` | number | 0 | Jumlah beli extra Karin Tower |
+| `_karinBuyFeetCount` | number | 0 | Jumlah beli kaki Karin Tower |
+| `_monthCardHaveGotReward` | object | {} | Reward month card per kartu |
+| `_entrustResetTimes` | number | 0 | Jumlah reset entrust |
+| `_mineResetTimes` | number | 0 | Jumlah reset mine/wild adventure |
+| `_mineBuyResetTimesCount` | number | 0 | Jumlah beli reset mine |
+| `_mineBuyStepCount` | number | 0 | Jumlah beli langkah mine |
+| `_guildBossTimes` | number | 0 | Sisa attempt guild boss |
+| `_guildBossTimesBuyCount` | number | 0 | Jumlah beli extra guild boss |
+| `_treasureTimes` | number | 0 | Sisa attempt guild treasure grab |
+| `_guildCheckInType` | number | 0 | Tipe check-in guild harian |
+| `_dragonExchangeSSPoolId` | number | 0 | Pool ID exchange dragon SS |
+| `_dragonExchangeSSSPoolId` | number | 0 | Pool ID exchange dragon SSS |
+| `_teamDugeonUsedRobots` | array | [] | Robot team dungeon yang dipakai |
+| `_timeTrialBuyTimesCount` | number | 0 | Jumlah beli extra time trial |
+| `_goldBuyCount` | number | 0 | Jumlah beli gold |
+| `_likeRank` | object | {} | Data like ranking |
+| `_mahaAttackTimes` | number | 0 | Sisa attempt Maha Adventure |
+| `_mahaBuyTimesCount` | number | 0 | Jumlah beli extra Maha |
+| `_bossCptTimes` | number | 0 | Sisa attempt Boss Competition |
+| `_bossCptBuyCount` | number | 0 | Jumlah beli extra Boss Competition |
+| `_ballWarBuyCount` | number | 0 | Jumlah beli extra Ball War |
+| `_mergeBossBuyCount` | number | 0 | Jumlah beli extra Merge Boss |
+| `_topBattleTimes` | number | 0 | Sisa attempt Top Battle |
+| `_topBattleBuyCount` | number | 0 | Jumlah beli extra Top Battle |
+| `_gravityTrialBuyTimesCount` | number | 0 | Jumlah beli extra Gravity Trial |
+| `_trainingBuyCount` | number | 0 | Jumlah beli extra Training |
+| `_templeBuyCount` | number | 0 | Jumlah beli extra Temple |
+| `_expeditionEvents` | object | {} | Data event expedition |
+| `_clickExpedition` | boolean | false | Flag klik expedition |
+| `_expeditionSpeedUpCost` | number | 0 | Biaya speed up expedition |
+| `_templeDailyReward` | boolean | false | Reward temple harian sudah diambil |
+| `_templeYesterdayLess` | number | 0 | Lesson temple kemarin |
+| `_dungeonTimes` | object | {} | Sisa attempt per tipe dungeon |
+| `_dungeonBuyTimesCount` | object | {} | Jumlah beli per tipe dungeon |
+
+### 10.8 Nested: `heros` Object (HerosManager)
+
+Setiap hero dalam `_heros` array:
+
+| Field | Property | Type |
+|-------|----------|------|
+| `_heroId` | `heroId` | string |
+| `_heroDisplayId` | `heroDisplayId` | number |
+| `_heroStar` | `heroStar` | number |
+| `_heroBaseAttr` | `heroBaseAttr` (HeroAttribute) | object |
+| `_superSkillLevel` | skills | number |
+| `_potentialLevel` | skills | number |
+| `_qigong` | `qigong` (AttrItems) | object |
+| `_qigongStage` | `qigongStage` | number |
+| `_breakInfo` | `breakInfo` | object |
+| `_gemstoneSuitId` | `gemstoneSuitId` | number |
+| `_linkTo` | `linkTo` | array |
+| `_linkFrom` | `linkFrom` | string |
+
+### 10.9 Nested: `giftInfo` Object (WelfareInfoManager)
+
+| Field | Type | Default | Deskripsi |
+|-------|------|---------|-----------|
+| `_fristRecharge` | object | `{}` | Data first recharge |
+| `_haveGotVipRewrd` | object | `{}` | VIP reward yang sudah diambil |
+| `_buyVipGiftCount` | object | `{}` | Jumlah beli VIP gift |
+| `_onlineGift` | object | `{ _curId: 0, _nextTime: 0 }` | Online gift info |
+| `_gotBSAddToHomeReward` | boolean | `false` | Reward add-to-home |
+| `_clickHonghuUrlTime` | number | `0` | Waktu klik Honghu URL |
+| `_gotChannelWeeklyRewardTag` | string | `""` | Tag reward channel mingguan |
+
+### 10.10 Nested: `timesInfo` Object (TimesInfoSingleton) — ⚠️ KRITIS
+
+> **PERINGATAN:** Field ini WAJIB dikirim. Jika tidak dikirim, cascade ke `TrialManager`, `MahaAdventureSingleton`, `TheWildAdventureManager`, `TowerDataManager` menyebabkan **NaN** di perhitungan waktu recovery.
+
+| Field | Type | Default | Cascade Target |
+|-------|------|---------|----------------|
+| `marketRefreshTimes` | number | `0` | Market refresh counter |
+| `marketRefreshTimesRecover` | number | `0` | Market recovery timestamp |
+| `vipMarketRefreshTimes` | number | `0` | VIP market refresh counter |
+| `vipMarketRefreshTimesRecover` | number | `0` | VIP market recovery timestamp |
+| `templeTimes` | number | `0` | `TrialManager.setTrialCount` |
+| `templeTimesRecover` | number | `0` | `TrialManager.setTrialCount` |
+| `mahaTimes` | number | `0` | `MahaAdventureSingleton` |
+| `mahaTimesRecover` | number | `0` | `MahaAdventureSingleton` |
+| `mineSteps` | number | `0` | `TheWildAdventureManager` |
+| `mineStepsRecover` | number | `0` | `TheWildAdventureManager` |
+| `karinFeet` | number | `0` | `TowerDataManager.setTowerCount` |
+| `karinFeetRecover` | number | `0` | `TowerDataManager.setTowerCount` |
+
+### 10.11 Nested: `timeTrial` Object (SpaceTrialManager)
+
+| Field | Type | Default | Deskripsi |
+|-------|------|---------|-----------|
+| `_levelStars` | object | `{}` | Star per level |
+| `_level` | number | `1` | Level trial saat ini |
+| `_totalStars` | number | `0` | Total bintang |
+| `_gotStarReward` | object | `{}` | Reward bintang yang sudah diambil |
+| `_haveTimes` | number | `0` | Sisa attempt |
+| `_timesStartRecover` | number | `0` | Timestamp mulai recovery |
+| `_lastRefreshTime` | number | `0` | Timestamp refresh terakhir |
+| `_timeTrialNextOpenTime` | number | `0` | (field terpisah di top-level) |
+
+### 10.12 Nested: `battleMedal` Object (BattleMedalManager) — ⚠️ KRITIS
+
+> **PERINGATAN:** Kode pasca-login mengakses `_battleMedal.nextRefreshTime` tanpa null check. Jika tidak dikirim, akan **CRASH**.
+
+| Field | Type | Default | Deskripsi |
+|-------|------|---------|-----------|
+| `_id` | string | `""` | ID data |
+| `_battleMedalId` | string | `""` | ID medal |
+| `_cycle` | number | `0` | Siklus medal |
+| `_nextRefreshTime` | number | `0` | Timestamp refresh berikutnya — WAJIB ada |
+| `_level` | number | `0` | Level medal |
+| `_curExp` | number | `0` | Exp saat ini |
+| `_openSuper` | boolean | `false` | Super medal terbuka |
+| `_task` | object | `{}` | Data task medal |
+| `_levelReward` | object | `{}` | Reward level yang diambil |
+| `_shopBuyTimes` | object | `{}` | Jumlah beli di shop medal |
+| `_buyLevelCount` | number | `0` | Jumlah beli level |
+
+### 10.13 Complete New User Response — SEMUA 76 Field
+
+```javascript
+{
+    ret: 0,
+    serverTime: Date.now(),
+    server0Time: 25200000,
+    data: JSON.stringify({
+        // === CORE (9 field) ===
+        currency: "USD",
+        newUser: true,
+        user: { _id: "userId", _pwd: "", _nickName: "Player", _headImage: "1",
+                _lastLoginTime: 0, _createTime: Date.now(), _bulletinVersions: {},
+                _oriServerId: 1, _nickChangeTimes: 0 },
+        hangup: { _curLess: 0, _maxPassLesson: 0, _haveGotChapterReward: {},
+                  _maxPassChapter: 0, _clickGlobalWarBuffTag: "", _buyFund: false,
+                  _haveGotFundReward: {} },
+        summon: { _energy: 0, _wishList: [], _wishVersion: 0,
+                  _canCommonFreeTime: 0, _canSuperFreeTime: 0, _summonTimes: {} },
+        totalProps: { _items: {} },
+        backpackLevel: 1,
+        heros: { _heros: [] },
+        scheduleInfo: { /* semua 40+ field dari 10.7 dengan default values */ },
+
+        // === EQUIPMENT & ITEMS (6 field) ===
+        imprint: { _items: {} },
+        equip: { _suits: {} },
+        weapon: { _items: {} },
+        genki: { _items: [], _curSmeltNormalExp: 0, _curSmeltSuperExp: 0 },
+        gemstone: { _items: {} },
+        dragonEquiped: {},
+
+        // === PROGRESS (5 field) ===
+        dungeon: { _dungeons: {} },
+        superSkill: { _skills: {} },
+        heroSkin: { _skins: {}, _curSkin: {} },
+        summonLog: [],
+        curMainTask: {},
+
+        // === WELFARE (8 field) ===
+        checkin: { _id: '', _activeItem: [], _curCycle: 1, _maxActiveDay: 0, _lastActiveDate: 0 },
+        channelSpecial: {},
+        vipLog: [],
+        cardLog: [],
+        giftInfo: { _fristRecharge: {}, _haveGotVipRewrd: {}, _buyVipGiftCount: {},
+                    _onlineGift: { _curId: 0, _nextTime: 0 }, _gotBSAddToHomeReward: false,
+                    _clickHonghuUrlTime: 0, _gotChannelWeeklyRewardTag: '' },
+        monthCard: { _id: '', _card: {} },
+        recharge: { _id: '', _haveBought: {} },
+
+        // === TIMES & RECOVERY — KRITIS (1 field) ===
+        timesInfo: { marketRefreshTimes: 0, marketRefreshTimesRecover: 0,
+                     vipMarketRefreshTimes: 0, vipMarketRefreshTimesRecover: 0,
+                     templeTimes: 0, templeTimesRecover: 0,
+                     mahaTimes: 0, mahaTimesRecover: 0,
+                     mineSteps: 0, mineStepsRecover: 0,
+                     karinFeet: 0, karinFeetRecover: 0 },
+
+        // === USER EXTRAS (5 field) ===
+        userDownloadReward: { _isClick: false, _haveGotDlReward: false, _isBind: false, _haveGotBindReward: false },
+        timeMachine: { _items: {} },
+        clickSystem: { _clickSys: { "1": false, "2": false } },
+        guildName: "",
+        guide: { _id: '', _steps: {} },
+
+        // === ARENA (2 field) ===
+        _arenaTeam: [],
+        _arenaSuper: [],
+
+        // === SERVER INFO (4 field) ===
+        serverVersion: "1.0",
+        serverOpenDate: 0,            // ⚠️ WAJIB: actual server open timestamp
+        serverId: 1,                  // ⚠️ WAJIB: actual server ID
+        headEffect: { _effects: [] },
+
+        // === TOWER (2 field) ===
+        karinStartTime: 0,
+        karinEndTime: 0,
+
+        // === TIM & TEAM (4 field) ===
+        lastTeam: { _lastTeamInfo: {} },
+        fastTeam: { _teamInfo: {} },
+        training: { _id: '', _type: 0, _times: 0, _timesStartRecover: 0, _cfgId: 0 },
+        timeBonusInfo: { _id: '', _timeBonus: {} },
+
+        // === WAR (6 field) ===
+        warInfo: {},
+        userWar: {},
+        globalWarBuffTag: "",
+        globalWarLastRank: {},
+        globalWarBuff: 0,
+        globalWarBuffEndTime: 0,
+
+        // === BALL WAR (4 field) ===
+        userBallWar: {},
+        ballWarState: 0,
+        ballBroadcast: [],
+        ballWarInfo: { _topMsg: '', _point: 0, _signed: false, _fieldId: '' },
+
+        // === GUILD (1 field) ===
+        guildActivePoints: {},
+
+        // === EXPEDITION & TRIAL (4 field) ===
+        expedition: {},
+        timeTrial: { _levelStars: {}, _level: 1, _totalStars: 0, _gotStarReward: {},
+                     _haveTimes: 0, _timesStartRecover: 0, _lastRefreshTime: 0 },
+        timeTrialNextOpenTime: 0,
+        gravity: { gravity: { _id: '', _haveTimes: 0, _timesStartRecover: 0, _lastLess: 0, _lastTime: 0 } },
+
+        // === RETRIEVE & MEDAL (2 field) ===
+        retrieve: null,
+        battleMedal: { _id: '', _battleMedalId: '', _cycle: 0, _nextRefreshTime: 0,
+                       _level: 0, _curExp: 0, _openSuper: false, _task: {},
+                       _levelReward: {}, _shopBuyTimes: {}, _buyLevelCount: 0 },
+
+        // === SHOP (1 field) ===
+        shopNewHeroes: {},
+
+        // === TEAM DUNGEON (4 field) ===
+        teamDungeon: { _myTeam: '', _canCreateTeamTime: 0, _nextCanJoinTime: 0 },
+        teamServerHttpUrl: "",
+        teamDungeonOpenTime: 0,
+        teamDungeonTask: { _achievement: {}, _dailyRefreshTime: 0, _daily: {} },
+
+        // === MISC (6 field) ===
+        onlineBulletin: [],
+        questionnaires: {},
+        resonance: { _id: '', _diamondCabin: 0, _cabins: {}, _buySeatCount: 0, _totalTalent: 0, _unlockSpecial: false },
+        blacklist: [],
+        forbiddenChat: { users: [], finishTime: {} },
+        littleGame: { _gotBattleReward: {}, _gotChapterReward: {}, _clickTime: 0 },
+
+        // === TOP BATTLE (2 field) ===
+        userTopBattle: { _id: '', _teams: {}, _teamTag: '', _records: [], _history: [], _gotRankReward: [] },
+        topBattleInfo: {},
+
+        // === BROADCAST (1 field) ===
+        broadcastRecord: []
+    }),
+    compress: false
+}
+```
+
+---
+
+## 11. Battle System — Arsitektur Lengkap
+
+### 11.1 Dua Pola Battle
+
+**Pola Dua-Phase (startBattle → checkBattleResult):**
+Digunakan untuk: Dungeon (semua tipe), Temple Trial, Gravity Trial, Expedition, Training, Strong Enemy, Guild Boss, Time Travel, Cell Game, Time Trial, Lesson
+
+**Pola Single-Phase (startBattle saja, result inline):**
+Digunakan untuk: Arena, Karin Tower, Boss Snatch, Guild Loot, Merge Boss, Maha Adventure, Mine, Snake Dungeon, Dragon Ball War, Top Battle, Friend Battle
+
+### 11.2 Battle Result Codes (BattleResultDef, line 76208)
+
+| Nilai | Nama | Makna |
+|-------|------|-------|
+| 0 | notFinish | VICTORY (di checkBattleResult) |
+| 1 | victoryFinish | Victory (di record playback) |
+| 2 | failedFinish | Defeat |
+| 3 | shaluFailed | Cell Game defeat |
+
+### 11.3 Battle Seed System
+
+Server menyediakan `_rand` (random seed) di response `startBattle`. Seed ini menentukan battle outcome secara deterministic. Client mereplay hasil berdasarkan seed. Ini memungkinkan server memvalidasi hasil client.
+
+### 11.4 Response Fields Universal Battle
+
+**startBattle Response:**
+- `_battleId` (string) — ID pertempuran unik
+- `_rand` (number) — Random seed
+- `_rightTeam` (array) — Data tim lawan
+- `_rightSuper` (array) — Super skill lawan
+- `_leftTeam` (array) — Data tim sendiri (hanya beberapa mode)
+- `_leftSuper` (array) — Super skill sendiri (hanya beberapa mode)
+
+**checkBattleResult Response:**
+- `_battleResult` (number) — 0 = victory, 2 = defeat
+- `_changeInfo._items` (object) — Perubahan item/reward
+- Field tambahan spesifik per tipe battle
+
+### 11.5 Complete Battle Type Registry
+
+| Tipe | Handler Type | Start Action | End Action | battleField |
+|------|-------------|-------------|------------|-------------|
+| Lesson/Story | `hangup` | `startGeneral` | `checkBattleResult` | 20 |
+| EXP/Evolve/Metal/ZStone Dungeon | `dungeon` | `startBattle` | `checkBattleResult` | 1-4 |
+| Equip Dungeon | `dungeon` | `startBattle` | `checkBattleResult` | 5 |
+| Signet Dungeon | `dungeon` | `startBattle` | `checkBattleResult` | 6 |
+| Arena PvP | `arena` | `startBattle` | (inline) | 12 |
+| Karin Tower | `tower` | `startBattle` | (inline) | 13 |
+| Strong Boss | `strongEnemy` | `startBattle` | `checkBattleResult` | 17 |
+| Boss Snatch | `bossCompetition` | `attackBoss/attackOwner` | (inline) | 18 |
+| Guild Boss | `guild` | `startBoss` | (inline) | 19 |
+| Guild Loot | `guild` | `treasureStartBattle` | (inline) | 14 |
+| Temple Trial | `trial` | `startBattle` | `checkBattleResult` | 7 |
+| Gravity Trial | `gravity` | `startBattle` | `checkBattleResult` | 29 |
+| Expedition | `expedition` | `startBattle` | `checkBattleResult` | 22 |
+| Mine/Wild | `mine` | `startBattle` | (inline) | 8 |
+| Training | `training` | `startBattle` | `checkBattleResult` | 11 |
+| Snake Dungeon | `snake` | `startBattle` | (inline) | 9 |
+| Cell Game | `cellGame` | `startBattle` | `checkBattleResult` | 15 |
+| Dragon Ball War | `ballWar` | `startBattle` | (inline) | 24 |
+| Maha Adventure | `maha` | `startBattle` | (inline) | 16 |
+| Top Battle | `topBattle` | `startBattle` | (inline) | 28 |
+| Friend Battle | `friend` | `friendBattle` | (inline) | 21 |
+| Time Travel Boss | `timeMachine` | `startBoss` | `checkBattleResult` | 10 |
+| Time Trial | `timeTrial` | `startBattle` | `checkBattleResult` | 26 |
+| Merge Boss | `activity` | `mergeBossStartBattle` | (inline) | 25 |
+
+### 11.6 Dungeon Sweep
+
+```javascript
+// Skip battle entirely, langsung dapat reward
+{
+    type: 'dungeon',
+    action: 'sweep',
+    userId: string,
+    dungeonType: number,    // DUNGEON_TYPE enum
+    dungeonLevel: number,
+    times: number,          // Jumlah sweep
+    version: '1.0'
+}
+```
+
+---
+
+## 12. Daily Reset & Server Time
+
+### 12.1 ServerTime Singleton (Line 116944)
+
+```javascript
+ServerTime.getInstance().updateServerTime(serverTime, server0Time)
+// serverTime = Date.now() dari server (UTC ms)
+// server0Time = 25200000 (UTC+7 offset)
+
+// Client menghitung waktu lokal server:
+getServerLocalDate() = new Date(serverTime + offset)
+// Digunakan untuk menentukan "hari ini" di timezone server
+```
+
+**PENTING:** `serverTime` dan `server0Time` WAJIB di setiap response tanpa terkecuali.
+
+### 12.2 Daily Reset Mechanism
+
+Reset harian sepenuhnya **server-driven**. Client TIDAK punya timer untuk reset.
+
+**Cara kerja:**
+1. **On login (`enterGame`):** Server cek apakah sudah ganti hari sejak aktivitas terakhir. Jika ya, `scheduleInfo` berisi nilai yang sudah direset.
+2. **While online:** Server push `scheduleModelRefresh` notify tepat pada tengah malam waktu server (UTC+7).
+3. **Client handler:** `AllRefreshCount.getInstance().initData(e._model)` — reinitialize lengkap semua counter.
+
+### 12.3 scheduleModelRefresh Notify Format
+
+```javascript
+// Server push ke semua player online saat ganti hari
+socket.emit('Notify', {
+    action: 'scheduleModelRefresh',
+    _model: {
+        // SELURUH field scheduleInfo (lihat 10.7) dengan nilai yang sudah direset
+        _arenaAttackTimes: 5,       // Reset ke max dari constant.json
+        _arenaBuyTimesCount: 0,     // Selalu reset ke 0
+        _strongEnemyTimes: 3,       // Reset ke max dari constant.json
+        _strongEnemyBuyCount: 0,
+        // ... semua field lainnya
+    }
+})
+```
+
+### 12.4 Time-Based Recovery (BUKAN daily reset)
+
+Sistem ini menggunakan recovery berbasis waktu, BUKAN reset harian:
+
+| Sistem | Config Key | Mekanisme |
+|--------|-----------|-----------|
+| Market refresh | `constant[1].marketRefreshTime` | Recovery per interval detik |
+| VIP Market refresh | `constant[1].vipMarketRefreshTime` | Recovery per interval detik |
+| Dragon Ball War | `constant[1].dragonBallWarTimesRefresh` | Recovery per interval detik |
+| Expedition | `constant[1].expeditionBattleTimesRefresh` | Recovery per interval detik |
+| Training | `constant[1].trainingTimesRefresh` | Recovery per interval detik |
+| Space Trial | `timeTrainConstant[1].timeTrainTimesEvery` | Recovery per interval detik |
+| Gravity Trial | `gravityTestConstant[1].gravityTestTimesRefresh` | Recovery per interval detik |
+| Temple Test | `constant[1].templeTestTimesRefresh` | Recovery per interval detik |
+| Maha Adventure | `constant[1].mahaAdventureCD` | CD-based recovery |
+| Mine action points | `constant[1].mineActionPointRefreshTime` | Recovery per interval detik |
+
+### 12.5 constant.json — Field Kritis untuk Server
+
+| Field | Deskripsi |
+|-------|-----------|
+| `bossAttackTimes` | Strong Enemy daily battle times |
+| `cellGameTimes` | Cell Game daily attempts |
+| `karinTowerBattleTimes` | Karin Tower daily battles |
+| `bossFightTimesMax` | Boss Competition max daily times |
+| `guildBOSSTimes` | Guild Boss daily times |
+| `guildGrabTimes` | Guild Treasure daily grab times |
+| `dragonBallWarTimesMax` | Dragon Ball War max times |
+| `mahaAdventureTimesMax` | Maha Adventure max daily times |
+| `expeditionBattleTimes` | Expedition max battle times |
+| `maxUserLevel` | Maximum player level |
+| `dragonWishVIP` | VIP level untuk Dragon Ball free wish |
+| `vipBattleSpeedNeeded` | VIP level untuk 2x battle speed |
+| `normalLastLesson` | Normal difficulty last lesson |
+| `difficultLastLesson` | Difficult difficulty last lesson |
+| `hellLastLesson` | Hell difficulty last lesson |
+
+---
+
+## 13. Feature Unlock System (OpenLimit)
+
+### 13.1 Unlock Logic
+
+```javascript
+// Cek apakah fitur terbuka berdasarkan level/VIP/task
+OpenLimit.checkLevelEnough(openLimitType, showTip)
+// 1. Cari entry di open.json berdasarkan nameNew
+// 2. Jika dependOn == Level → cek userLevel >= dependOnPara ATAU vipLevel >= vipNeeded
+// 3. Jika dependOn == Task → cek prerequisite task selesai
+```
+
+### 13.2 open.json Config Structure
+
+```json
+{
+    "id": number,
+    "nameNew": "openCellGame",
+    "name": "Display Name",
+    "dependOn": 1,
+    "dependOnPara": 25,
+    "vipNeeded": 0,
+    "showIcon": true,
+    "level": 25
+}
+```
+
+### 13.3 Server Requirement
+
+1. Load `open.json` di startup server
+2. Validasi akses fitur di setiap handler request berdasarkan level/VIP user
+3. Pada level up, tentukan fitur baru yang terbuka → kirim `openID` array di response
+
+---
+
+## 14. Tutorial/Guide System
+
+### 14.1 Guide Data Model
+
+```javascript
+// Di enterGame response:
+guide: { _id: string, _steps: { [guideType]: stepId } }
+```
+
+### 14.2 Save Guide Request
+
+```javascript
+{
+    type: 'guide',
+    action: 'saveGuide',
+    userId: string,
+    guideType: number,    // GUIDE_TYPE enum
+    step: number,         // Step ID saat ini
+    version: '1.0'
+}
+```
+
+### 14.3 Server Requirement
+
+Guide sepenuhnya **client-driven**. Server hanya perlu:
+1. Simpan `_steps` map per player
+2. Handle `guide/saveGuide` request — persist step
+3. Return guide state di `enterGame` response
+4. Tidak perlu validasi — guide steps dikontrol oleh client
+
+---
+
+## 15. Complete Handler Catalog — Summary Table (498 Actions × 60 Types)
+
+| # | Type | Actions | Kategori Utama |
+|---|------|---------|----------------|
+| 1 | `YouTuber` | 2 | Sosial/media |
+| 2 | `activity` | 103 | Event, promo, luck, equip up, lantern, turntable, dll. |
+| 3 | `arena` | 10 | PvP ranking |
+| 4 | `backpack` | 5 | Inventaris, open box, sell, use |
+| 5 | `ballWar` | 14 | Dragon Ball War |
+| 6 | `battle` | 1 | Random seed |
+| 7 | `battleMedal` | 7 | Battle medal system |
+| 8 | `battleRecordCheck` | 1 | Anti-cheat |
+| 9 | `bossCompetition` | 6 | Boss Attack/Snatch |
+| 10 | `buryPoint` | 1 | Analytics |
+| 11 | `cellGame` | 8 | Cell Game (ShaLu) |
+| 12 | `checkin` | 1 | Sign-in harian |
+| 13 | `downloadReward` | 2 | Download reward |
+| 14 | `dragon` | 3 | Dragon Ball wish/equip |
+| 15 | `dungeon` | 4 | Resource dungeons |
+| 16 | `entrust` | 11 | Entrust/mission |
+| 17 | `equip` | 10 | Equipment management |
+| 18 | `expedition` | 14 | Expedition system |
+| 19 | `friend` | 16 | Friend system |
+| 20 | `gemstone` | 4 | Gemstone system |
+| 21 | `genki` | 4 | Genki/fusion system |
+| 22 | `gift` | 12 | Gift/reward/recharge |
+| 23 | `gravity` | 3 | Gravity trial |
+| 24 | `guide` | 1 | Tutorial save |
+| 25 | `guild` | 33 | Guild management |
+| 26 | `hangup` | 6 | Idle/lesson/story |
+| 27 | `hero` | 20 | Hero management |
+| 28 | `heroImage` | 6 | Hero image/comment |
+| 29 | `imprint` | 10 | Imprint/signet system |
+| 30 | `littleGame` | 3 | Mini-game |
+| 31 | `maha` | 6 | Maha Adventure |
+| 32 | `mail` | 6 | Mail system |
+| 33 | `market` | 1 | Market info |
+| 34 | `mine` | 7 | Mine/Wild Adventure |
+| 35 | `monthCard` | 2 | Month card |
+| 36 | `questionnaire` | 1 | Kuesioner |
+| 37 | `rank` | 2 | Ranking |
+| 38 | `recharge` | 1 | Recharge/purchase |
+| 39 | `resonance` | 5 | Resonance system |
+| 40 | `retrieve` | 2 | Resource retrieve |
+| 41 | `shop` | 4 | Shop system |
+| 42 | `snake` | 8 | Snake Dungeon |
+| 43 | `strongEnemy` | 5 | Strong Enemy/Boss Attack |
+| 44 | `summon` | 6 | Summon/gacha |
+| 45 | `superSkill` | 5 | Super skill system |
+| 46 | `task` | 2 | Task/quest system |
+| 47 | `teamDungeonGame` | 19 | Team Dungeon |
+| 48 | `teamTraining` | 4 | Team training |
+| 49 | `timeBonus` | 2 | Time-limited bonus |
+| 50 | `timeMachine` | 4 | Time machine/travel |
+| 51 | `timeTrial` | 6 | Space trial |
+| 52 | `topBattle` | 18 | Top Battle (cross-server) |
+| 53 | `tower` | 11 | Karin Tower |
+| 54 | `training` | 7 | Training (PadiPata) |
+| 55 | `trial` | 5 | Temple trial |
+| 56 | `user` | 13 | User management |
+| 57 | `userMsg` | 5 | User messaging |
+| 58 | `vipMarket` | 1 | VIP market |
+| 59 | `war` | 12 | Global war |
+| 60 | `weapon` | 7 | Weapon system |
+
+**Total: 498 unique type/action pairs**
+
+---
+
+## 16. Notify System — Expanded (30+ Actions)
+
+| Notify Action | Data Fields | Client Processing |
+|--------------|-------------|-------------------|
+| `guildAgree` | `_guildId`, `_chatRoomId`, `_canJoinGuildTime` | Set guild ID, join chat room |
+| `beKickedOutGuild` | `_guildId`, `_chatRoomId`, `_canJoinGuildTime` | Bersihkan data guild |
+| `redDotDataChange` | `redData` | Update RedDotManager |
+| `payFinish` | `_code`, `_detail` | Proses hasil pembayaran |
+| `timeBonus` | `_triggerBonus`, `_timeBonus` | Tampilkan time-limited gift |
+| `heroBackpackFull` | — | Dialog notifikasi |
+| `onlineBulletin` | `bulletins` | Update BulletinSingleton |
+| `scheduleModelRefresh` | `_model` (full scheduleInfo) | Reinitialize semua counter harian |
+| `monthCard` | month card data | Tambah log month card |
+| `vipLevel` | VIP change data | Tambah log VIP |
+| `notifySummon` | summon result data | Set system hero di SummonSingleton |
+| `warStageChange` | `stage`, `signed`, `session`, `worldId`, `areaId` | Update GlobalWarManager stage |
+| `warRankChange` | `globalWarBuffTag`, `globalWarLastRank`, `globalWarBuff`, `globalWarBuffEndTime` | Update ranking war |
+| `warAutoSign` | — | Auto-sign war |
+| `ballWarStateChange` | `stage` | Update BallWar state |
+| `ballWarPointRankChange` | `point` | Update ranking poin ball war |
+| `ballWarBroadcast` | `msgs` | Set pesan broadcast |
+| `ballSignUp` | `activePoints` | Tandai signed, update points |
+| `userMessage` | `friendId`, `msg`, `userInfo` | Update MailInfoManager |
+| `mainTaskChange` | `_curMainTask` | Update task utama |
+| `areanRecord` | arena record data | Set info pertempuran arena |
+| `battleMedalRefresh` | `model` | Refresh battle medal data |
+| `battleMedalTaskChange` | `task` | Update task battle medal |
+| `broadcast` | `_msg` | System broadcast message |
+| `itemChange` | item change data | Update items inventory |
+| `joinTeamSuccess` | team data | Team dungeon join success |
+| `teamDungeonFinish` | dungeon result | Team dungeon selesai |
+| `teamDungeonTaskChange` | task data | Task team dungeon berubah |
+| `teamDungeonExpire` | — | Team dungeon expired |
+| `teamDungeonBroadcast` | broadcast data | Team dungeon broadcast |
+| `teamDungeonHideChange` | `info` | Team dungeon hide info |
+| `teamDungeonCloseTimeChange` | time data | Team dungeon close time |
+| `FGAddMsg` | `friendId`, `msg` | Friend guild message |
+| `FGNewApply` | — | Friend guild new apply |
+| `FGAddChatMsg` | chat data | Friend guild chat message |
+| `addQuestionnaire` | `questionnaire` | New questionnaire available |
+| `topBattleBeAttack` | `defencerRecord` | Top battle attacked |
+| `topBattleStageChange` | stage data | Top battle stage changed |
+| `updateForbiddenChat` | ban data | Update chat ban |
+| `timeTrialReset` | reset timing data | Reset time trial |
+| `resonanceUnlockSpecial` | — | Resonance special unlocked |
+| `Kickout` | — | **Force disconnect** → destroy semua socket, return to login |
+
+---
+
+## 17. Implementation Priority
+
+### Phase 3A — Core (WAJIB pertama)
+
+1. **Socket.IO server** dengan TEA handshake + `handler.process` event
+2. **`user.enterGame`** — Response minimal yang bisa membuat client masuk game
+3. **ServerTime** — `serverTime` + `server0Time` di setiap response
+4. **Resource/JSON loader** — Auto-load semua 471 file JSON dari `resource/json/`
+
+### Phase 3B — Basic Gameplay
+
+5. **`hero.autoLevelUp`** + **`hero.evolve`** + **`hero.wakeUp`** — Sistem hero dasar
+6. **`summon.summonOne`** + **`summon.summonTen`** — Sistem gacha
+7. **`hangup.startGeneral`** + **`hangup.checkBattleResult`** — Battle lesson/story
+8. **`dungeon.startBattle`** + **`dungeon.checkBattleResult`** — Resource dungeon
+9. **`backpack.openBox`** + **`backpack.useItem`** — Sistem inventaris
+
+### Phase 3C — Social & Progression
+
+10. **`friend.*`** — Sistem teman
+11. **`guild.*`** — Sistem guild
+12. **`arena.*`** — Arena PvP
+13. **`mail.*`** — Sistem mail
+14. **`task.*`** — Task/quest system
+
+### Phase 3D — Advanced Content
+
+15. **`activity.*`** — Event system (103 actions, implementasi bertahap)
+16. **`tower.*`** — Karin Tower
+17. **`expedition.*`** — Expedition
+18. **`shop.*`** + **`market.*`** — Toko
+19. **`equip.*`** + **`weapon.*`** + **`imprint.*`** — Equipment system
+
+### Phase 3E — End-game & Cross-server
+
+20. **`war.*`** — Global War
+21. **`ballWar.*`** — Dragon Ball War
+22. **`topBattle.*`** — Top Battle
+23. **`teamDungeonGame.*`** — Team Dungeon
+24. **`recharge.*`** + **`gift.*`** + **`monthCard.*`** — Monetisasi
+
+---
+
+## 18. Key Statistics
+
+| Metric | Value |
+|--------|-------|
+| Total unique type/action pairs (Main-Server) | **498** |
+| Type categories | **60** |
+| Largest category | `activity` (103 actions) |
+| Second largest | `guild` (33 actions) |
+| Third largest | `hero` (20 actions) |
+| Battle-starting actions | **22** types |
+| Battle-result-checking actions | **11** types |
+| Notify actions (server→client push) | **30+** |
+| enterGame response fields | **70+** top-level keys |
+| scheduleInfo fields (daily reset) | **40+** |
+| Resource/JSON config files | **471** |
+| Error codes | **365** |
+
+---
+
+## 19. Fondasi Implementasi
+
+> **PRINSIP:** Bangun pondasi dulu sebelum sentuh folder `handlers/`. Tiga komponen fondasi: (1) Database, (2) JSON Loader, (3) New User Data Builder.
+
+### 19.1 Database — Satu Tabel Per Fitur
+
+**Arsitektur:** Setiap fitur game punya tabel database sendiri, diakses oleh satu handler file. Tidak ada tabel monolitik. Ini memastikan isolasi, maintainability, dan debugging yang terfokus.
+
+**Teknologi:** better-sqlite3 dengan WAL mode (sama seperti SDK-Server dan Login-Server yang sudah dibangun).
+
+**Tabel yang sudah didokumentasi di Section 7:**
+
+| # | Nama Tabel | Fitur | File Handler |
+|---|-----------|-------|-------------|
+| 1 | `user_data` | Data user utama | `handlers/user/enterGame.js` |
+| 2 | `hero_data` | Data hero | `handlers/hero/*.js` |
+| 3 | `item_data` | Item/inventaris | `handlers/item/*.js` |
+| 4 | `equip_data` | Equipment | `handlers/equip/*.js` |
+| 5 | `weapon_data` | Senjata | `handlers/weapon/*.js` |
+| 6 | `imprint_data` | Signet/imprint | `handlers/sign/*.js` |
+| 7 | `genki_data` | Genki | `handlers/genki/*.js` |
+| 8 | `guild_data` | Guild info | `handlers/guild/*.js` |
+| 9 | `guild_member_data` | Member guild | `handlers/guild/*.js` |
+| 10 | `friend_data` | Teman | `handlers/friend/*.js` |
+| 11 | `friend_blacklist` | Blacklist | `handlers/friend/*.js` |
+| 12 | `arena_data` | Arena | `handlers/arena/*.js` |
+| 13 | `mail_data` | Mail | `handlers/userMsg/*.js` |
+| 14 | `shop_data` | Toko | `handlers/shop/*.js` |
+| 15 | `dungeon_data` | Dungeon progress | `handlers/dungeon/*.js` |
+| 16 | `tower_data` | Karin Tower | `handlers/tower/*.js` |
+| 17 | `expedition_data` | Expedition | `handlers/expedition/*.js` |
+| 18 | `battle_data` | Pertempuran aktif | `handlers/battle/*.js` |
+| 19 | `ball_war_data` | Dragon Ball War | `handlers/ballWar/*.js` |
+| 20 | `entrust_data` | Entrust | `handlers/entrust/*.js` |
+| 21 | `resonance_data` | Resonance | `handlers/hero/*.js` |
+| 22 | `super_skill_data` | Super skill | `handlers/superSkill/*.js` |
+| 23 | `gemstone_data` | Gemstone | `handlers/gemstone/*.js` |
+| 24 | `rank_data` | Ranking | `handlers/rank/*.js` |
+| 25 | `schedule_data` | Reset harian | `handlers/schedule/*.js` |
+| 26 | `times_data` | Times info | `handlers/times/*.js` |
+| 27 | `battle_medal_data` | Battle medal | `handlers/battleMedal/*.js` |
+| 28 | `time_trial_data` | Time trial | `handlers/timeTrial/*.js` |
+| 29 | `hangup_data` | Idle/hangup | `handlers/hangup/*.js` |
+| 30 | `summon_data` | Summon log | `handlers/summon/*.js` |
+
+**Tambahan tabel yang perlu dibuat (belum di Section 7):**
+
+| # | Nama Tabel | Fitur | Keterangan |
+|---|-----------|-------|-----------|
+| 31 | `bulletin_data` | Bulletin/notice | Server-wide announcements |
+| 32 | `online_bonus_data` | Online bonus | Time-based rewards |
+| 33 | `gift_data` | Gift/welfare | First recharge, VIP reward, dll. |
+| 34 | `month_card_data` | Month card | Data langganan |
+| 35 | `recharge_data` | Recharge history | Riwayat pembayaran |
+| 36 | `guide_data` | Tutorial/guide | Langkah tutorial per user |
+| 37 | `training_data` | Training | Data training |
+| 38 | `mine_data` | Mine | Data mine/excavation |
+| 39 | `little_game_data` | Cell game | Mini-game |
+| 40 | `top_battle_data` | Top battle | Data pertempuran top |
+| 41 | `team_dungeon_data` | Team dungeon | Data dungeon tim |
+| 42 | `gravity_data` | Gravity test | Data gravity test |
+| 43 | `time_machine_data` | Time leap | Data time machine |
+| 44 | `dragon_ball_data` | Dragon ball | Koleksi dragon ball |
+| 45 | `download_reward_data` | Download reward | Reward download |
+
+**File `db.js` — Struktur:**
+
+```javascript
+// server/main-server/db.js
+const Database = require('better-sqlite3');
+const path = require('path');
+
+const DB_PATH = path.join(__dirname, 'data', 'main_server.db');
+
+let db;
+
+function initDatabase() {
+    db = new Database(DB_PATH);
+    db.pragma('journal_mode = WAL');
+    db.pragma('foreign_keys = ON');
+    
+    // Create semua tabel (gunakan CREATE TABLE IF NOT EXISTS)
+    createTables();
+    
+    return db;
+}
+
+function getDatabase() {
+    if (!db) throw new Error('Database not initialized');
+    return db;
+}
+
+function createTables() {
+    // Tabel 1-45 — masing-masing dengan CREATE TABLE IF NOT EXISTS
+    // Lihat Section 7 untuk schema lengkap
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS user_data (...);
+        CREATE TABLE IF NOT EXISTS hero_data (...);
+        CREATE TABLE IF NOT EXISTS item_data (...);
+        -- ... semua tabel
+    `);
+}
+
+module.exports = { initDatabase, getDatabase };
+```
+
+### 19.2 JSON Loader — 471 File ke Memory saat Startup
+
+**Mengapa:** Client `ReadJsonSingleton` mengakses data JSON secara synchronous dari memory. Server HARUS melakukan hal yang sama — load semua 471 file ke memory saat startup agar handler bisa mengakses data konfigurasi secara synchronous tanpa I/O blocking.
+
+**Statistik:**
+
+| Metric | Value |
+|--------|-------|
+| Total file JSON | **471** |
+| Total ukuran | **49 MB** |
+| Format akses client | `ReadJsonSingleton.getInstance().<namaFile>` |
+| Contoh akses | `ReadJsonSingleton.getInstance().constant[1].startUserLevel` |
+| Contoh akses | `ReadJsonSingleton.getInstance().hero[displayId]` |
+
+**File `jsonLoader.js` — Struktur:**
+
+```javascript
+// server/main-server/jsonLoader.js
+const fs = require('fs');
+const path = require('path');
+
+const JSON_DIR = path.join(__dirname, '..', '..', 'resource', 'json');
+
+// Mirror struktur ReadJsonSingleton dari client
+const jsonData = {};
+
+function loadAllJson() {
+    const files = fs.readdirSync(JSON_DIR).filter(f => f.endsWith('.json'));
+    
+    let loaded = 0;
+    let errors = [];
+    
+    for (const file of files) {
+        try {
+            // Nama file tanpa .json = key akses
+            // contoh: "constant.json" -> jsonData.constant
+            // contoh: "hero.json" -> jsonData.hero
+            const key = file.replace('.json', '');
+            const raw = fs.readFileSync(path.join(JSON_DIR, file), 'utf-8');
+            jsonData[key] = JSON.parse(raw);
+            loaded++;
+        } catch (err) {
+            errors.push({ file, error: err.message });
+        }
+    }
+    
+    console.log(`[JSON Loader] Loaded ${loaded}/${files.length} files, ${errors.length} errors`);
+    if (errors.length > 0) {
+        console.error('[JSON Loader] Errors:', errors);
+    }
+    
+    return { loaded, total: files.length, errors };
+}
+
+function getJson(name) {
+    return jsonData[name] || null;
+}
+
+// Convenience: akses langsung seperti client
+// jsonLoader.constant[1].startUserLevel
+function getAll() {
+    return jsonData;
+}
+
+module.exports = { loadAllJson, getJson, getAll };
+```
+
+**Catatan penting:**
+- File `constant.json` punya key `"1"` sebagai top-level key, bukan array. Akses: `jsonData.constant["1"].startUserLevel`
+- File `hero.json` menggunakan displayId sebagai key. Akses: `jsonData.hero[displayId]`
+- File `errorDefine.json` menggunakan error code sebagai key. Akses: `jsonData.errorDefine[errorCode]`
+- File `open.json` menggunakan ID fitur sebagai key. Akses: `jsonData.open[featureId]`
+- File `battleRecord_*.json` (49 file) menggunakan format khusus per stage
+
+### 19.3 New User Data — EKSPLISIT, BUKAN Kosong
+
+**Sumber kebenaran:** `constant.json` key `"1"` — berisi semua parameter new user.
+
+**Kunci constant.json untuk new user:**
+
+| Key | Value | Digunakan Di |
+|-----|-------|-------------|
+| `startUserLevel` | `1` | `totalProps._items` (PLAYERLEVELID = 1) |
+| `startUserExp` | `0` | `totalProps._items` (PLAYEREXPERIENCEID = 0) |
+| `startDiamond` | `0` | `totalProps._items` (DIAMONDID = 0) |
+| `startGold` | `0` | `totalProps._items` (GOLDID = 0) |
+| `startHero` | `"1205"` | `heros` array (hero Wukong) |
+| `startHeroLevel` | `"3"` | `heros` array (hero level 3) |
+| `startChapter` | `801` | `counterpart` (chapter awal) |
+| `startLesson` | `10101` | `counterpart` (lesson awal) |
+| `playerIcon` | `"hero_icon_1205"` | `user.headImageId` |
+| `resetTime` | `"6:00:00"` | `scheduleInfo` (reset harian) |
+| `friendMax` | `30` | Limit friend list |
+| `mailMax` | `999` | Limit mail |
+
+**New User totalProps._items — WAJIB EKSPLISIT:**
+
+```javascript
+// New user _items — 7 entries WAJIB, TIDAK BOLEH kosong!
+const NEW_USER_ITEMS = {
+    "0": { "_id": 104, "_num": 1 },    // PLAYERLEVELID — KRITIS! Tanpa ini game bricked
+    "1": { "_id": 103, "_num": 0 },    // PLAYEREXPERIENCEID
+    "2": { "_id": 101, "_num": 0 },    // DIAMONDID
+    "3": { "_id": 102, "_num": 0 },    // GOLDID
+    "4": { "_id": 106, "_num": 0 },    // PLAYERVIPLEVELID
+    "5": { "_id": 105, "_num": 0 },    // PLAYERVIPEXPERIENCEID
+    "6": { "_id": 107, "_num": 0 }     // PLAYERVIPEXPALLID
+};
+```
+
+**Cascade Failure jika PLAYERLEVELID (104) hilang:**
+
+| # | Efek | Bukti Kode |
+|---|------|-----------|
+| 1 | `setLastUserLevel()` TIDAK PERNAH dipanggil | L114917: `a == PLAYERLEVELID && NewOpenSystemManager.getInstance().setLastUserLevel(r)` — loop tidak iterasi |
+| 2 | `getUserLevel()` return 0 | L96314: `return ItemsCommonSingleton.getInstance().getItemNum(PLAYERLEVELID)` — item 104 tidak ada |
+| 3 | **SEMUA** OpenLimit check gagal | L116723: `o.getUserLevel() >= a.dependOnPara` — 0 >= 1 = false, semua fitur level 1 terkunci |
+| 4 | `setItem(104,1)` pertama = NaN | L118398: `n.levelDiff = t - n.items[e]` — 1 - undefined = NaN |
+| 5 | Level-up notifications gagal | L215027: `o[s].level > n` — level > undefined = false untuk semua |
+
+**File `newUserBuilder.js` — Struktur:**
+
+```javascript
+// server/main-server/newUserBuilder.js
+const jsonLoader = require('./jsonLoader');
+
+function createNewUserData(userId, nickName, serverId, language) {
+    const constant = jsonLoader.getJson('constant')["1"];
+    const now = Date.now();
+    
+    return {
+        // === USER INFO ===
+        user: {
+            userId: userId,
+            nickName: nickName,
+            headImageId: constant.playerIcon,
+            headBoxId: 0,
+            level: constant.startUserLevel,
+            exp: constant.startUserExp,
+            vipLevel: 0,
+            vipExp: 0,
+            serverId: serverId,
+            language: language,
+            createTime: now,
+            lastLoginTime: now,
+            newUser: true
+        },
+        
+        // === CURRENCY (totalProps._items) — EKSPLISIT! ===
+        currency: {
+            diamond: constant.startDiamond,
+            gold: constant.startGold
+        },
+        totalProps: {
+            _items: {
+                "0": { "_id": 104, "_num": constant.startUserLevel },  // PLAYERLEVELID
+                "1": { "_id": 103, "_num": constant.startUserExp },   // PLAYEREXPERIENCEID
+                "2": { "_id": 101, "_num": constant.startDiamond },   // DIAMONDID
+                "3": { "_id": 102, "_num": constant.startGold },      // GOLDID
+                "4": { "_id": 106, "_num": 0 },                       // PLAYERVIPLEVELID
+                "5": { "_id": 105, "_num": 0 },                       // PLAYERVIPEXPERIENCEID
+                "6": { "_id": 107, "_num": 0 }                        // PLAYERVIPEXPALLID
+            },
+            backpackLevel: 1
+        },
+        
+        // === HERO AWAL ===
+        heros: [
+            createStartHero(constant.startHero, constant.startHeroLevel)
+        ],
+        
+        // === HANGUP/IDLE ===
+        hangup: {
+            stageId: 0,
+            startTime: now,
+            offlineTime: 0,
+            maxOfflineTime: constant.idle
+        },
+        
+        // === SUMMON ===
+        summon: {
+            _summonTimes: {},
+            _freeRefreshTime: 0,
+            _friendRefreshTime: 0
+        },
+        
+        // === SIGNET/IMPRINT ===
+        imprint: { _items: {} },
+        
+        // === EQUIP ===
+        equip: { _items: {} },
+        
+        // === WEAPON ===
+        weapon: { _items: [] },
+        
+        // === GENKI ===
+        genki: { _items: [], _curSmeltNormalExp: 0, _curSmeltSuperExp: 0 },
+        
+        // === TEAM ===
+        team: { attackTeam: [], defenseTeam: [] },
+        
+        // === SCHEDULE INFO (daily reset) ===
+        scheduleInfo: {
+            _buyCount: {},
+            _refreshCount: {},
+            _freeCount: {},
+            _resetTime: constant.resetTime,
+            _cellgameHaveSetHero: 0
+        },
+        
+        // === GIFT INFO ===
+        giftInfo: {
+            _fristRecharge: 0,
+            _haveGotVipRewrd: 0,
+            _buyVipGiftCount: 0,
+            _onlineGift: 0,
+            _gotBSAddToHomeReward: 0,
+            _clickHonghuUrlTime: 0
+        },
+        
+        // === TIMES INFO ===
+        timesInfo: {
+            _recovery: { _lastRecoveryTime: now, _value: 0 },
+            _dungeonTimes: {},
+            _buyCount: {},
+            _freeCount: {}
+        },
+        
+        // === COUNTERPART (chapter/lesson progress) ===
+        counterpart: {
+            chapterId: constant.startChapter,
+            lessonId: constant.startLesson,
+            normalProgress: 0,
+            difficultProgress: 0
+        },
+        
+        // === BATTLE MEDAL ===
+        battleMedal: {
+            level: 0,
+            exp: 0,
+            nextRefreshTime: now + 86400000,
+            todayTaskIds: [],
+            taskProgress: {}
+        },
+        
+        // === TIME TRIAL ===
+        timeTrial: {
+            floor: 0,
+            times: 0,
+            nextOpenTime: 0
+        },
+        
+        // === SERVER METADATA ===
+        serverId: serverId,
+        serverOpenDate: now,
+        serverVersion: '1.0'
+    };
+}
+
+function createStartHero(displayIdStr, levelStr) {
+    const heroJson = jsonLoader.getJson('hero');
+    const displayId = parseInt(displayIdStr);
+    const heroTemplate = heroJson[displayId];
+    
+    if (!heroTemplate) {
+        throw new Error(`Start hero ${displayId} not found in hero.json`);
+    }
+    
+    return {
+        displayId: displayId,
+        level: parseInt(levelStr),
+        quality: 1,              // WHITE
+        evolveLevel: 0,
+        star: 0,
+        skinId: 0,
+        qigongLevel: 0,
+        selfBreakLevel: 0,
+        selfBreakType: 0,
+        position: 1,             // Posisi 1 di team
+        power: 0,
+        activeSkill: []
+    };
+}
+
+module.exports = { createNewUserData };
+```
+
+### 19.4 Startup Sequence — Urutan Inisialisasi
+
+```
+1.  Load JSON files (jsonLoader.loadAllJson())
+    └── 471 file, ~49MB ke memory
+    └── Validasi: constant.json wajib ada, hero.json wajib ada
+
+2.  Initialize Database (db.initDatabase())
+    └── Create 45 tabel jika belum ada
+    └── WAL mode, foreign keys ON
+
+3.  Register Socket.IO handlers
+    └── socket.on('handler.process', handlerPipeline)
+    └── TEA verify handshake
+
+4.  Server ready — listening on port 8001
+```
+
+```javascript
+// server/main-server/index.js
+const { loadAllJson } = require('./jsonLoader');
+const { initDatabase } = require('./db');
+
+// Step 1: Load JSON
+const loadResult = loadAllJson();
+if (loadResult.errors.length > 0) {
+    console.error('[FATAL] JSON loader errors:', loadResult.errors);
+    process.exit(1);
+}
+
+// Step 2: Init Database
+const db = initDatabase();
+
+// Step 3: Socket.IO server
+const io = require('socket.io')(8001, {
+    cors: { origin: '*' }
+});
+
+// TEA verify handler
+io.on('connection', (socket) => {
+    // ... TEA handshake
+    // ... handler.process dispatch
+});
+
+console.log('[Main-Server] Ready on port 8001');
+```
+
+### 19.5 Handler Pipeline — Dispatch Pattern
+
+```javascript
+// server/main-server/handlerPipeline.js
+// Pola dispatch: type + action → file handler
+
+const handlers = {};
+
+function registerHandler(type, action, handlerFn) {
+    const key = `${type}.${action}`;
+    handlers[key] = handlerFn;
+}
+
+function dispatch(request, callback) {
+    const key = `${request.type}.${request.action}`;
+    const handler = handlers[key];
+    
+    if (!handler) {
+        return callback({
+            ret: 8,  // ERROR_LACK_PARAM
+            data: JSON.stringify({ error: 'Unknown handler: ' + key }),
+            serverTime: Date.now(),
+            server0Time: 25200000
+        });
+    }
+    
+    try {
+        handler(request, callback);
+    } catch (err) {
+        console.error(`[Handler Error] ${key}:`, err);
+        callback({
+            ret: 1,  // ERROR_UNKNOWN
+            data: JSON.stringify({ error: err.message }),
+            serverTime: Date.now(),
+            server0Time: 25200000
+        });
+    }
+}
+
+module.exports = { registerHandler, dispatch };
+```
+
+**Contoh registrasi handler:**
+
+```javascript
+// handlers/user/enterGame.js
+const { getDatabase } = require('../../db');
+const { getAll } = require('../../jsonLoader');
+const { createNewUserData } = require('../../newUserBuilder');
+
+module.exports = function(request, callback) {
+    const db = getDatabase();
+    const json = getAll();
+    
+    // Verifikasi loginToken
+    // Cek user exists di DB
+    // Jika baru: createNewUserData()
+    // Jika existing: load dari DB
+    // Build response string
+    // Return via callback
+};
+```
+
+```javascript
+// server/main-server/index.js (handler registration)
+const { registerHandler, dispatch } = require('./handlerPipeline');
+
+// Register semua handler
+registerHandler('user', 'enterGame', require('./handlers/user/enterGame'));
+registerHandler('user', 'registChat', require('./handlers/user/registChat'));
+registerHandler('user', 'getBulletinBrief', require('./handlers/user/getBulletinBrief'));
+registerHandler('hero', 'levelUp', require('./handlers/hero/levelUp'));
+// ... 498 handlers total
+```
