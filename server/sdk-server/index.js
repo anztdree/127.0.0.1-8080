@@ -410,11 +410,13 @@ app.post('/auth/validate', (req, res) => {
                 );
             }
 
-            // Selalu return sign & securityCode agar sdk.js bisa re-populate saat session restore
+            // Selalu return sign, securityCode, dan loginToken
+            // loginToken ditambahkan v3.0 — dipakai oleh Login-Server (Option A) untuk SaveHistory response
             res.json({
                 valid,
                 sign: user.sign,
-                securityCode: user.securityCode
+                securityCode: user.securityCode,
+                loginToken: user.loginToken
             });
 
         } else {
@@ -429,7 +431,8 @@ app.post('/auth/validate', (req, res) => {
             res.json({
                 valid: false,
                 sign: '',
-                securityCode: ''
+                securityCode: '',
+                loginToken: ''
             });
         }
 
