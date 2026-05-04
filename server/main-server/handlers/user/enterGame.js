@@ -1,36 +1,29 @@
 /**
- * enterGame.js — Handler untuk user.enterGame
- * Referensi: main.min(unminfy).js saveUserData (Line 114793-114873)
- * Cross-reference: SetHeroDataToModel, SetEquipDataToModel, WeaponDataModel,
- *   ImprintItem, GemstoneItem, GenkiModel, dll.
+ * handlers/enterGame.js — user.enterGame Handler
+ * Referensi: main-server.md v4.0 Section 3.3, 8.1, 10
  *
- * Request: {type:'user', action:'enterGame', loginToken, userId, serverId, version, language, gameVersion}
- * Response: Full user data (saveUserData)
+ * Handler terpenting di Main-Server.
+ * Response berisi SEMUA data game state user (76 field).
  *
- * Flow:
- * 1. Validate required fields (loginToken, userId, serverId)
- * 2. Validate loginToken via SDK-Server /auth/validate
- * 3. Check if user exists → createCompleteUser (new) OR updateUserFields (existing)
- * 4. Set user online
- * 5. Load semua relasional data dari DB
- * 6. Build enterGame response SESUAI client saveUserData format
- * 7. Mark firstEnter = 0 setelah pertama kali
+ * PRINSIP:
+ * - Semua field WAJIB dikirim — tidak ada opsional
+ * - Jika field tidak dikirim, singleton tidak init → silent error
+ * - Default value dari constant.json (bukan hardcode)
+ * - Struktur response mengikuti client parser UserDataParser.saveUserData()
  *
- * CRITICAL: Client expects specific wire format:
- *   - All keys start with '_' prefix (auto-stripped by Serializable)
- *   - Arrays wrapped in { _items: [...] } pattern (ItemsList)
- *   - Maps keyed by heroId (not arrays)
- *   - Field names must match EXACTLY what client reads
+ * Request: { type:'user', action:'enterGame', loginToken, userId, serverId, version, language, gameVersion }
+ * Response: Full user data via responseHelper.buildSuccess()
  */
 
 const http = require('http');
 const db = require('../db');
-const logger = require('../logger');
-const responseHelper = require('../responseHelper');
-const config = require('../config');
 const jsonLoader = require('../jsonLoader');
+const responseHelper = require('../responseHelper');
+const logger = require('../logger');
 
-// ─── SDK-Server API Helper ───
+// ═══════════════════════════════════════════════════════════════
+// SDK-SERVER API HELPER
+// ═══════════════════════════════════════════════════════════════
 
 /**
  * Validate loginToken via SDK-Server /auth/validate
@@ -91,277 +84,306 @@ function validateWithSDKServer(loginToken, userId) {
     });
 }
 
-// ─── Helper: Safe JSON parse ───
-function safeParse(jsonStr, fallback) {
-    try { return JSON.parse(jsonStr || '{}'); } catch (e) { return fallback; }
-}
+// ═══════════════════════════════════════════════════════════════
+// HELPER: Safe JSON parse
+// ═══════════════════════════════════════════════════════════════
 
-// ─── Helper: Build HeroAttribute from DB hero row ───
-// Client reads _heroBaseAttr with: _hp, _attack, _armor, _speed, _hit, _dodge,
-//   _block, _damageReduce, _armorBreak, _controlResist, _skillDamage,
-//   _criticalDamage, _blockEffect, _critical, _criticalResist, _trueDamage,
-//   _energy, _power, _extraArmor, _hpPercent, _armorPercent, _attackPercent,
-//   _speedPercent, _orghp, _superDamage, _healPlus, _healerPlus, _damageDown,
-//   _shielderPlus, _damageUp, _level, _evolveLevel
-function buildHeroBaseAttr(heroRow) {
-    return {
-        _level: heroRow.level || 1,
-        _evolveLevel: heroRow.evolveLevel || 0,
-        _power: heroRow.power || 0,
-        _hp: 0, _attack: 0, _armor: 0, _speed: 0,
-        _hit: 0, _dodge: 0, _block: 0, _damageReduce: 0,
-        _armorBreak: 0, _controlResist: 0, _skillDamage: 0,
-        _criticalDamage: 0, _blockEffect: 0, _critical: 0,
-        _criticalResist: 0, _trueDamage: 0, _energy: 0,
-        _extraArmor: 0, _hpPercent: 0, _armorPercent: 0,
-        _attackPercent: 0, _speedPercent: 0, _orghp: 0,
-        _superDamage: 0, _healPlus: 0, _healerPlus: 0,
-        _damageDown: 0, _shielderPlus: 0, _damageUp: 0
-    };
-}
-
-// ─── Helper: Build HeroTotalCost (all empty arrays for new/initial hero) ───
-function buildHeroTotalCost(heroRow) {
-    let totalCost = safeParse(heroRow.totalCost, null);
-    if (totalCost && typeof totalCost === 'object') return totalCost;
-    return {
-        _wakeUp: { _items: [] }, _earring: { _items: [] },
-        _levelUp: { _items: [] }, _evolve: { _items: [] },
-        _skill: { _items: [] }, _qigong: { _items: [] },
-        _heroBreak: { _items: [] }
-    };
-}
-
-// ─── Helper: Build HeroBreak ───
-function buildHeroBreak(heroRow) {
-    let breakInfo = safeParse(heroRow.breakInfo, null);
-    if (breakInfo && typeof breakInfo === 'object') {
-        if (!breakInfo._breakLevel) breakInfo._breakLevel = heroRow.selfBreakLevel || 0;
-        if (!breakInfo._level) breakInfo._level = 0;
-        if (!breakInfo._attr) breakInfo._attr = { _items: [] };
-        return breakInfo;
+function safeParse(str, fallback) {
+    try {
+        return JSON.parse(str || '{}');
+    } catch (e) {
+        return fallback;
     }
-    return {
-        _breakLevel: heroRow.selfBreakLevel || 0,
-        _level: 0,
-        _attr: { _items: [] }
-    };
 }
 
-// ─── Helper: Build single hero wire format ───
-// Referensi: SetHeroDataToModel (Line 134052)
-function buildHeroWire(heroRow) {
-    const heroId = String(heroRow.displayId);
-    return {
-        _heroId: heroId,
-        _heroDisplayId: heroRow.displayId,
-        _heroStar: heroRow.star || 0,
-        _expeditionMaxLevel: heroRow.expeditionMaxLevel || 0,
-        _heroTag: heroRow.heroTag || '[]',
-        _fragment: heroRow.fragment || 0,
-        _superSkillResetCount: heroRow.superSkillResetCount || 0,
-        _potentialResetCount: heroRow.potentialResetCount || 0,
-        _heroBaseAttr: buildHeroBaseAttr(heroRow),
-        _superSkillLevel: safeParse(heroRow.superSkillLevel, []),
-        _potentialLevel: safeParse(heroRow.potentialLevel, []),
-        _qigong: safeParse(heroRow.qigong, {}),
-        _qigongTmp: safeParse(heroRow.qigongTmp, {}),
-        _qigongStage: 1,
-        _qigongTmpPower: heroRow.qigongTmpPower || 0,
-        _totalCost: buildHeroTotalCost(heroRow),
-        _breakInfo: buildHeroBreak(heroRow),
-        _gemstoneSuitId: heroRow.gemstoneSuitId || 0,
-        _linkTo: safeParse(heroRow.linkTo, []),
-        _linkFrom: ''
-    };
+// ═══════════════════════════════════════════════════════════════
+// HELPER: Build totalProps._items dari item_data
+// Referensi: main-server.md Section 2.3, 10.6
+// STRUKTUR: { "0": { _id: 104, _num: 1 }, "1": { _id: 103, _num: 0 }, ... }
+// ═══════════════════════════════════════════════════════════════
+
+function buildItemsDict(items) {
+    const _items = {};
+    items.forEach((item, index) => {
+        _items[String(index)] = { _id: item.itemId, _num: item.num };
+    });
+    return _items;
 }
 
-// ─── Helper: Build heros map (keyed by heroId = displayId) ───
-// Client reads: e.heros._heros → map by heroId
-function buildHerosMap(heroes) {
+// ═══════════════════════════════════════════════════════════════
+// HELPER: Build heros._heros dari hero_data
+// Referensi: main-server.md Section 10.8
+// STRUKTUR: { _heros: { [id]: { ...heroData } } }
+// ═══════════════════════════════════════════════════════════════
+
+function buildHerosDict(heroes) {
     const _heros = {};
-    for (const h of heroes) {
-        const heroId = String(h.displayId);
-        _heros[heroId] = buildHeroWire(h);
-    }
-    return { _heros };
+    heroes.forEach((h) => {
+        const heroKey = String(h.id);
+        _heros[heroKey] = {
+            _heroId: String(h.id),
+            _heroDisplayId: h.displayId,
+            _heroLevel: h.level,
+            _heroQuality: h.quality,
+            _heroEvolveLevel: h.evolveLevel,
+            _heroStar: h.star,
+            _heroSkinId: h.skinId,
+            _heroActiveSkill: safeParse(h.activeSkill, {}),
+            _heroQigongLevel: h.qigongLevel,
+            _heroSelfBreakLevel: h.selfBreakLevel,
+            _heroSelfBreakType: h.selfBreakType,
+            _heroConnectHeroId: h.connectHeroId,
+            _heroPosition: h.position,
+            _heroPower: h.power
+        };
+    });
+    return _heros;
 }
 
-// ─── Helper: Build equip suits map (keyed by heroId) ───
-// Client reads: e.equip._suits → map by heroId
-// Each suit: { _suitItems: [{_id, _pos}], _suitAttrs: [{_id, _num}],
-//              _equipAttrs: [{_id, _num}], _earrings: EarringsItem, _weaponState: 0 }
+// ═══════════════════════════════════════════════════════════════
+// HELPER: Build equip._suits dari equip_data
+// Referensi: main-server.md Section 10 (field #11)
+// STRUKTUR: { _suits: { [id]: { ...equipData } } }
+// ═══════════════════════════════════════════════════════════════
+
 function buildEquipSuits(equips) {
     const _suits = {};
-    // Group equips by heroId
-    const byHero = {};
-    for (const e of equips) {
-        const hId = String(e.heroId || 0);
-        if (!byHero[hId]) byHero[hId] = [];
-        byHero[hId].push(e);
-    }
-    for (const [heroId, items] of Object.entries(byHero)) {
-        _suits[heroId] = {
-            _suitItems: items.map(e => ({ _id: e.equipId, _pos: e.position || 0 })),
-            _suitAttrs: [],
-            _equipAttrs: [],
-            _earrings: { _id: 0, _level: 0, _attrs: { _items: [] } },
-            _weaponState: 0
+    equips.forEach((e) => {
+        _suits[String(e.id)] = {
+            _equipId: e.equipId,
+            _level: e.level,
+            _quality: e.quality,
+            _heroId: e.heroId,
+            _position: e.position
         };
-    }
-    return { _suits };
+    });
+    return _suits;
 }
 
-// ─── Helper: Build weapon items array ───
-// Client reads: e.weapon._items → array of WeaponDataModel
-// Each: { _weaponId, _displayId, _heroId, _star, _level,
-//         _attrs: {_items:[]}, _strengthenCost: {_items:[]},
-//         _haloId, _haloLevel, _haloCost: {_items:[]} }
+// ═══════════════════════════════════════════════════════════════
+// HELPER: Build weapon._items dari weapon_data
+// Referensi: main-server.md Section 10 (field #12)
+// STRUKTUR: { _items: { [id]: { ...weaponData } } }
+// ═══════════════════════════════════════════════════════════════
+
 function buildWeaponItems(weapons) {
-    return {
-        _items: weapons.map(w => ({
+    const _items = {};
+    weapons.forEach((w) => {
+        _items[String(w.id)] = {
             _weaponId: w.weaponId,
-            _displayId: w.displayId || 0,
-            _heroId: String(w.heroId || 0),
-            _star: w.star || 0,
-            _level: w.level || 1,
-            _attrs: safeParse(w.attrs, { _items: [] }),
-            _strengthenCost: safeParse(w.strengthenCost, { _items: [] }),
-            _haloId: w.haloId || 0,
-            _haloLevel: w.haloLevel || 0,
-            _haloCost: safeParse(w.haloCost, { _items: [] })
-        }))
-    };
+            _level: w.level,
+            _quality: w.quality,
+            _heroId: w.heroId,
+            _haloLevel: w.haloLevel
+        };
+    });
+    return _items;
 }
 
-// ─── Helper: Build imprint (sign) items ───
-// Client reads: e.imprint._items → array of ImprintItem
-// Each: { _id, _displayId, _heroId, _level, _star,
-//         _mainAttr: {_items:[]}, _starAttr: {_items:[]},
-//         _viceAttr: [], _addAttr: {}, _tmpViceAttr: [], _totalCost: {_items:[]} }
-// NOTE: _signType, part, SignQuality are derived from _displayId by client — NOT sent
+// ═══════════════════════════════════════════════════════════════
+// HELPER: Build imprint._items dari imprint_data
+// Referensi: main-server.md Section 10 (field #10)
+// STRUKTUR: { _items: { [id]: { ...imprintData } } }
+// ═══════════════════════════════════════════════════════════════
+
 function buildImprintItems(imprints) {
-    return {
-        _items: imprints.map(i => ({
-            _id: i.id,
-            _displayId: i.displayId || i.imprintId,
-            _heroId: String(i.heroId || 0),
-            _level: i.level || 1,
-            _star: i.star || 0,
-            _mainAttr: safeParse(i.mainAttr, { _items: [] }),
-            _starAttr: safeParse(i.starAttr, { _items: [] }),
-            _viceAttr: safeParse(i.viceAttr, []),
-            _addAttr: safeParse(i.addAttr, {}),
-            _tmpViceAttr: safeParse(i.tmpViceAttr, []),
-            _totalCost: safeParse(i.totalCost, { _items: [] })
-        }))
-    };
+    const _items = {};
+    imprints.forEach((imp) => {
+        _items[String(imp.id)] = {
+            _imprintId: imp.imprintId,
+            _level: imp.level,
+            _star: imp.star,
+            _quality: imp.quality,
+            _part: imp.part,
+            _heroId: imp.heroId,
+            _viceAttrId: imp.viceAttrId
+        };
+    });
+    return _items;
 }
 
-// ─── Helper: Build gemstone items ───
-// Client reads: e.gemstone._items → array of GemstoneItem
-// Each: { _id, _displayId, _heroId, _level, _totalExp, _version }
-function buildGemstoneItems(gemstones) {
-    return {
-        _items: gemstones.map(g => ({
-            _id: g.id,
-            _displayId: g.displayId || g.stoneId,
-            _heroId: String(g.heroId || 0),
-            _level: g.level || 1,
-            _totalExp: g.totalExp || 0,
-            _version: g.version || ''
-        }))
-    };
-}
+// ═══════════════════════════════════════════════════════════════
+// HELPER: Build genki dari genki_data
+// Referensi: main-server.md Section 10 (field #13)
+// STRUKTUR: { _items: [], _curSmeltNormalExp: 0, _curSmeltSuperExp: 0 }
+// ═══════════════════════════════════════════════════════════════
 
-// ─── Helper: Build genki model ───
-// Client reads: e.genki → { _id, _items: GenkiItem[], _curSmeltNormalExp, _curSmeltSuperExp }
-// Each GenkiItem: { _id, _displayId, _heroId, _heroPos, _mainAttr, _viceAttr, _disable }
 function buildGenkiModel(genkis) {
+    const _items = genkis.map(g => ({
+        _genkiId: g.genkiId,
+        _heroId: g.heroId,
+        _pos: g.pos
+    }));
     return {
-        _id: '0',
-        _items: genkis.map(g => ({
-            _id: g.id,
-            _displayId: g.displayId || g.genkiId,
-            _heroId: String(g.heroId || 0),
-            _heroPos: g.pos || 0,
-            _mainAttr: safeParse(g.mainAttr, { _items: [] }),
-            _viceAttr: safeParse(g.viceAttr, { _items: [] }),
-            _disable: g.disable || 0
-        })),
+        _items: _items,
         _curSmeltNormalExp: 0,
         _curSmeltSuperExp: 0
     };
 }
 
-// ─── Helper: Build initial scheduleInfo from constant.json ───
-// Client reads: AllRefreshCount.initData(e.scheduleInfo)
-// If user has saved scheduleData, use that; otherwise build from constant.json
-function buildInitialScheduleInfo() {
-    const constantData = jsonLoader.get('constant');
-    const c1 = (constantData && constantData['1']) || {};
+// ═══════════════════════════════════════════════════════════════
+// HELPER: Build dungeon._dungeons dari dungeon_data
+// Referensi: main-server.md Section 10 (field #14)
+// STRUKTUR: { _dungeons: { [dungeonType]: { ...dungeonData } } }
+// ═══════════════════════════════════════════════════════════════
+
+function buildDungeonModel(dungeons) {
+    const _dungeons = {};
+    dungeons.forEach((d) => {
+        _dungeons[String(d.dungeonType)] = {
+            _dungeonType: d.dungeonType,
+            _level: d.level,
+            _sweepLevel: d.sweepLevel,
+            _times: d.times,
+            _buyTimes: d.buyTimes
+        };
+    });
+    return { _dungeons: _dungeons };
+}
+
+// ═══════════════════════════════════════════════════════════════
+// HELPER: Build superSkill dari super_skill_data
+// Referensi: main-server.md Section 10 (field #15)
+// STRUKTUR: array of skill objects (plain array, bukan dict)
+// ═══════════════════════════════════════════════════════════════
+
+function buildSuperSkillModel(superSkills) {
+    const _skills = {};
+    superSkills.forEach((s) => {
+        _skills[String(s.id)] = {
+            _skillId: s.skillId,
+            _level: s.level,
+            _evolveLevel: s.evolveLevel
+        };
+    });
+    return { _skills: _skills };
+}
+
+// ═══════════════════════════════════════════════════════════════
+// HELPER: Build gemstone._items dari gemstone_data
+// Referensi: main-server.md Section 10 (field #62)
+// STRUKTUR: { _items: { [id]: { ...gemstoneData } } }
+// ═══════════════════════════════════════════════════════════════
+
+function buildGemstoneModel(gemstones) {
+    const _items = {};
+    gemstones.forEach((g) => {
+        _items[String(g.id)] = {
+            _stoneId: g.stoneId,
+            _displayId: g.displayId,
+            _level: g.level,
+            _heroId: g.heroId
+        };
+    });
+    return { _items: _items };
+}
+
+// ═══════════════════════════════════════════════════════════════
+// HELPER: Build resonance dari resonance_data
+// Referensi: main-server.md Section 10 (field #64)
+// STRUKTUR: { _id: '', _diamondCabin: 0, _cabins: {}, _buySeatCount: 0, _totalTalent: 0, _unlockSpecial: false }
+// ═══════════════════════════════════════════════════════════════
+
+function buildResonanceModel(resonances) {
+    const _cabins = {};
+    resonances.forEach((r) => {
+        const cabinKey = String(r.cabinId);
+        if (!_cabins[cabinKey]) {
+            _cabins[cabinKey] = {};
+        }
+        _cabins[cabinKey][String(r.seatId)] = r.heroId;
+    });
     return {
-        _arenaAttackTimes: Number(c1.arenaAttackTimes || 5),
-        _arenaBuyTimesCount: 0,
-        _strongEnemyTimes: Number(c1.bossAttackTimes || 6),
-        _strongEnemyBuyCount: 0,
-        _karinTowerBattleTimes: Number(c1.karinTowerBattleTimes || 10),
-        _karinTowerBuyTimesCount: 0,
-        _cellGameTimes: Number(c1.cellGameTimes || 1),
-        _cellGameBuyTimesCount: 0,
-        _templeTestTimes: Number(c1.templeTestTimes || 10),
-        _templeTestBuyTimesCount: 0,
-        _expDungeonTimes: Number(c1.expDungeonTimes || 2),
-        _expDungeonBuyTimes: 0,
-        _evolveDungeonTimes: Number(c1.evolveDungeonTimes || 2),
-        _evolveDungeonBuyTimes: 0,
-        _energyDungeonTimes: Number(c1.energyDungeonTimes || 2),
-        _energyDungeonBuyTimes: 0,
-        _metalDungeonTimes: Number(c1.metalDungeonTimes || 2),
-        _metalDungeonBuyTimes: 0,
-        _zStoneDungeonTimes: Number(c1.zStoneDungeonTimes || 2),
-        _zStoneDungeonBuyTimes: 0,
-        _equipDungeonTimes: Number(c1.equipDungeonTimes || 2),
-        _equipDungeonBuyTimes: 0,
-        _signDungeonTimes: Number(c1.signDungeonTimes || 2),
-        _signDungeonBuyTimes: 0,
-        _bossFightTimes: Number(c1.bossFightTimesMax || 3),
-        _bossFightBuyTimes: 0,
-        _mahaAdventureTimes: Number(c1.mahaAdventureTimesMax || 5),
-        _mahaAdventureBuyTimes: 0,
-        _trainingTimes: Number(c1.trainingTimesMax || 10),
-        _trainingBuyTimes: 0,
-        _guildBOSSTimes: Number(c1.guildBOSSTimes || 2),
-        _guildBOSSBuyTimes: 0,
-        _guildGrabTimes: Number(c1.guildGrabTimes || 3),
-        _mineActionPoint: Number(c1.mineActionPointMax || 50),
-        _dragonBallWarTimes: Number(c1.dragonBallWarTimesMax || 3),
-        _dragonBallWarBuyTimes: 0,
-        _expeditionTimes: Number(c1.expeditionBattleTimes || 10),
-        _snakeDungeonTimes: Number(c1.snakeTimes || 1),
-        _topBattleTimes: 0,
-        _topBattleBuyTimes: 0,
-        _gravityTestTimes: Number(c1.gravityTestRewardpreview || 50),
-        _timeTrainTimes: 0,
-        _timeTrainBuyTimes: 0,
-        _marketRefreshTimes: Number(c1.marketRefreshTimeMax || 5),
-        _vipMarketRefreshTimes: Number(c1.vipMarketRefreshTimeMax || 5),
-        _rewardHelpTimes: Number(c1.rewardHelpRewardEveryday || 10),
-        _goldBuyTimes: Number(c1.goldBuyFree || 20)
+        _id: '',
+        _diamondCabin: 0,
+        _cabins: _cabins,
+        _buySeatCount: 0,
+        _totalTalent: 0,
+        _unlockSpecial: false
     };
 }
 
-// ─── Main Handler ───
+// ═══════════════════════════════════════════════════════════════
+// HELPER: Build default scheduleInfo dari constant.json
+// Referensi: main-server.md Section 10.7
+// Default values dibaca dari constant.json key "1"
+// ═══════════════════════════════════════════════════════════════
+
+function buildScheduleInfo(storedSchedule) {
+    const c1 = (jsonLoader.get('constant') || {})['1'] || {};
+
+    // Jika ada stored scheduleData dari DB, merge dengan default
+    // Stored data = data yang sudah di-save sebelumnya
+    if (storedSchedule && Object.keys(storedSchedule).length > 0) {
+        return storedSchedule;
+    }
+
+    // Default new user scheduleInfo dari constant.json
+    return {
+        _marketDiamondRefreshCount: 0,
+        _vipMarketDiamondRefreshCount: 0,
+        _arenaAttackTimes: Number(c1.arenaAttackTimes || 5),
+        _arenaBuyTimesCount: 0,
+        _snakeResetTimes: 0,
+        _snakeSweepCount: 0,
+        _cellGameHaveGotReward: false,
+        _cellGameHaveTimes: Number(c1.cellGameTimes || 1),
+        _cellgameHaveSetHero: false,
+        _strongEnemyTimes: Number(c1.bossAttackTimes || 6),
+        _strongEnemyBuyCount: 0,
+        _karinBattleTimes: Number(c1.karinTowerBattleTimes || 10),
+        _karinBuyBattleTimesCount: 0,
+        _karinBuyFeetCount: 0,
+        _monthCardHaveGotReward: {},
+        _entrustResetTimes: 0,
+        _mineResetTimes: 0,
+        _mineBuyResetTimesCount: 0,
+        _mineBuyStepCount: 0,
+        _guildBossTimes: Number(c1.guildBOSSTimes || 2),
+        _guildBossTimesBuyCount: 0,
+        _treasureTimes: Number(c1.guildGrabTimes || 3),
+        _guildCheckInType: 0,
+        _dragonExchangeSSPoolId: 0,
+        _dragonExchangeSSSPoolId: 0,
+        _teamDugeonUsedRobots: [],
+        _timeTrialBuyTimesCount: 0,
+        _goldBuyCount: 0,
+        _likeRank: {},
+        _mahaAttackTimes: Number(c1.mahaAdventureTimesMax || 5),
+        _mahaBuyTimesCount: 0,
+        _bossCptTimes: Number(c1.bossFightTimesMax || 3),
+        _bossCptBuyCount: 0,
+        _ballWarBuyCount: 0,
+        _mergeBossBuyCount: 0,
+        _topBattleTimes: 0,
+        _topBattleBuyCount: 0,
+        _gravityTrialBuyTimesCount: 0,
+        _trainingBuyCount: 0,
+        _templeBuyCount: 0,
+        _expeditionEvents: {},
+        _clickExpedition: false,
+        _expeditionSpeedUpCost: 0,
+        _templeDailyReward: false,
+        _templeYesterdayLess: 0,
+        _dungeonTimes: {},
+        _dungeonBuyTimesCount: {}
+    };
+}
+
+// ═══════════════════════════════════════════════════════════════
+// MAIN HANDLER
+// ═══════════════════════════════════════════════════════════════
 
 /**
- * Handle user.enterGame
- * @param {object} request - Client request object
- * @param {object} session - Socket session { userId, verified, nonce, ... }
- * @returns {Promise<object>} Response via responseHelper
+ * Handler: user.enterGame
+ * Referensi: main-server.md v4.0 Section 3.3, 8.1, 10
+ *
+ * Request: { type:'user', action:'enterGame', loginToken, userId, serverId, version, language, gameVersion }
+ * Response: Full user data (76 field) via UserDataParser.saveUserData()
  */
 async function handleEnterGame(request, session) {
     const startTime = Date.now();
-    const { loginToken, userId, serverId, version, language, gameVersion } = request;
+    const { loginToken, userId, serverId, version, language } = request;
 
     logger.log('INFO', 'ENTER', 'enterGame request');
     logger.details('request',
@@ -371,29 +393,30 @@ async function handleEnterGame(request, session) {
         ['language', language || '']
     );
 
-    // 1. Validate required fields
+    // ── 1. Validate required fields ──
     if (!loginToken || !userId || !serverId) {
         logger.log('WARN', 'ENTER', 'Missing required fields');
         return responseHelper.buildError(responseHelper.ErrorCodes.ERROR_LACK_PARAM);
     }
 
-    // 2. Validate loginToken via SDK-Server
+    // ── 2. Validate loginToken via SDK-Server ──
     const validation = await validateWithSDKServer(loginToken, userId);
     if (!validation.valid) {
         logger.log('WARN', 'ENTER', 'loginToken validation failed');
         return responseHelper.buildError(responseHelper.ErrorCodes.ERROR_NO_LOGIN_CLIENT);
     }
 
-    // 3. Check if user exists in main_server.db
+    // ── 3. Check if user exists in main_server.db ──
     let user = db.getUser(userId);
+    let isNewUser = false;
 
     if (!user) {
         // New user — create complete user data
-        // Default values dari SQLite DEFAULT constraints via db.createCompleteUser()
         logger.log('INFO', 'ENTER', `Creating new user: ${userId}`);
 
         const nickName = 'Guest_' + userId.slice(-4);
         user = db.createCompleteUser(userId, nickName, loginToken, serverId, language);
+        isNewUser = true;
 
         logger.log('INFO', 'ENTER', `New user created: ${userId}`);
         logger.details('data', ['nickName', nickName]);
@@ -408,30 +431,29 @@ async function handleEnterGame(request, session) {
         });
     }
 
-    // 4. Set user online
+    // ── 4. Set user online ──
     db.setUserOnline(userId, 1);
 
-    // 5. Track userId in session
+    // ── 5. Track userId in session ──
     session.userId = userId;
     session.verified = true;
 
-    // ═══════════════════════════════════════════════════════════════
-    // 6. Load semua relasional data dari DB
-    // ═══════════════════════════════════════════════════════════════
-
+    // ── 6. Load ALL relational data dari DB ──
     const heroes = db.getHeroes(userId);
     const items = db.getItems(userId);
     const equips = db.getEquips(userId);
     const weapons = db.getWeapons(userId);
     const imprints = db.getImprints(userId);
     const genkis = db.getGenkis(userId);
-    const friends = db.getFriends(userId);
-    const mails = db.getMails(userId);
-    const expeditions = db.getExpeditions(userId);
-    const entrusts = db.getEntrusts(userId);
-    const resonances = db.getResonances(userId);
     const superSkills = db.getSuperSkills(userId);
     const gemstones = db.getGemstones(userId);
+    const resonances = db.getResonance(userId);
+    const expeditions = db.getExpedition(userId);
+    const dungeonProgress = db.getDungeonProgress(userId);
+    const friends = db.getFriends(userId);
+    const blacklist = db.getBlacklist(userId);
+    const mails = db.getMails(userId);
+    const shopData = db.getShopData(userId);
 
     // Guild
     const guildInfo = db.getGuildByUser(userId);
@@ -442,415 +464,428 @@ async function handleEnterGame(request, session) {
     // Tower
     const towerData = db.getTowerData(userId);
 
-    // Ball war
+    // Ball War
     const ballWarData = db.getBallWarData(userId);
 
-    // Dungeon
-    const dungeonProgress = db.getDungeonProgress(userId);
-
-    // Shop
-    const shopData = db.getShopData(userId);
-
-    // ═══════════════════════════════════════════════════════════════
-    // 7. Build enterGame response — SESUAI client saveUserData format
-    //    Cross-reference: main.min(unminfy).js Line 114793-114873
-    // ═══════════════════════════════════════════════════════════════
-
-    // Parse JSON fields dari user_data
-    const scheduleInfo = safeParse(user.scheduleData, null) || buildInitialScheduleInfo();
+    // ── 7. Parse JSON fields dari user_data ──
+    const scheduleInfo = safeParse(user.scheduleData, {});
     const timesInfo = safeParse(user.timesData, {});
     const battleMedalInfo = safeParse(user.battleMedalData, {});
     const giftInfoData = safeParse(user.giftInfoData, {});
+    const ballWarDataParsed = safeParse(user.ballWarData, {});
+    const expeditionDataParsed = safeParse(user.expeditionData, []);
+    const entrustDataParsed = safeParse(user.entrustData, []);
 
-    // Parse 1:1 JSON data blocks dari user_data
-    const hangupData = safeParse(user.hangupData, {});
-    const summonData = safeParse(user.summonData, {});
-    const heroSkinData = safeParse(user.heroSkinData, {});
-    const dragonEquipedData = safeParse(user.dragonEquiped, {});
-    const lastTeamData = safeParse(user.lastTeamData, {});
-    const trainingData = safeParse(user.trainingData, {});
-    const retrieveData = safeParse(user.retrieveData, {});
-    const snakeData = safeParse(user.snakeData, {});
-    const checkinData = safeParse(user.checkinData, {});
-    const littleGameData = safeParse(user.littleGameData, {});
-    const gravityData = safeParse(user.gravityData, {});
-    const headEffectData = safeParse(user.headEffectData, {});
-    const warData = safeParse(user.warData, {});
-    const timeTrialData = safeParse(user.timeTrialData, {});
-    const cellGameData = safeParse(user.cellGameData, {});
-    const hideHeroesData = safeParse(user.hideHeroesData, {});
-    const teamTrainingData = safeParse(user.teamTrainingData, {});
-    const channelSpecialData = safeParse(user.channelSpecial, {});
+    // ── 8. Read constants dari constant.json ──
+    const c1 = (jsonLoader.get('constant') || {})['1'] || {};
 
-    // ─── Build totalProps (client: e.totalProps._items) ───
-    // Client reads: e.totalProps._items → array of {_id, _num}
-    const _items = {};
-    let itemIndex = 0;
-    for (const item of items) {
-        _items[String(itemIndex)] = { _id: item.itemId, _num: item.num };
-        itemIndex++;
-    }
-
-    // ─── Build expedition ───
-    // Client reads: e.expedition → ExpeditionManager
-    const expeditionWire = expeditions.map(e => ({
-        _machineId: e.machineId, _heroId: e.heroId,
-        _lessonIds: safeParse(e.lessonIds, []), _teams: safeParse(e.teams, [])
-    }));
-
-    // ─── Build resonance ───
-    // Client reads: e.resonance → HerosManager.setResonanceModel
-    const resonanceWire = resonances.map(r => ({
-        _cabinId: r.cabinId, _seatId: r.seatId, _heroId: r.heroId
-    }));
-
-    // ─── Build superSkill ───
-    // Client reads: e.superSkill → plain array of super skill objects
-    const superSkillWire = superSkills.map(s => ({
-        _skillId: s.skillId, _level: s.level, _evolveLevel: s.evolveLevel
-    }));
-
-    // ─── Build entrust ───
-    const entrustWire = entrusts.map(e => ({
-        _entrustIndex: e.entrustIndex, _heroInfo: safeParse(e.heroInfo, {}),
-        _status: e.status, _finishTime: e.finishTime
-    }));
-
-    // ─── Build dungeon (client: e.dungeon._dungeons) ───
-    const dungeonWire = { _dungeons: dungeonProgress };
-
-    // ─── Build tower data for karinStartTime/karinEndTime ───
-    const karinStartTime = towerData ? (towerData.climbTimes || 0) : 0;
-    const karinEndTime = 0;
-
-    // ─── Build ball war ───
-    const userBallWarWire = ballWarData ? {
-        _state: ballWarData.state, _signedUp: ballWarData.signedUp,
-        _times: ballWarData.times, _defence: safeParse(ballWarData.defence, {})
-    } : {};
-
-    // ─── Build guild related ───
-    const guildName = guildInfo ? guildInfo.guildName : '';
-    const guildLevel = guildInfo ? guildInfo.guildLevel || 1 : 0;
-    const userGuild = guildInfo ? {
-        _tech: {}
-    } : null;
-
-    // ═══════════════════════════════════════════════════════════════
-    // COMPLETE ENTERGAME RESPONSE
-    // Field order & names sesuai client saveUserData (main.min.js Line 114793+)
-    // ═══════════════════════════════════════════════════════════════
-
+    // ── 9. Build complete enterGame response — SEMUA 76 FIELD ──
+    // Referensi: main-server.md v4.0 Section 10.2, 10.13
     const enterGameData = {
-        // ─── currency ───
-        currency: {
-            _diamond: user.diamond,
-            _gold: user.gold
-        },
 
-        // ─── user (nested object — client: e.user._id, e.user._nickName, dll) ───
+        // ═══════════════════════════════════════════
+        // CORE (9 field, #1-#7 + sub)
+        // ═══════════════════════════════════════════
+
+        // #1 currency
+        currency: 'USD',
+
+        // #2 newUser
+        newUser: isNewUser,
+
+        // #3 user (UserInfoSingleton)
         user: {
             _id: user.userId,
             _pwd: '',
             _nickName: user.nickName,
-            _headImage: user.headImageId,
-            _lastLoginTime: user.lastLoginTime,
-            _createTime: user.createTime,
-            _bulletinVersions: user.bulletinRead || '',
-            _oriServerId: user.serverId,
-            _nickChangeTimes: user.nickChangeTimes || 0
+            _headImage: String(user.headImageId),
+            _lastLoginTime: user.lastLoginTime || 0,
+            _createTime: user.createTime || 0,
+            _bulletinVersions: {},
+            _oriServerId: Number(user.serverId) || 1,
+            _nickChangeTimes: 0
         },
 
-        // ─── hangup (client: e.hangup → setOnHook) ───
-        hangup: hangupData,
+        // #4 hangup (OnHookSingleton)
+        hangup: {
+            _curLess: 0,
+            _maxPassLesson: 0,
+            _haveGotChapterReward: {},
+            _maxPassChapter: 0,
+            _clickGlobalWarBuffTag: '',
+            _buyFund: false,
+            _haveGotFundReward: {}
+        },
 
-        // ─── global war fields (client: e.globalWarBuffTag etc) ───
-        globalWarBuffTag: warData._globalWarBuffTag || '',
-        globalWarLastRank: warData._globalWarLastRank || 0,
-        globalWarBuff: warData._globalWarBuff || {},
-        globalWarBuffEndTime: warData._globalWarBuffEndTime || 0,
+        // #5 summon (SummonSingleton)
+        summon: {
+            _energy: 0,
+            _wishList: [],
+            _wishVersion: 0,
+            _canCommonFreeTime: 0,
+            _canSuperFreeTime: 0,
+            _summonTimes: {}
+        },
 
-        // ─── summon (client: e.summon → setSummon) ───
-        summon: summonData,
-
-        // ─── totalProps (client: e.totalProps._items → [{_id, _num}]) ───
-        // CRITICAL: Named "totalProps" NOT "backpack" — client reads e.totalProps
+        // #6 totalProps (ItemsCommonSingleton)
+        // KRITIS: _items EKSPLISIT, bukan kosong! (cascade failure jika kosong)
         totalProps: {
-            _items: _items
+            _items: buildItemsDict(items)
         },
 
-        // ─── backpackLevel (top-level, NOT inside totalProps) ───
+        // #7 backpackLevel
         backpackLevel: user.backpackLevel || 1,
 
-        // ─── imprint (client: e.imprint._items → NOT "sign") ───
-        imprint: buildImprintItems(imprints),
+        // ═══════════════════════════════════════════
+        // HEROES & EQUIPMENT (8 field, #8-#15)
+        // ═══════════════════════════════════════════
 
-        // ─── equip (client: e.equip._suits → map by heroId) ───
-        equip: buildEquipSuits(equips),
+        // #8 heros (HerosManager)
+        heros: {
+            _heros: buildHerosDict(heroes)
+        },
 
-        // ─── weapon (client: e.weapon._items → array) ───
-        weapon: buildWeaponItems(weapons),
+        // #9 scheduleInfo (AllRefreshCount)
+        scheduleInfo: buildScheduleInfo(scheduleInfo),
 
-        // ─── genki (client: e.genki → GenkiModel) ───
+        // #10 imprint (SignInfoManager)
+        imprint: {
+            _items: buildImprintItems(imprints)
+        },
+
+        // #11 equip (EquipInfoManager)
+        equip: {
+            _suits: buildEquipSuits(equips)
+        },
+
+        // #12 weapon (EquipInfoManager)
+        weapon: {
+            _items: buildWeaponItems(weapons)
+        },
+
+        // #13 genki (EquipInfoManager)
         genki: buildGenkiModel(genkis),
 
-        // ─── dungeon (client: e.dungeon._dungeons → NOT "counterpart") ───
-        dungeon: dungeonWire,
+        // #14 dungeon (CounterpartSingleton)
+        dungeon: buildDungeonModel(dungeonProgress),
 
-        // ─── superSkill (client: e.superSkill → plain array) ───
-        superSkill: superSkillWire,
+        // #15 superSkill (SuperSkillSingleton)
+        superSkill: buildSuperSkillModel(superSkills),
 
-        // ─── heroSkin (client: e.heroSkin → HerosManager.setSkinData) ───
-        heroSkin: heroSkinData,
+        // ═══════════════════════════════════════════
+        // PROGRESS & SKINS (3 field, #16-#18)
+        // ═══════════════════════════════════════════
 
-        // ─── heros (client: e.heros._heros → map by heroId, NOT array) ───
-        heros: buildHerosMap(heroes),
+        // #16 heroSkin (HerosManager)
+        heroSkin: { _skins: {}, _curSkin: {} },
 
-        // ─── curMainTask ───
-        curMainTask: null,
-
-        // ─── checkin (client: e.checkin → WelfareInfoManager.setSignInInfo) ───
-        checkin: checkinData,
-
-        // ─── channelSpecial ───
-        channelSpecial: channelSpecialData,
-
-        // ─── scheduleInfo (client: e.scheduleInfo → AllRefreshCount.initData) ───
-        scheduleInfo: scheduleInfo,
-
-        // ─── dragonEquiped (client: e.dragonEquiped → ItemsCommonSingleton) ───
-        dragonEquiped: dragonEquipedData,
-
-        // ─── guide ───
-        guide: user.guideStep || '',
-
-        // ─── guildName ───
-        guildName: guildName,
-
-        // ─── clickSystem ───
-        clickSystem: { _clickSys: safeParse(user.clickSystem, {}) },
-
-        // ─── giftInfo ───
-        giftInfo: giftInfoData,
-
-        // ─── timesInfo ───
-        timesInfo: timesInfo,
-
-        // ─── _arenaTeam (client: e._arenaTeam → AltarInfoManger) ───
-        _arenaTeam: arenaData ? safeParse(arenaData.team, {}) : {},
-
-        // ─── _arenaSuper (client: e._arenaSuper → AltarInfoManger.setArenaSuperInfo) ───
-        _arenaSuper: {},
-
-        // ─── serverVersion ───
-        serverVersion: config.version,
-
-        // ─── serverOpenDate ───
-        serverOpenDate: config.server0Time,
-
-        // ─── lastTeam (client: e.lastTeam._lastTeamInfo) ───
-        lastTeam: lastTeamData._lastTeamInfo ? lastTeamData : { _lastTeamInfo: {} },
-
-        // ─── heroImageVersion ───
-        heroImageVersion: '',
-
-        // ─── superImageVersion ───
-        superImageVersion: '',
-
-        // ─── training (client: e.training → PadipataInfoManager) ───
-        training: trainingData,
-
-        // ─── warInfo ───
-        warInfo: warData._warInfo || {},
-
-        // ─── userWar ───
-        userWar: warData._userWar || {},
-
-        // ─── serverId ───
-        serverId: user.serverId,
-
-        // ─── headEffect ───
-        headEffect: headEffectData,
-
-        // ─── userBallWar ───
-        userBallWar: userBallWarWire,
-
-        // ─── ballWarState ───
-        ballWarState: ballWarData ? ballWarData.state : 0,
-
-        // ─── ballBroadcast ───
-        ballBroadcast: '',
-
-        // ─── ballWarInfo ───
-        ballWarInfo: null,
-
-        // ─── guildActivePoints ───
-        guildActivePoints: 0,
-
-        // ─── expedition ───
-        expedition: expeditionWire,
-
-        // ─── timeTrial ───
-        timeTrial: timeTrialData,
-
-        // ─── timeTrialNextOpenTime ───
-        timeTrialNextOpenTime: 0,
-
-        // ─── retrieve ───
-        retrieve: retrieveData,
-
-        // ─── battleMedal ───
-        battleMedal: battleMedalInfo,
-
-        // ─── gemstone (client: e.gemstone._items → array) ───
-        gemstone: buildGemstoneItems(gemstones),
-
-        // ─── resonance ───
-        resonance: resonanceWire,
-
-        // ─── fastTeam ───
-        fastTeam: safeParse(user.fastTeams, {}),
-
-        // ─── forbiddenChat (client: e.forbiddenChat → {users:{}, finishTime:{}}) ───
-        forbiddenChat: user.forbiddenChat ? { users: {}, finishTime: {} } : { users: {}, finishTime: {} },
-
-        // ─── gravity ───
-        gravity: gravityData,
-
-        // ─── littleGame ───
-        littleGame: littleGameData,
-
-        // ─── userGuild (client: e.userGuild → TeamInfoManager) ───
-        userGuild: userGuild,
-
-        // ─── userGuildPub ───
-        userGuildPub: null,
-
-        // ─── guildLevel ───
-        guildLevel: guildLevel,
-
-        // ─── hideHeroes ───
-        hideHeroes: hideHeroesData,
-
-        // ─── karinStartTime ───
-        karinStartTime: karinStartTime,
-
-        // ─── karinEndTime ───
-        karinEndTime: karinEndTime,
-
-        // ─── entrustData ───
-        entrustData: entrustWire,
-
-        // ─── cellgameHaveSetHero ───
-        cellgameHaveSetHero: cellGameData._cellgameHaveSetHero || 0,
-
-        // ─── shopNewHeroes ───
-        shopNewHeroes: [],
-
-        // ─── onlineBulletin ───
-        onlineBulletin: null,
-
-        // ─── questionnaires ───
-        questionnaires: null,
-
-        // ─── newUser / firstEnter ───
-        newUser: user.firstEnter === 1 ? 1 : 0,
-        _firstEnter: user.firstEnter,
-
-        // ─── _bulletinRead ───
-        _bulletinRead: user.bulletinRead || '',
-
-        // ─── teamTraining ───
-        teamTraining: teamTrainingData,
-
-        // ─── gameVersion (echo back from client) ───
-        gameVersion: gameVersion || '',
-
-        // ─── templeLess ───
-        templeLess: null,
-
-        // ─── userTopBattle ───
-        userTopBattle: null,
-
-        // ─── topBattleInfo ───
-        topBattleInfo: null,
-
-        // ─── guildTreasureMatchRet ───
-        guildTreasureMatchRet: null,
-
-        // ─── myTeamServerSocketUrl ───
-        myTeamServerSocketUrl: '',
-
-        // ─── teamDungeon ───
-        teamDungeon: null,
-
-        // ─── teamServerHttpUrl ───
-        teamServerHttpUrl: '',
-
-        // ─── teamDungeonOpenTime ───
-        teamDungeonOpenTime: 0,
-
-        // ─── teamDungeonTask ───
-        teamDungeonTask: null,
-
-        // ─── teamDungeonSplBcst ───
-        teamDungeonSplBcst: '',
-
-        // ─── teamDungeonNormBcst ───
-        teamDungeonNormBcst: '',
-
-        // ─── teamDungeonHideInfo ───
-        teamDungeonHideInfo: '',
-
-        // ─── teamDungeonInvitedFriends ───
-        teamDungeonInvitedFriends: null,
-
-        // ─── timeMachine ───
-        timeMachine: null,
-
-        // ─── timeBonusInfo ───
-        timeBonusInfo: null,
-
-        // ─── vipLog ───
-        vipLog: null,
-
-        // ─── cardLog ───
-        cardLog: null,
-
-        // ─── monthCard ───
-        monthCard: null,
-
-        // ─── recharge ───
-        recharge: null,
-
-        // ─── userDownloadReward ───
-        userDownloadReward: null,
-
-        // ─── YouTuberRecruit ───
-        YouTuberRecruit: null,
-
-        // ─── userYouTuberRecruit ───
-        userYouTuberRecruit: null,
-
-        // ─── summonLog ───
+        // #17 summonLog (SummonSingleton)
         summonLog: [],
 
-        // ─── QQ-specific (safe defaults) ───
-        enableShowQQ: 0,
-        showQQVip: 0,
-        showQQ: '',
-        showQQImg1: '',
-        showQQImg2: '',
-        showQQUrl: ''
+        // #18 curMainTask (UserInfoSingleton)
+        curMainTask: {},
+
+        // ═══════════════════════════════════════════
+        // WELFARE (8 field, #19-#26)
+        // ═══════════════════════════════════════════
+
+        // #19 checkin (WelfareInfoManager)
+        checkin: { _id: '', _activeItem: [], _curCycle: 1, _maxActiveDay: 0, _lastActiveDate: 0 },
+
+        // #20 channelSpecial (WelfareInfoManager)
+        channelSpecial: {},
+
+        // #21 dragonEquiped (ItemsCommonSingleton)
+        dragonEquiped: {},
+
+        // #22 vipLog (WelfareInfoManager)
+        vipLog: [],
+
+        // #23 cardLog (WelfareInfoManager)
+        cardLog: [],
+
+        // #24 guide (GuideInfoManager)
+        guide: { _id: '', _steps: safeParse(user.guideStep, {}) },
+
+        // #25 guildName (TeamInfoManager)
+        guildName: guildInfo ? guildInfo.guildName : '',
+
+        // #26 clickSystem (UserClickSingleton)
+        clickSystem: { _clickSys: safeParse(user.clickSystem, { '1': false, '2': false }) },
+
+        // ═══════════════════════════════════════════
+        // GIFT & CARDS (3 field, #27-#29)
+        // ═══════════════════════════════════════════
+
+        // #27 giftInfo (WelfareInfoManager)
+        giftInfo: {
+            _fristRecharge: {},
+            _haveGotVipRewrd: {},
+            _buyVipGiftCount: {},
+            _onlineGift: { _curId: 0, _nextTime: 0 },
+            _gotBSAddToHomeReward: false,
+            _clickHonghuUrlTime: 0,
+            _gotChannelWeeklyRewardTag: ''
+        },
+
+        // #28 monthCard (WelfareInfoManager)
+        monthCard: { _id: '', _card: {} },
+
+        // #29 recharge (WelfareInfoManager)
+        recharge: { _id: '', _haveBought: {} },
+
+        // ═══════════════════════════════════════════
+        // TIMES & RECOVERY — KRITIS (1 field, #30)
+        // ═══════════════════════════════════════════
+
+        // #30 timesInfo (TimesInfoSingleton) — ⚠️ KRITIS: NaN BUG jika tidak dikirim
+        timesInfo: {
+            marketRefreshTimes: Number(timesInfo._marketRefreshTimes || timesInfo.marketRefreshTimes || 0),
+            marketRefreshTimesRecover: Number(timesInfo._marketRefreshTimesRecover || timesInfo.marketRefreshTimesRecover || 0),
+            vipMarketRefreshTimes: Number(timesInfo._vipMarketRefreshTimes || timesInfo.vipMarketRefreshTimes || 0),
+            vipMarketRefreshTimesRecover: Number(timesInfo._vipMarketRefreshTimesRecover || timesInfo.vipMarketRefreshTimesRecover || 0),
+            templeTimes: Number(timesInfo._templeTimes || timesInfo.templeTimes || 0),
+            templeTimesRecover: Number(timesInfo._templeTimesRecover || timesInfo.templeTimesRecover || 0),
+            mahaTimes: Number(timesInfo._mahaTimes || timesInfo.mahaTimes || 0),
+            mahaTimesRecover: Number(timesInfo._mahaTimesRecover || timesInfo.mahaTimesRecover || 0),
+            mineSteps: Number(timesInfo._mineSteps || timesInfo.mineSteps || 0),
+            mineStepsRecover: Number(timesInfo._mineStepsRecover || timesInfo.mineStepsRecover || 0),
+            karinFeet: Number(timesInfo._karinFeet || timesInfo.karinFeet || 0),
+            karinFeetRecover: Number(timesInfo._karinFeetRecover || timesInfo.karinFeetRecover || 0)
+        },
+
+        // ═══════════════════════════════════════════
+        // USER EXTRAS (5 field, #31-#35)
+        // ═══════════════════════════════════════════
+
+        // #31 userDownloadReward (UserInfoSingleton)
+        userDownloadReward: { _isClick: false, _haveGotDlReward: false, _isBind: false, _haveGotBindReward: false },
+
+        // #32 timeMachine (TimeLeapSingleton)
+        timeMachine: { _items: {} },
+
+        // #33 _arenaTeam (AltarInfoManger)
+        _arenaTeam: safeParse(arenaData ? arenaData.team : '{}', []),
+
+        // #34 _arenaSuper (AltarInfoManger)
+        _arenaSuper: [],
+
+        // #35 timeBonusInfo (TimeLimitGiftBagManager)
+        timeBonusInfo: { _id: '', _timeBonus: {} },
+
+        // ═══════════════════════════════════════════
+        // SERVER INFO (5 field, #36-#40)
+        // ═══════════════════════════════════════════
+
+        // #36 onlineBulletin (BulletinSingleton)
+        onlineBulletin: [],
+
+        // #37 karinStartTime (TowerDataManager)
+        karinStartTime: 0,
+
+        // #38 karinEndTime (TowerDataManager)
+        karinEndTime: 0,
+
+        // #39 serverVersion (UserInfoSingleton)
+        serverVersion: '1.0',
+
+        // #40 serverOpenDate (UserInfoSingleton)
+        serverOpenDate: 0,
+
+        // ═══════════════════════════════════════════
+        // TEAM & TRAINING (3 field, #41-#43)
+        // ═══════════════════════════════════════════
+
+        // #41 lastTeam (UserInfoSingleton)
+        lastTeam: { _lastTeamInfo: {} },
+
+        // #42 training (PadipataInfoManager)
+        training: { _id: '', _type: 0, _times: 0, _timesStartRecover: 0, _cfgId: 0 },
+
+        // #43 warInfo (GlobalWarManager)
+        warInfo: {},
+
+        // ═══════════════════════════════════════════
+        // WAR (5 field, #44-#48)
+        // ═══════════════════════════════════════════
+
+        // #44 userWar (GlobalWarManager)
+        userWar: {},
+
+        // #45 serverId — ⚠️ WAJIB kirim nilai asli
+        serverId: Number(user.serverId) || 1,
+
+        // #46 headEffect (UserInfoSingleton)
+        headEffect: { _effects: [] },
+
+        // #47 userBallWar (TeamInfoManager)
+        userBallWar: {},
+
+        // #48 ballWarState (TeamInfoManager)
+        ballWarState: ballWarData ? ballWarData.state : 0,
+
+        // ═══════════════════════════════════════════
+        // BALL WAR (3 field, #49-#51)
+        // ═══════════════════════════════════════════
+
+        // #49 ballBroadcast (TeamInfoManager)
+        ballBroadcast: [],
+
+        // #50 ballWarInfo (TeamInfoManager)
+        ballWarInfo: { _topMsg: '', _point: 0, _signed: false, _fieldId: '' },
+
+        // #51 guildActivePoints (TeamInfoManager)
+        guildActivePoints: {},
+
+        // ═══════════════════════════════════════════
+        // EXPEDITION & TRIAL (4 field, #52-#55)
+        // ═══════════════════════════════════════════
+
+        // #52 expedition (ExpeditionManager)
+        expedition: {},
+
+        // #53 timeTrial (SpaceTrialManager)
+        timeTrial: {
+            _levelStars: {},
+            _level: 1,
+            _totalStars: 0,
+            _gotStarReward: {},
+            _haveTimes: 0,
+            _timesStartRecover: 0,
+            _lastRefreshTime: 0
+        },
+
+        // #54 timeTrialNextOpenTime (SpaceTrialManager)
+        timeTrialNextOpenTime: 0,
+
+        // #55 retrieve (GetBackReourceManager)
+        retrieve: null,
+
+        // ═══════════════════════════════════════════
+        // BATTLE MEDAL — KRITIS (1 field, #56)
+        // ═══════════════════════════════════════════
+
+        // #56 battleMedal — ⚠️ CRASH jika _nextRefreshTime tidak ada
+        battleMedal: {
+            _id: String(battleMedalInfo._id || ''),
+            _battleMedalId: String(battleMedalInfo._battleMedalId || ''),
+            _cycle: Number(battleMedalInfo._cycle || 0),
+            _nextRefreshTime: Number(battleMedalInfo._nextRefreshTime || 0),
+            _level: Number(battleMedalInfo._level || 0),
+            _curExp: Number(battleMedalInfo._curExp || 0),
+            _openSuper: Boolean(battleMedalInfo._openSuper || false),
+            _task: battleMedalInfo._task || {},
+            _levelReward: battleMedalInfo._levelReward || {},
+            _shopBuyTimes: battleMedalInfo._shopBuyTimes || {},
+            _buyLevelCount: Number(battleMedalInfo._buyLevelCount || 0)
+        },
+
+        // ═══════════════════════════════════════════
+        // SHOP (1 field, #57)
+        // ═══════════════════════════════════════════
+
+        // #57 shopNewHeroes (ShopInfoManager)
+        shopNewHeroes: {},
+
+        // ═══════════════════════════════════════════
+        // TEAM DUNGEON (4 field, #58-#61)
+        // ═══════════════════════════════════════════
+
+        // #58 teamDungeon (TeamworkManager)
+        teamDungeon: { _myTeam: '', _canCreateTeamTime: 0, _nextCanJoinTime: 0 },
+
+        // #59 teamServerHttpUrl (TeamworkManager)
+        teamServerHttpUrl: '',
+
+        // #60 teamDungeonOpenTime (TeamworkManager)
+        teamDungeonOpenTime: 0,
+
+        // #61 teamDungeonTask (TeamworkManager)
+        teamDungeonTask: { _achievement: {}, _dailyRefreshTime: 0, _daily: {} },
+
+        // ═══════════════════════════════════════════
+        // GEMSTONE & MISC (6 field, #62-#67)
+        // ═══════════════════════════════════════════
+
+        // #62 gemstone (EquipInfoManager)
+        gemstone: buildGemstoneModel(gemstones),
+
+        // #63 questionnaires (UserInfoSingleton)
+        questionnaires: {},
+
+        // #64 resonance (HerosManager)
+        resonance: buildResonanceModel(resonances),
+
+        // #65 fastTeam (HerosManager)
+        fastTeam: { _teamInfo: safeParse(user.fastTeams, {}) },
+
+        // #66 blacklist (BroadcastSingleton)
+        blacklist: [],
+
+        // #67 forbiddenChat (BroadcastSingleton)
+        forbiddenChat: { users: [], finishTime: {} },
+
+        // ═══════════════════════════════════════════
+        // GRAVITY & MINI-GAME (2 field, #68-#69)
+        // ═══════════════════════════════════════════
+
+        // #68 gravity (TrialManager)
+        gravity: {
+            gravity: {
+                _id: '',
+                _haveTimes: 0,
+                _timesStartRecover: 0,
+                _lastLess: 0,
+                _lastTime: 0
+            }
+        },
+
+        // #69 littleGame (LittleGameManager)
+        littleGame: { _gotBattleReward: {}, _gotChapterReward: {}, _clickTime: 0 },
+
+        // ═══════════════════════════════════════════
+        // TOP BATTLE (2 field, #70-#71)
+        // ═══════════════════════════════════════════
+
+        // #70 userTopBattle (TopBattleManager)
+        userTopBattle: { _id: '', _teams: {}, _teamTag: '', _records: [], _history: [], _gotRankReward: [] },
+
+        // #71 topBattleInfo (TopBattleManager)
+        topBattleInfo: {},
+
+        // ═══════════════════════════════════════════
+        // GLOBAL WAR (4 field, #72-#75)
+        // ═══════════════════════════════════════════
+
+        // #72 globalWarBuffTag (OnHookSingleton)
+        globalWarBuffTag: '',
+
+        // #73 globalWarLastRank (OnHookSingleton)
+        globalWarLastRank: {},
+
+        // #74 globalWarBuff (OnHookSingleton)
+        globalWarBuff: 0,
+
+        // #75 globalWarBuffEndTime (OnHookSingleton)
+        globalWarBuffEndTime: 0,
+
+        // ═══════════════════════════════════════════
+        // BROADCAST (1 field, #76)
+        // ═══════════════════════════════════════════
+
+        // #76 broadcastRecord (ts.chatJoinRecord)
+        broadcastRecord: []
     };
 
     const duration = Date.now() - startTime;
     logger.log('INFO', 'ENTER', 'enterGame success');
     logger.details('data',
         ['userId', userId],
+        ['isNewUser', String(isNewUser)],
         ['level', String(user.level)],
         ['heroes', String(heroes.length)],
         ['items', String(items.length)],
+        ['fields', '76'],
         ['duration', duration + 'ms']
     );
 
