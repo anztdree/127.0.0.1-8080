@@ -27,15 +27,6 @@ module.exports = {
     // ─── External Servers ───
     sdkServerUrl: 'http://127.0.0.1:9999',
     loginServerUrl: 'http://127.0.0.1:8000',
-    chatServerUrl: 'http://127.0.0.1:8002',
-    dungeonServerUrl: 'http://127.0.0.1:8003',
-
-    // ─── Chat Server Parameters ───
-    // Client membaca dari registChat response (main.min.js Line 114462)
-    chatWorldRoomId: 'world_room',
-    chatGuildRoomIdPrefix: 'guild_',
-    chatTeamDungeonRoomPrefix: 'team_dungeon_',
-    chatTeamRoomPrefix: 'team_',
 
     // ─── Resource Paths ───
     jsonResourcePath: path.join(__dirname, '..', '..', 'resource', 'json'),

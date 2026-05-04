@@ -18,7 +18,6 @@
 
 const http = require('http');
 const path = require('path');
-const fs = require('fs');
 const chalk = require('chalk');
 const logger = require('./logger');
 const config = require('./config');
@@ -141,44 +140,27 @@ function registerHandler(type, action, handlerFn) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// HANDLER AUTO-LOADER
-// Setiap file di handlers/ → 1 action = 1 file
-// Filename convention: handlers/<actionName>.js
-// Contoh: handlers/enterGame.js → registerHandler('user', 'enterGame', handlerFn)
+// HANDLER LOADER — Load dari handlers/ directory
+// 1 Action = 1 File
 // ═══════════════════════════════════════════════════════════════
 
-const HANDLERS_DIR = path.join(__dirname, 'handlers');
+const handlerFs = require('fs');
 
-/**
- * Auto-load semua handler dari handlers/ folder
- * Setiap file export satu async function(request, session) → response
- */
-function loadHandlers() {
-    if (!fs.existsSync(HANDLERS_DIR)) {
-        logger.log('WARN', 'HANDLER', 'handlers/ directory not found');
-        return;
+const handlersDir = path.join(__dirname, 'handlers');
+if (handlerFs.existsSync(handlersDir)) {
+    const handlerFiles = handlerFs.readdirSync(handlersDir).filter(f => f.endsWith('.js'));
+    for (const file of handlerFiles) {
+        const handlerFn = require(path.join(handlersDir, file));
+        // Filename convention: enterGame.js → type='user', action='enterGame'
+        // Override dengan module.handlerKey jika ada
+        const handlerKey = handlerFn.handlerKey || `user.${file.replace('.js', '')}`;
+        const [type, action] = handlerKey.split('.');
+        registerHandler(type, action, handlerFn);
     }
-
-    const files = fs.readdirSync(HANDLERS_DIR).filter(f => f.endsWith('.js'));
-
-    for (const file of files) {
-        const actionName = path.basename(file, '.js');
-        const handlerFn = require(path.join(HANDLERS_DIR, file));
-
-        if (typeof handlerFn !== 'function') {
-            logger.log('WARN', 'HANDLER', `Skipping ${file} — not a function export`);
-            continue;
-        }
-
-        // Default: register sebagai 'user.<actionName>'
-        // Handler file bisa specify custom type via handlerFn.handlerType
-        const type = handlerFn.handlerType || 'user';
-        registerHandler(type, actionName, handlerFn);
-    }
+    logger.log('INFO', 'HANDLER', `Loaded ${handlerFiles.length} handler(s) from handlers/`);
+} else {
+    logger.log('WARN', 'HANDLER', 'handlers/ directory not found');
 }
-
-// Load semua handlers
-loadHandlers();
 
 /**
  * Handler: user.registChat
@@ -190,21 +172,9 @@ function handleRegistChat(request, session) {
     logger.log('INFO', 'REGCHAT', 'registChat request');
     logger.detail('data', ['userId', userId]);
 
-    // Client membaca response fields (main.min.js Line 114462-114471):
-    //   n._success → truthy check
-    //   n._chatServerUrl → chat server URL
-    //   n._worldRoomId → world chat room ID
-    //   n._guildRoomId → guild chat room ID prefix
-    //   n._teamDungeonChatRoom → team dungeon chat room prefix
-    //   n._teamChatRoom → team chat room prefix
-    return responseHelper.buildSuccess({
-        _success: 1,
-        _chatServerUrl: config.chatServerUrl,
-        _worldRoomId: config.chatWorldRoomId,
-        _guildRoomId: config.chatGuildRoomIdPrefix + (session.userId || userId),
-        _teamDungeonChatRoom: config.chatTeamDungeonRoomPrefix,
-        _teamChatRoom: config.chatTeamRoomPrefix
-    });
+    // RegistChat hanya mengembalikan status sukses
+    // Chat-Server handle di port 8002
+    return responseHelper.buildSuccess({ registChat: 1 });
 }
 
 /**
@@ -217,24 +187,13 @@ function handleGetBulletinBrief(request, session) {
     logger.log('INFO', 'ENTER', 'getBulletinBrief request');
     logger.detail('data', ['userId', userId]);
 
-    // Client membaca n._brief[o].title, n._brief[o].version, n._brief[o].order
-    // (main.min.js Line 121084-121102)
+    // Get bulletin dari noticeContent.json
     const noticeContent = jsonLoader.get('noticeContent');
 
-    // Wrap dalam _brief jika belum ada
-    let brief = {};
-    if (noticeContent) {
-        if (noticeContent._brief) {
-            brief = noticeContent;
-        } else {
-            brief._brief = noticeContent;
-        }
-    }
-
-    return responseHelper.buildSuccess(brief);
+    return responseHelper.buildSuccess(noticeContent || {});
 }
 
-// Register built-in handlers (simple handlers yang belum perlu file terpisah)
+// Register built-in handlers (non-file handlers)
 registerHandler('user', 'registChat', handleRegistChat);
 registerHandler('user', 'getBulletinBrief', handleGetBulletinBrief);
 
@@ -445,35 +404,6 @@ io.on('connection', (socket) => {
 });
 
 // ═══════════════════════════════════════════════════════════════
-// KICKOUT / DUPLICATE LOGIN HANDLER
-// Client membaca Notify action='Kickout' → destroy semua sockets → back to login
-// (main.min.js Line 114216-114227)
-// ═══════════════════════════════════════════════════════════════
-
-/**
- * Kick user — send Kickout notify dan disconnect socket
- * Digunakan saat duplicate login atau admin kick
- * @param {string} userId
- */
-function kickUser(userId) {
-    for (const [socketId, session] of sessions.entries()) {
-        if (session.userId === userId) {
-            const socket = io.sockets.connected[socketId];
-            if (socket) {
-                // Send Kickout notify sebelum disconnect
-                socket.emit('Notify', { action: 'Kickout' });
-                logger.log('INFO', 'SOCKET', `Kickout notify sent → ${userId}`);
-
-                // Delay disconnect sedikit agar notify sampai
-                setTimeout(() => {
-                    socket.disconnect(true);
-                }, 100);
-            }
-        }
-    }
-}
-
-// ═══════════════════════════════════════════════════════════════
 // DAILY RESET SCHEDULER
 // Referensi: main-server.md v4.0 Section 12
 // ═══════════════════════════════════════════════════════════════
@@ -597,8 +527,7 @@ module.exports = {
     io,
     sessions,
     registerHandler,
-    ACTION_HANDLERS,
-    kickUser
+    ACTION_HANDLERS
 };
 
 // ═══════════════════════════════════════════════════════════════

@@ -1,7 +1,6 @@
 /**
  * db.js — MAIN-SERVER Database Module
  * Referensi: main-server.md v4.0 Section 7
- * Cross-reference verified against: main.min(unminfy).js
  *
  * Database: better-sqlite3 WAL mode
  * File: ./data/main_server.db
@@ -9,20 +8,6 @@
  *
  * Default values: SQLite DEFAULT constraints menangani semua default
  * Game constants: dibaca dari constant.json via jsonLoader
- *
- * CRUD Pattern:
- *   - READ:   getXxx(id)     → object|null  |  getXxxs(userId) → array
- *   - CREATE: createXxx(params) → object (created row)
- *   - UPDATE: updateXxx(id, fields) → void  (generic field updater)
- *   - DELETE: deleteXxx(id) → boolean
- *   - UPSERT: upsertXxx(...) → void  (untuk tabel dengan UNIQUE constraint)
- *
- * Schema Strategy:
- *   - Core persistent fields → dedicated columns with DEFAULT
- *   - Complex/nested objects → TEXT columns with JSON DEFAULT ('{}' or '[]')
- *   - Derived/computed fields → NOT stored (calculated by handlers from config)
- *   - 1:1 user data → JSON columns in user_data
- *   - 1:many user data → separate tables
  */
 
 const Database = require('better-sqlite3');
@@ -46,7 +31,6 @@ db.pragma('journal_mode = WAL');
 
 // ─── Create Tables ───
 // Referensi: main-server.md v4.0 Section 7.1
-// Cross-reference: main.min(unminfy).js client data models
 db.exec(`
     -- ═══════════════════════════════════════════════════════════
     -- USER DATA (Data User Utama)
@@ -83,8 +67,17 @@ db.exec(`
         ballWarData TEXT DEFAULT '{}',
         expeditionData TEXT DEFAULT '[]',
         entrustData TEXT DEFAULT '[]',
+        towerFloor INTEGER DEFAULT 0,
+        towerTimes INTEGER DEFAULT 10,
+        towerBuyTimes INTEGER DEFAULT 0,
+        towerClimbTimes INTEGER DEFAULT 0,
+        towerEvents TEXT DEFAULT '[]',
+        arenaRank INTEGER DEFAULT 0,
+        arenaTimes INTEGER DEFAULT 5,
+        arenaBuyTimes INTEGER DEFAULT 0,
+        arenaLastRefreshTime INTEGER DEFAULT 0,
+        arenaTeam TEXT DEFAULT '{}',
         online INTEGER DEFAULT 0,
-        -- Card/VIP data
         monthlyCardEndTime INTEGER DEFAULT 0,
         bigMonthlyCardEndTime INTEGER DEFAULT 0,
         lifelongCardEndTime INTEGER DEFAULT 0,
@@ -94,33 +87,7 @@ db.exec(`
         firstRechargeGot INTEGER DEFAULT 0,
         monthCardGot INTEGER DEFAULT 0,
         bigMonthCardGot INTEGER DEFAULT 0,
-        lifelongCardGot INTEGER DEFAULT 0,
-        -- Additional user fields from client cross-reference
-        newUser INTEGER DEFAULT 0,
-        nickChangeTimes INTEGER DEFAULT 0,
-        oriServerId TEXT DEFAULT '',
-        serverVersion TEXT DEFAULT '',
-        serverOpenDate INTEGER DEFAULT 0,
-        forbiddenChat INTEGER DEFAULT 0,
-        -- 1:1 JSON data blocks (client expects these in enterGame)
-        hangupData TEXT DEFAULT '{}',
-        summonData TEXT DEFAULT '{}',
-        heroSkinData TEXT DEFAULT '{}',
-        dragonEquiped TEXT DEFAULT '{}',
-        lastTeamData TEXT DEFAULT '{}',
-        trainingData TEXT DEFAULT '{}',
-        retrieveData TEXT DEFAULT '{}',
-        snakeData TEXT DEFAULT '{}',
-        checkinData TEXT DEFAULT '{}',
-        littleGameData TEXT DEFAULT '{}',
-        gravityData TEXT DEFAULT '{}',
-        headEffectData TEXT DEFAULT '{}',
-        warData TEXT DEFAULT '{}',
-        timeTrialData TEXT DEFAULT '{}',
-        cellGameData TEXT DEFAULT '{}',
-        hideHeroesData TEXT DEFAULT '{}',
-        teamTrainingData TEXT DEFAULT '{}',
-        channelSpecial TEXT DEFAULT '{}'
+        lifelongCardGot INTEGER DEFAULT 0
     );
 
     CREATE INDEX IF NOT EXISTS idx_user_data_loginToken ON user_data(loginToken);
@@ -130,8 +97,6 @@ db.exec(`
 
     -- ═══════════════════════════════════════════════════════════
     -- HERO DATA (Data Hero)
-    -- Cross-reference: HeroDataModel + SetHeroDataToModel
-    -- Server wire format: _heroId, _heroDisplayId, _heroStar, etc.
     -- ═══════════════════════════════════════════════════════════
     CREATE TABLE IF NOT EXISTS hero_data (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -149,20 +114,6 @@ db.exec(`
         connectHeroId INTEGER DEFAULT 0,
         position INTEGER DEFAULT 0,
         power INTEGER DEFAULT 0,
-        -- Additional hero fields from client cross-reference
-        fragment INTEGER DEFAULT 0,
-        expeditionMaxLevel INTEGER DEFAULT 0,
-        heroTag TEXT DEFAULT '[]',
-        qigong TEXT DEFAULT '{}',
-        qigongTmp TEXT DEFAULT '{}',
-        qigongTmpPower INTEGER DEFAULT 0,
-        breakInfo TEXT DEFAULT '{}',
-        gemstoneSuitId INTEGER DEFAULT 0,
-        linkTo TEXT DEFAULT '[]',
-        superSkillResetCount INTEGER DEFAULT 0,
-        potentialResetCount INTEGER DEFAULT 0,
-        superSkillLevel TEXT DEFAULT '[]',
-        potentialLevel TEXT DEFAULT '[]',
         FOREIGN KEY (userId) REFERENCES user_data(userId)
     );
 
@@ -171,7 +122,6 @@ db.exec(`
 
     -- ═══════════════════════════════════════════════════════════
     -- ITEM DATA (Data Item/Inventaris)
-    -- Cross-reference: totalProps._items [{_id, _num}]
     -- ═══════════════════════════════════════════════════════════
     CREATE TABLE IF NOT EXISTS item_data (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -188,9 +138,6 @@ db.exec(`
 
     -- ═══════════════════════════════════════════════════════════
     -- EQUIP DATA (Data Equipment)
-    -- Cross-reference: EquipItem {id, pos} per hero suit
-    -- NOTE: Client expects per-hero suit structure, but we store flat
-    --       Handler transforms flat data → per-hero suit on enterGame
     -- ═══════════════════════════════════════════════════════════
     CREATE TABLE IF NOT EXISTS equip_data (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -207,23 +154,15 @@ db.exec(`
 
     -- ═══════════════════════════════════════════════════════════
     -- WEAPON DATA (Data Senjata)
-    -- Cross-reference: WeaponDataModel {weaponId, displayId, heroId, star,
-    --   level, attrs[], strengthenCost[], haloId, haloLevel, haloCost[], quality}
     -- ═══════════════════════════════════════════════════════════
     CREATE TABLE IF NOT EXISTS weapon_data (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         userId TEXT NOT NULL,
         weaponId INTEGER NOT NULL,
-        displayId INTEGER DEFAULT 0,
         level INTEGER DEFAULT 1,
         quality INTEGER DEFAULT 1,
-        star INTEGER DEFAULT 0,
         heroId INTEGER DEFAULT 0,
-        haloId INTEGER DEFAULT 0,
         haloLevel INTEGER DEFAULT 0,
-        attrs TEXT DEFAULT '[]',
-        strengthenCost TEXT DEFAULT '[]',
-        haloCost TEXT DEFAULT '[]',
         FOREIGN KEY (userId) REFERENCES user_data(userId)
     );
 
@@ -231,25 +170,17 @@ db.exec(`
 
     -- ═══════════════════════════════════════════════════════════
     -- IMPRINT DATA (Data Imprint/Signet)
-    -- Cross-reference: ImprintItem {id, displayId, heroId, level, star,
-    --   mainAttr, starAttr, viceAttr[], totalCost[], addAttr, part, tmpViceAttr[]}
     -- ═══════════════════════════════════════════════════════════
     CREATE TABLE IF NOT EXISTS imprint_data (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         userId TEXT NOT NULL,
         imprintId INTEGER NOT NULL,
-        displayId INTEGER DEFAULT 0,
         level INTEGER DEFAULT 1,
         star INTEGER DEFAULT 0,
         quality INTEGER DEFAULT 1,
         part INTEGER DEFAULT 0,
         heroId INTEGER DEFAULT 0,
-        mainAttr TEXT DEFAULT '{}',
-        starAttr TEXT DEFAULT '{}',
-        viceAttr TEXT DEFAULT '[]',
-        totalCost TEXT DEFAULT '[]',
-        addAttr TEXT DEFAULT '{}',
-        tmpViceAttr TEXT DEFAULT '[]',
+        viceAttrId INTEGER DEFAULT 0,
         FOREIGN KEY (userId) REFERENCES user_data(userId)
     );
 
@@ -257,19 +188,13 @@ db.exec(`
 
     -- ═══════════════════════════════════════════════════════════
     -- GENKI DATA (Data Genki)
-    -- Cross-reference: GenkiItem {id, displayId, heroId, heroPos,
-    --   mainAttr, viceAttr, disable}
     -- ═══════════════════════════════════════════════════════════
     CREATE TABLE IF NOT EXISTS genki_data (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         userId TEXT NOT NULL,
         genkiId INTEGER NOT NULL,
-        displayId INTEGER DEFAULT 0,
         heroId INTEGER DEFAULT 0,
         pos INTEGER DEFAULT 0,
-        mainAttr TEXT DEFAULT '{}',
-        viceAttr TEXT DEFAULT '{}',
-        disable INTEGER DEFAULT 0,
         FOREIGN KEY (userId) REFERENCES user_data(userId)
     );
 
@@ -482,9 +407,6 @@ db.exec(`
 
     -- ═══════════════════════════════════════════════════════════
     -- RESONANCE DATA (Data Resonance)
-    -- Cross-reference: ResonanceModel {id, diamondCabin, cabins{},
-    --   buySeatCount, totalTalent, unlockSpecial}
-    --   ResonanceCabin {id, mainHero, diamondSeat, seats{}, specialSeat}
     -- ═══════════════════════════════════════════════════════════
     CREATE TABLE IF NOT EXISTS resonance_data (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -499,7 +421,6 @@ db.exec(`
 
     -- ═══════════════════════════════════════════════════════════
     -- SUPER SKILL DATA (Data Super Skill)
-    -- Cross-reference: [{_id, _level}]
     -- ═══════════════════════════════════════════════════════════
     CREATE TABLE IF NOT EXISTS super_skill_data (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -514,8 +435,6 @@ db.exec(`
 
     -- ═══════════════════════════════════════════════════════════
     -- GEMSTONE DATA (Data Gemstone)
-    -- Cross-reference: GemstoneItem {id, displayId, heroId, level,
-    --   totalExp, version, jewPosition}
     -- ═══════════════════════════════════════════════════════════
     CREATE TABLE IF NOT EXISTS gemstone_data (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -524,9 +443,6 @@ db.exec(`
         displayId INTEGER DEFAULT 0,
         level INTEGER DEFAULT 1,
         heroId INTEGER DEFAULT 0,
-        totalExp INTEGER DEFAULT 0,
-        version TEXT DEFAULT '',
-        jewPosition INTEGER DEFAULT 1,
         FOREIGN KEY (userId) REFERENCES user_data(userId)
     );
 
@@ -615,36 +531,6 @@ function userExists(userId) {
     return !!stmt.get(userId);
 }
 
-/**
- * Create new user
- * @param {object} params
- * @returns {object} Created user row
- */
-function createUser(params) {
-    const stmt = db.prepare(`
-        INSERT INTO user_data (userId, nickName, headImageId, level, exp, diamond, gold,
-            loginToken, serverId, createTime, lastLoginTime, language, online)
-        VALUES (@userId, @nickName, @headImageId, @level, @exp, @diamond, @gold,
-            @loginToken, @serverId, @createTime, @lastLoginTime, @language, @online)
-    `);
-    const info = stmt.run({
-        userId: params.userId,
-        nickName: params.nickName || '',
-        headImageId: params.headImageId || 0,
-        level: params.level || 1,
-        exp: params.exp || 0,
-        diamond: params.diamond || 0,
-        gold: params.gold || 0,
-        loginToken: params.loginToken || null,
-        serverId: params.serverId || null,
-        createTime: params.createTime || Date.now(),
-        lastLoginTime: params.lastLoginTime || Date.now(),
-        language: params.language || 'en',
-        online: params.online || 1
-    });
-    return getUser(params.userId);
-}
-
 // ═══════════════════════════════════════════════════════════════
 // HERO DATA OPERATIONS
 // ═══════════════════════════════════════════════════════════════
@@ -660,43 +546,16 @@ function getHeroes(userId) {
 }
 
 /**
- * Get hero by database id
- * @param {number} id - Auto-increment id
- * @returns {object|null}
- */
-function getHeroById(id) {
-    return db.prepare('SELECT * FROM hero_data WHERE id = ?').get(id);
-}
-
-/**
- * Get hero by userId + displayId
- * @param {string} userId
- * @param {number} displayId
- * @returns {object|null}
- */
-function getHeroByDisplayId(userId, displayId) {
-    return db.prepare('SELECT * FROM hero_data WHERE userId = ? AND displayId = ?').get(userId, displayId);
-}
-
-/**
  * Create hero
  * @param {object} params
- * @returns {object} Created hero row
+ * @returns {object}
  */
 function createHero(params) {
     const stmt = db.prepare(`
-        INSERT INTO hero_data (userId, displayId, level, quality, evolveLevel, star, skinId,
-            activeSkill, qigongLevel, selfBreakLevel, selfBreakType, connectHeroId, position, power,
-            fragment, expeditionMaxLevel, heroTag, qigong, qigongTmp, qigongTmpPower,
-            breakInfo, gemstoneSuitId, linkTo, superSkillResetCount, potentialResetCount,
-            superSkillLevel, potentialLevel)
-        VALUES (@userId, @displayId, @level, @quality, @evolveLevel, @star, @skinId,
-            @activeSkill, @qigongLevel, @selfBreakLevel, @selfBreakType, @connectHeroId, @position, @power,
-            @fragment, @expeditionMaxLevel, @heroTag, @qigong, @qigongTmp, @qigongTmpPower,
-            @breakInfo, @gemstoneSuitId, @linkTo, @superSkillResetCount, @potentialResetCount,
-            @superSkillLevel, @potentialLevel)
+        INSERT INTO hero_data (userId, displayId, level, quality, evolveLevel, star, skinId, activeSkill, qigongLevel, selfBreakLevel, selfBreakType, connectHeroId, position, power)
+        VALUES (@userId, @displayId, @level, @quality, @evolveLevel, @star, @skinId, @activeSkill, @qigongLevel, @selfBreakLevel, @selfBreakType, @connectHeroId, @position, @power)
     `);
-    const info = stmt.run({
+    stmt.run({
         userId: params.userId,
         displayId: params.displayId,
         level: params.level || 1,
@@ -710,26 +569,13 @@ function createHero(params) {
         selfBreakType: params.selfBreakType || 0,
         connectHeroId: params.connectHeroId || 0,
         position: params.position || 0,
-        power: params.power || 0,
-        fragment: params.fragment || 0,
-        expeditionMaxLevel: params.expeditionMaxLevel || 0,
-        heroTag: params.heroTag || '[]',
-        qigong: params.qigong || '{}',
-        qigongTmp: params.qigongTmp || '{}',
-        qigongTmpPower: params.qigongTmpPower || 0,
-        breakInfo: params.breakInfo || '{}',
-        gemstoneSuitId: params.gemstoneSuitId || 0,
-        linkTo: params.linkTo || '[]',
-        superSkillResetCount: params.superSkillResetCount || 0,
-        potentialResetCount: params.potentialResetCount || 0,
-        superSkillLevel: params.superSkillLevel || '[]',
-        potentialLevel: params.potentialLevel || '[]'
+        power: params.power || 0
     });
-    return db.prepare('SELECT * FROM hero_data WHERE id = ?').get(info.lastInsertRowid);
+    return db.prepare('SELECT * FROM hero_data WHERE userId = ? ORDER BY id DESC LIMIT 1').get(params.userId);
 }
 
 /**
- * Update hero by id — generic updater
+ * Update hero by id
  * @param {number} heroDbId - Auto-increment id
  * @param {object} fields
  */
@@ -739,16 +585,6 @@ function updateHero(heroDbId, fields) {
     const setClauses = keys.map(k => `${k} = @${k}`).join(', ');
     const values = { id: heroDbId, ...fields };
     db.prepare(`UPDATE hero_data SET ${setClauses} WHERE id = @id`).run(values);
-}
-
-/**
- * Delete hero by id
- * @param {number} heroDbId
- * @returns {boolean}
- */
-function deleteHero(heroDbId) {
-    const info = db.prepare('DELETE FROM hero_data WHERE id = ?').run(heroDbId);
-    return info.changes > 0;
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -846,61 +682,19 @@ function createItems(userId, items) {
     insertMany(items);
 }
 
-/**
- * Delete item completely (not decrement — full remove)
- * @param {string} userId
- * @param {number} itemId
- * @param {number} displayId
- * @returns {boolean}
- */
-function deleteItem(userId, itemId, displayId) {
-    const info = db.prepare('DELETE FROM item_data WHERE userId = ? AND itemId = ? AND displayId = ?').run(userId, itemId, displayId || 0);
-    return info.changes > 0;
-}
-
 // ═══════════════════════════════════════════════════════════════
 // EQUIP DATA OPERATIONS
 // ═══════════════════════════════════════════════════════════════
 
-/**
- * Get all equips for a user
- * @param {string} userId
- * @returns {array}
- */
 function getEquips(userId) {
     return db.prepare('SELECT * FROM equip_data WHERE userId = ?').all(userId);
 }
 
-/**
- * Get equip by database id
- * @param {number} id
- * @returns {object|null}
- */
-function getEquipById(id) {
-    return db.prepare('SELECT * FROM equip_data WHERE id = ?').get(id);
-}
-
-/**
- * Get equips by heroId
- * @param {string} userId
- * @param {number} heroId
- * @returns {array}
- */
-function getEquipsByHeroId(userId, heroId) {
-    return db.prepare('SELECT * FROM equip_data WHERE userId = ? AND heroId = ?').all(userId, heroId);
-}
-
-/**
- * Create equip
- * @param {object} params
- * @returns {object} Created equip row
- */
 function createEquip(params) {
-    const stmt = db.prepare(`
+    db.prepare(`
         INSERT INTO equip_data (userId, equipId, level, quality, heroId, position)
         VALUES (@userId, @equipId, @level, @quality, @heroId, @position)
-    `);
-    const info = stmt.run({
+    `).run({
         userId: params.userId,
         equipId: params.equipId,
         level: params.level || 1,
@@ -908,1463 +702,282 @@ function createEquip(params) {
         heroId: params.heroId || 0,
         position: params.position || 0
     });
-    return db.prepare('SELECT * FROM equip_data WHERE id = ?').get(info.lastInsertRowid);
-}
-
-/**
- * Update equip by id — generic updater
- * @param {number} equipDbId
- * @param {object} fields
- */
-function updateEquip(equipDbId, fields) {
-    const keys = Object.keys(fields);
-    if (keys.length === 0) return;
-    const setClauses = keys.map(k => `${k} = @${k}`).join(', ');
-    const values = { id: equipDbId, ...fields };
-    db.prepare(`UPDATE equip_data SET ${setClauses} WHERE id = @id`).run(values);
-}
-
-/**
- * Delete equip by id
- * @param {number} equipDbId
- * @returns {boolean}
- */
-function deleteEquip(equipDbId) {
-    const info = db.prepare('DELETE FROM equip_data WHERE id = ?').run(equipDbId);
-    return info.changes > 0;
 }
 
 // ═══════════════════════════════════════════════════════════════
 // WEAPON DATA OPERATIONS
 // ═══════════════════════════════════════════════════════════════
 
-/**
- * Get all weapons for a user
- * @param {string} userId
- * @returns {array}
- */
 function getWeapons(userId) {
     return db.prepare('SELECT * FROM weapon_data WHERE userId = ?').all(userId);
 }
 
-/**
- * Get weapon by database id
- * @param {number} id
- * @returns {object|null}
- */
-function getWeaponById(id) {
-    return db.prepare('SELECT * FROM weapon_data WHERE id = ?').get(id);
-}
-
-/**
- * Create weapon
- * @param {object} params
- * @returns {object} Created weapon row
- */
 function createWeapon(params) {
-    const stmt = db.prepare(`
-        INSERT INTO weapon_data (userId, weaponId, displayId, level, quality, star, heroId, haloId, haloLevel, attrs, strengthenCost, haloCost)
-        VALUES (@userId, @weaponId, @displayId, @level, @quality, @star, @heroId, @haloId, @haloLevel, @attrs, @strengthenCost, @haloCost)
-    `);
-    const info = stmt.run({
+    db.prepare(`
+        INSERT INTO weapon_data (userId, weaponId, level, quality, heroId, haloLevel)
+        VALUES (@userId, @weaponId, @level, @quality, @heroId, @haloLevel)
+    `).run({
         userId: params.userId,
         weaponId: params.weaponId,
-        displayId: params.displayId || 0,
         level: params.level || 1,
         quality: params.quality || 1,
-        star: params.star || 0,
         heroId: params.heroId || 0,
-        haloId: params.haloId || 0,
-        haloLevel: params.haloLevel || 0,
-        attrs: params.attrs || '[]',
-        strengthenCost: params.strengthenCost || '[]',
-        haloCost: params.haloCost || '[]'
+        haloLevel: params.haloLevel || 0
     });
-    return db.prepare('SELECT * FROM weapon_data WHERE id = ?').get(info.lastInsertRowid);
-}
-
-/**
- * Update weapon by id — generic updater
- * @param {number} weaponDbId
- * @param {object} fields
- */
-function updateWeapon(weaponDbId, fields) {
-    const keys = Object.keys(fields);
-    if (keys.length === 0) return;
-    const setClauses = keys.map(k => `${k} = @${k}`).join(', ');
-    const values = { id: weaponDbId, ...fields };
-    db.prepare(`UPDATE weapon_data SET ${setClauses} WHERE id = @id`).run(values);
-}
-
-/**
- * Delete weapon by id
- * @param {number} weaponDbId
- * @returns {boolean}
- */
-function deleteWeapon(weaponDbId) {
-    const info = db.prepare('DELETE FROM weapon_data WHERE id = ?').run(weaponDbId);
-    return info.changes > 0;
 }
 
 // ═══════════════════════════════════════════════════════════════
 // IMPRINT DATA OPERATIONS
 // ═══════════════════════════════════════════════════════════════
 
-/**
- * Get all imprints for a user
- * @param {string} userId
- * @returns {array}
- */
 function getImprints(userId) {
     return db.prepare('SELECT * FROM imprint_data WHERE userId = ?').all(userId);
-}
-
-/**
- * Get imprint by database id
- * @param {number} id
- * @returns {object|null}
- */
-function getImprintById(id) {
-    return db.prepare('SELECT * FROM imprint_data WHERE id = ?').get(id);
-}
-
-/**
- * Create imprint
- * @param {object} params
- * @returns {object} Created imprint row
- */
-function createImprint(params) {
-    const stmt = db.prepare(`
-        INSERT INTO imprint_data (userId, imprintId, displayId, level, star, quality, part, heroId,
-            mainAttr, starAttr, viceAttr, totalCost, addAttr, tmpViceAttr)
-        VALUES (@userId, @imprintId, @displayId, @level, @star, @quality, @part, @heroId,
-            @mainAttr, @starAttr, @viceAttr, @totalCost, @addAttr, @tmpViceAttr)
-    `);
-    const info = stmt.run({
-        userId: params.userId,
-        imprintId: params.imprintId,
-        displayId: params.displayId || 0,
-        level: params.level || 1,
-        star: params.star || 0,
-        quality: params.quality || 1,
-        part: params.part || 0,
-        heroId: params.heroId || 0,
-        mainAttr: params.mainAttr || '{}',
-        starAttr: params.starAttr || '{}',
-        viceAttr: params.viceAttr || '[]',
-        totalCost: params.totalCost || '[]',
-        addAttr: params.addAttr || '{}',
-        tmpViceAttr: params.tmpViceAttr || '[]'
-    });
-    return db.prepare('SELECT * FROM imprint_data WHERE id = ?').get(info.lastInsertRowid);
-}
-
-/**
- * Update imprint by id — generic updater
- * @param {number} imprintDbId
- * @param {object} fields
- */
-function updateImprint(imprintDbId, fields) {
-    const keys = Object.keys(fields);
-    if (keys.length === 0) return;
-    const setClauses = keys.map(k => `${k} = @${k}`).join(', ');
-    const values = { id: imprintDbId, ...fields };
-    db.prepare(`UPDATE imprint_data SET ${setClauses} WHERE id = @id`).run(values);
-}
-
-/**
- * Delete imprint by id
- * @param {number} imprintDbId
- * @returns {boolean}
- */
-function deleteImprint(imprintDbId) {
-    const info = db.prepare('DELETE FROM imprint_data WHERE id = ?').run(imprintDbId);
-    return info.changes > 0;
 }
 
 // ═══════════════════════════════════════════════════════════════
 // GENKI DATA OPERATIONS
 // ═══════════════════════════════════════════════════════════════
 
-/**
- * Get all genkis for a user
- * @param {string} userId
- * @returns {array}
- */
 function getGenkis(userId) {
     return db.prepare('SELECT * FROM genki_data WHERE userId = ?').all(userId);
-}
-
-/**
- * Get genki by database id
- * @param {number} id
- * @returns {object|null}
- */
-function getGenkiById(id) {
-    return db.prepare('SELECT * FROM genki_data WHERE id = ?').get(id);
-}
-
-/**
- * Create genki
- * @param {object} params
- * @returns {object} Created genki row
- */
-function createGenki(params) {
-    const stmt = db.prepare(`
-        INSERT INTO genki_data (userId, genkiId, displayId, heroId, pos, mainAttr, viceAttr, disable)
-        VALUES (@userId, @genkiId, @displayId, @heroId, @pos, @mainAttr, @viceAttr, @disable)
-    `);
-    const info = stmt.run({
-        userId: params.userId,
-        genkiId: params.genkiId,
-        displayId: params.displayId || 0,
-        heroId: params.heroId || 0,
-        pos: params.pos || 0,
-        mainAttr: params.mainAttr || '{}',
-        viceAttr: params.viceAttr || '{}',
-        disable: params.disable || 0
-    });
-    return db.prepare('SELECT * FROM genki_data WHERE id = ?').get(info.lastInsertRowid);
-}
-
-/**
- * Update genki by id — generic updater
- * @param {number} genkiDbId
- * @param {object} fields
- */
-function updateGenki(genkiDbId, fields) {
-    const keys = Object.keys(fields);
-    if (keys.length === 0) return;
-    const setClauses = keys.map(k => `${k} = @${k}`).join(', ');
-    const values = { id: genkiDbId, ...fields };
-    db.prepare(`UPDATE genki_data SET ${setClauses} WHERE id = @id`).run(values);
-}
-
-/**
- * Delete genki by id
- * @param {number} genkiDbId
- * @returns {boolean}
- */
-function deleteGenki(genkiDbId) {
-    const info = db.prepare('DELETE FROM genki_data WHERE id = ?').run(genkiDbId);
-    return info.changes > 0;
 }
 
 // ═══════════════════════════════════════════════════════════════
 // GUILD DATA OPERATIONS
 // ═══════════════════════════════════════════════════════════════
 
-/**
- * Get guild by UUID
- * @param {string} guildUUID
- * @returns {object|null}
- */
 function getGuild(guildUUID) {
     return db.prepare('SELECT * FROM guild_data WHERE guildUUID = ?').get(guildUUID);
 }
 
-/**
- * Get all guilds
- * @param {object} options - { page, pageSize, isAll }
- * @returns {array}
- */
-function getGuilds(options = {}) {
-    const page = options.page || 1;
-    const pageSize = options.pageSize || 20;
-    const offset = (page - 1) * pageSize;
-    return db.prepare('SELECT * FROM guild_data ORDER BY memberNum DESC LIMIT ? OFFSET ?').all(pageSize, offset);
+function getGuildByUser(userId) {
+    const member = db.prepare('SELECT * FROM guild_member_data WHERE userId = ?').get(userId);
+    if (!member) return null;
+    return getGuild(member.guildUUID);
 }
 
-/**
- * Search guild by name or UUID
- * @param {string} idOrName
- * @returns {object|null}
- */
-function getGuildByIdOrName(idOrName) {
-    return db.prepare('SELECT * FROM guild_data WHERE guildUUID = ? OR guildName = ?').get(idOrName, idOrName);
-}
-
-/**
- * Create guild
- * @param {object} params
- * @returns {object} Created guild row
- */
-function createGuild(params) {
-    const stmt = db.prepare(`
-        INSERT INTO guild_data (guildUUID, guildName, iconId, captainUserId, viceCaptainUserId,
-            bulletin, description, level, exp, memberNum, needAgree, limitLevel, createTime, activePoint)
-        VALUES (@guildUUID, @guildName, @iconId, @captainUserId, @viceCaptainUserId,
-            @bulletin, @description, @level, @exp, @memberNum, @needAgree, @limitLevel, @createTime, @activePoint)
-    `);
-    stmt.run({
-        guildUUID: params.guildUUID,
-        guildName: params.guildName,
-        iconId: params.iconId || 0,
-        captainUserId: params.captainUserId,
-        viceCaptainUserId: params.viceCaptainUserId || '',
-        bulletin: params.bulletin || '',
-        description: params.description || '',
-        level: params.level || 1,
-        exp: params.exp || 0,
-        memberNum: params.memberNum || 0,
-        needAgree: params.needAgree !== undefined ? params.needAgree : 1,
-        limitLevel: params.limitLevel || 0,
-        createTime: params.createTime || Date.now(),
-        activePoint: params.activePoint || 0
-    });
-    return getGuild(params.guildUUID);
-}
-
-/**
- * Update guild by UUID — generic updater
- * @param {string} guildUUID
- * @param {object} fields
- */
-function updateGuild(guildUUID, fields) {
-    const keys = Object.keys(fields);
-    if (keys.length === 0) return;
-    const setClauses = keys.map(k => `${k} = @${k}`).join(', ');
-    const values = { guildUUID, ...fields };
-    db.prepare(`UPDATE guild_data SET ${setClauses} WHERE guildUUID = @guildUUID`).run(values);
-}
-
-/**
- * Delete guild by UUID
- * @param {string} guildUUID
- * @returns {boolean}
- */
-function deleteGuild(guildUUID) {
-    const info = db.prepare('DELETE FROM guild_data WHERE guildUUID = ?').run(guildUUID);
-    return info.changes > 0;
-}
-
-// ═══════════════════════════════════════════════════════════════
-// GUILD MEMBER DATA OPERATIONS
-// ═══════════════════════════════════════════════════════════════
-
-/**
- * Get all members of a guild
- * @param {string} guildUUID
- * @returns {array}
- */
 function getGuildMembers(guildUUID) {
     return db.prepare('SELECT * FROM guild_member_data WHERE guildUUID = ?').all(guildUUID);
-}
-
-/**
- * Get guild member by userId
- * @param {string} userId
- * @returns {object|null}
- */
-function getGuildMemberByUserId(userId) {
-    return db.prepare('SELECT * FROM guild_member_data WHERE userId = ?').get(userId);
-}
-
-/**
- * Create guild member
- * @param {object} params
- * @returns {object} Created member row
- */
-function createGuildMember(params) {
-    const stmt = db.prepare(`
-        INSERT INTO guild_member_data (guildUUID, userId, position, joinTime, donateNum)
-        VALUES (@guildUUID, @userId, @position, @joinTime, @donateNum)
-    `);
-    const info = stmt.run({
-        guildUUID: params.guildUUID,
-        userId: params.userId,
-        position: params.position || 0,
-        joinTime: params.joinTime || Date.now(),
-        donateNum: params.donateNum || 0
-    });
-    return db.prepare('SELECT * FROM guild_member_data WHERE id = ?').get(info.lastInsertRowid);
-}
-
-/**
- * Update guild member by id — generic updater
- * @param {number} memberDbId
- * @param {object} fields
- */
-function updateGuildMember(memberDbId, fields) {
-    const keys = Object.keys(fields);
-    if (keys.length === 0) return;
-    const setClauses = keys.map(k => `${k} = @${k}`).join(', ');
-    const values = { id: memberDbId, ...fields };
-    db.prepare(`UPDATE guild_member_data SET ${setClauses} WHERE id = @id`).run(values);
-}
-
-/**
- * Delete guild member by id
- * @param {number} memberDbId
- * @returns {boolean}
- */
-function deleteGuildMember(memberDbId) {
-    const info = db.prepare('DELETE FROM guild_member_data WHERE id = ?').run(memberDbId);
-    return info.changes > 0;
 }
 
 // ═══════════════════════════════════════════════════════════════
 // FRIEND DATA OPERATIONS
 // ═══════════════════════════════════════════════════════════════
 
-/**
- * Get all friends for a user
- * @param {string} userId
- * @returns {array}
- */
 function getFriends(userId) {
     return db.prepare('SELECT * FROM friend_data WHERE userId = ?').all(userId);
 }
 
-/**
- * Get specific friend record
- * @param {string} userId
- * @param {string} friendId
- * @returns {object|null}
- */
-function getFriend(userId, friendId) {
-    return db.prepare('SELECT * FROM friend_data WHERE userId = ? AND friendId = ?').get(userId, friendId);
-}
-
-/**
- * Create friend (add friend)
- * @param {object} params
- * @returns {object|null} Created friend row
- */
-function createFriend(params) {
-    const stmt = db.prepare(`
-        INSERT INTO friend_data (userId, friendId, giveHeartTime, getHeartTime)
-        VALUES (@userId, @friendId, @giveHeartTime, @getHeartTime)
-    `);
-    const info = stmt.run({
-        userId: params.userId,
-        friendId: params.friendId,
-        giveHeartTime: params.giveHeartTime || 0,
-        getHeartTime: params.getHeartTime || 0
-    });
-    return db.prepare('SELECT * FROM friend_data WHERE id = ?').get(info.lastInsertRowid);
-}
-
-/**
- * Update friend by id — generic updater
- * @param {number} friendDbId
- * @param {object} fields
- */
-function updateFriend(friendDbId, fields) {
-    const keys = Object.keys(fields);
-    if (keys.length === 0) return;
-    const setClauses = keys.map(k => `${k} = @${k}`).join(', ');
-    const values = { id: friendDbId, ...fields };
-    db.prepare(`UPDATE friend_data SET ${setClauses} WHERE id = @id`).run(values);
-}
-
-/**
- * Delete friend by id
- * @param {number} friendDbId
- * @returns {boolean}
- */
-function deleteFriend(friendDbId) {
-    const info = db.prepare('DELETE FROM friend_data WHERE id = ?').run(friendDbId);
-    return info.changes > 0;
-}
-
-// ═══════════════════════════════════════════════════════════════
-// FRIEND BLACKLIST OPERATIONS
-// ═══════════════════════════════════════════════════════════════
-
-/**
- * Get blacklist for a user
- * @param {string} userId
- * @returns {array}
- */
 function getBlacklist(userId) {
     return db.prepare('SELECT * FROM friend_blacklist WHERE userId = ?').all(userId);
-}
-
-/**
- * Add to blacklist
- * @param {object} params
- * @returns {object|null} Created row
- */
-function createBlacklist(params) {
-    const stmt = db.prepare(`
-        INSERT INTO friend_blacklist (userId, targetUserId)
-        VALUES (@userId, @targetUserId)
-    `);
-    const info = stmt.run({
-        userId: params.userId,
-        targetUserId: params.targetUserId
-    });
-    return db.prepare('SELECT * FROM friend_blacklist WHERE id = ?').get(info.lastInsertRowid);
-}
-
-/**
- * Remove from blacklist
- * @param {string} userId
- * @param {string} targetUserId
- * @returns {boolean}
- */
-function deleteBlacklist(userId, targetUserId) {
-    const info = db.prepare('DELETE FROM friend_blacklist WHERE userId = ? AND targetUserId = ?').run(userId, targetUserId);
-    return info.changes > 0;
-}
-
-// ═══════════════════════════════════════════════════════════════
-// ARENA DATA OPERATIONS
-// ═══════════════════════════════════════════════════════════════
-
-/**
- * Get arena data for a user
- * @param {string} userId
- * @returns {object|null}
- */
-function getArena(userId) {
-    return db.prepare('SELECT * FROM arena_data WHERE userId = ?').get(userId);
-}
-
-/**
- * Create or update arena data (upsert)
- * @param {string} userId
- * @param {object} fields
- */
-function upsertArena(userId, fields) {
-    const stmt = db.prepare(`
-        INSERT INTO arena_data (userId, rank, times, buyTimes, team, lastRefreshTime)
-        VALUES (@userId, @rank, @times, @buyTimes, @team, @lastRefreshTime)
-        ON CONFLICT(userId) DO UPDATE SET
-            rank = @rank, times = @times, buyTimes = @buyTimes,
-            team = @team, lastRefreshTime = @lastRefreshTime
-    `);
-    stmt.run({
-        userId,
-        rank: fields.rank || 0,
-        times: fields.times || 5,
-        buyTimes: fields.buyTimes || 0,
-        team: fields.team || '{}',
-        lastRefreshTime: fields.lastRefreshTime || 0
-    });
-}
-
-/**
- * Update arena by userId — generic updater
- * @param {string} userId
- * @param {object} fields
- */
-function updateArena(userId, fields) {
-    const keys = Object.keys(fields);
-    if (keys.length === 0) return;
-    const setClauses = keys.map(k => `${k} = @${k}`).join(', ');
-    const values = { userId, ...fields };
-    db.prepare(`UPDATE arena_data SET ${setClauses} WHERE userId = @userId`).run(values);
-}
-
-/**
- * Get arena rank list
- * @param {number} limit
- * @returns {array}
- */
-function getArenaRankList(limit = 100) {
-    return db.prepare('SELECT * FROM arena_data WHERE rank > 0 ORDER BY rank ASC LIMIT ?').all(limit);
 }
 
 // ═══════════════════════════════════════════════════════════════
 // MAIL DATA OPERATIONS
 // ═══════════════════════════════════════════════════════════════
 
-/**
- * Get all mail for a user
- * @param {string} userId
- * @returns {array}
- */
 function getMails(userId) {
     return db.prepare('SELECT * FROM mail_data WHERE userId = ? ORDER BY sendTime DESC').all(userId);
 }
 
-/**
- * Get mail by mailId
- * @param {number} mailId
- * @returns {object|null}
- */
-function getMailById(mailId) {
-    return db.prepare('SELECT * FROM mail_data WHERE mailId = ?').get(mailId);
-}
-
-/**
- * Create mail
- * @param {object} params
- * @returns {object} Created mail row
- */
 function createMail(params) {
-    const stmt = db.prepare(`
+    const now = Date.now();
+    db.prepare(`
         INSERT INTO mail_data (userId, senderId, title, content, awards, isRead, isGot, sendTime, expireTime, type)
-        VALUES (@userId, @senderId, @title, @content, @awards, @isRead, @isGot, @sendTime, @expireTime, @type)
-    `);
-    const info = stmt.run({
+        VALUES (@userId, @senderId, @title, @content, @awards, 0, 0, @sendTime, @expireTime, @type)
+    `).run({
         userId: params.userId,
         senderId: params.senderId || '',
         title: params.title || '',
         content: params.content || '',
         awards: params.awards || '[]',
-        isRead: params.isRead || 0,
-        isGot: params.isGot || 0,
-        sendTime: params.sendTime || Date.now(),
-        expireTime: params.expireTime || (Date.now() + 7 * 24 * 60 * 60 * 1000),
+        sendTime: now,
+        expireTime: params.expireTime || (now + 30 * 24 * 60 * 60 * 1000),
         type: params.type || 0
     });
-    return db.prepare('SELECT * FROM mail_data WHERE mailId = ?').get(info.lastInsertRowid);
-}
-
-/**
- * Update mail by mailId — generic updater
- * @param {number} mailId
- * @param {object} fields
- */
-function updateMail(mailId, fields) {
-    const keys = Object.keys(fields);
-    if (keys.length === 0) return;
-    const setClauses = keys.map(k => `${k} = @${k}`).join(', ');
-    const values = { mailId, ...fields };
-    db.prepare(`UPDATE mail_data SET ${setClauses} WHERE mailId = @mailId`).run(values);
-}
-
-/**
- * Delete mail by mailId
- * @param {number} mailId
- * @returns {boolean}
- */
-function deleteMail(mailId) {
-    const info = db.prepare('DELETE FROM mail_data WHERE mailId = ?').run(mailId);
-    return info.changes > 0;
-}
-
-/**
- * Delete expired mail for a user
- * @param {string} userId
- * @returns {number} Number of deleted mails
- */
-function deleteExpiredMails(userId) {
-    const info = db.prepare('DELETE FROM mail_data WHERE userId = ? AND expireTime < ? AND isGot = 1').run(userId, Date.now());
-    return info.changes;
 }
 
 // ═══════════════════════════════════════════════════════════════
 // SHOP DATA OPERATIONS
 // ═══════════════════════════════════════════════════════════════
 
-/**
- * Get shop data for a user by shopType
- * @param {string} userId
- * @param {number} shopType
- * @returns {array}
- */
-function getShopByType(userId, shopType) {
-    return db.prepare('SELECT * FROM shop_data WHERE userId = ? AND shopType = ?').all(userId, shopType);
-}
-
-/**
- * Get all shop data for a user
- * @param {string} userId
- * @returns {array}
- */
-function getShops(userId) {
+function getShopData(userId) {
     return db.prepare('SELECT * FROM shop_data WHERE userId = ?').all(userId);
-}
-
-/**
- * Get specific shop goods
- * @param {string} userId
- * @param {number} shopType
- * @param {number} goodsId
- * @returns {object|null}
- */
-function getShopGoods(userId, shopType, goodsId) {
-    return db.prepare('SELECT * FROM shop_data WHERE userId = ? AND shopType = ? AND goodsId = ?').get(userId, shopType, goodsId);
-}
-
-/**
- * Upsert shop goods (create or update)
- * @param {object} params
- */
-function upsertShopGoods(params) {
-    const stmt = db.prepare(`
-        INSERT INTO shop_data (userId, shopType, goodsId, buyTimes, refreshTime)
-        VALUES (@userId, @shopType, @goodsId, @buyTimes, @refreshTime)
-        ON CONFLICT(userId, shopType, goodsId) DO UPDATE SET
-            buyTimes = @buyTimes, refreshTime = @refreshTime
-    `);
-    stmt.run({
-        userId: params.userId,
-        shopType: params.shopType,
-        goodsId: params.goodsId,
-        buyTimes: params.buyTimes || 0,
-        refreshTime: params.refreshTime || 0
-    });
-}
-
-/**
- * Update shop goods — generic updater
- * @param {number} shopDbId
- * @param {object} fields
- */
-function updateShopGoods(shopDbId, fields) {
-    const keys = Object.keys(fields);
-    if (keys.length === 0) return;
-    const setClauses = keys.map(k => `${k} = @${k}`).join(', ');
-    const values = { id: shopDbId, ...fields };
-    db.prepare(`UPDATE shop_data SET ${setClauses} WHERE id = @id`).run(values);
-}
-
-/**
- * Delete shop goods
- * @param {number} shopDbId
- * @returns {boolean}
- */
-function deleteShopGoods(shopDbId) {
-    const info = db.prepare('DELETE FROM shop_data WHERE id = ?').run(shopDbId);
-    return info.changes > 0;
 }
 
 // ═══════════════════════════════════════════════════════════════
 // DUNGEON DATA OPERATIONS
 // ═══════════════════════════════════════════════════════════════
 
-/**
- * Get all dungeon data for a user
- * @param {string} userId
- * @returns {array}
- */
-function getDungeons(userId) {
+function getDungeonProgress(userId) {
     return db.prepare('SELECT * FROM dungeon_data WHERE userId = ?').all(userId);
 }
 
-/**
- * Get dungeon by type
- * @param {string} userId
- * @param {number} dungeonType
- * @returns {object|null}
- */
 function getDungeonByType(userId, dungeonType) {
     return db.prepare('SELECT * FROM dungeon_data WHERE userId = ? AND dungeonType = ?').get(userId, dungeonType);
 }
 
-/**
- * Upsert dungeon data
- * @param {object} params
- */
-function upsertDungeon(params) {
-    const stmt = db.prepare(`
-        INSERT INTO dungeon_data (userId, dungeonType, level, sweepLevel, times, buyTimes)
-        VALUES (@userId, @dungeonType, @level, @sweepLevel, @times, @buyTimes)
-        ON CONFLICT(userId, dungeonType) DO UPDATE SET
-            level = @level, sweepLevel = @sweepLevel, times = @times, buyTimes = @buyTimes
-    `);
-    stmt.run({
-        userId: params.userId,
-        dungeonType: params.dungeonType,
-        level: params.level || 0,
-        sweepLevel: params.sweepLevel || 0,
-        times: params.times || 0,
-        buyTimes: params.buyTimes || 0
-    });
+function upsertDungeon(userId, dungeonType, fields) {
+    const existing = getDungeonByType(userId, dungeonType);
+    if (existing) {
+        const keys = Object.keys(fields);
+        if (keys.length === 0) return;
+        const setClauses = keys.map(k => `${k} = @${k}`).join(', ');
+        const values = { id: existing.id, ...fields };
+        db.prepare(`UPDATE dungeon_data SET ${setClauses} WHERE id = @id`).run(values);
+    } else {
+        db.prepare(`
+            INSERT INTO dungeon_data (userId, dungeonType, level, sweepLevel, times, buyTimes)
+            VALUES (@userId, @dungeonType, @level, @sweepLevel, @times, @buyTimes)
+        `).run({
+            userId,
+            dungeonType,
+            level: fields.level || 0,
+            sweepLevel: fields.sweepLevel || 0,
+            times: fields.times || 0,
+            buyTimes: fields.buyTimes || 0
+        });
+    }
 }
 
-/**
- * Update dungeon by id — generic updater
- * @param {number} dungeonDbId
- * @param {object} fields
- */
-function updateDungeon(dungeonDbId, fields) {
-    const keys = Object.keys(fields);
-    if (keys.length === 0) return;
-    const setClauses = keys.map(k => `${k} = @${k}`).join(', ');
-    const values = { id: dungeonDbId, ...fields };
-    db.prepare(`UPDATE dungeon_data SET ${setClauses} WHERE id = @id`).run(values);
-}
+// ═══════════════════════════════════════════════════════════════
+// ARENA DATA OPERATIONS
+// ═══════════════════════════════════════════════════════════════
 
-/**
- * Delete dungeon by id
- * @param {number} dungeonDbId
- * @returns {boolean}
- */
-function deleteDungeon(dungeonDbId) {
-    const info = db.prepare('DELETE FROM dungeon_data WHERE id = ?').run(dungeonDbId);
-    return info.changes > 0;
+function getArenaData(userId) {
+    return db.prepare('SELECT * FROM arena_data WHERE userId = ?').get(userId);
 }
 
 // ═══════════════════════════════════════════════════════════════
 // TOWER DATA OPERATIONS
 // ═══════════════════════════════════════════════════════════════
 
-/**
- * Get tower data for a user
- * @param {string} userId
- * @returns {object|null}
- */
-function getTower(userId) {
+function getTowerData(userId) {
     return db.prepare('SELECT * FROM tower_data WHERE userId = ?').get(userId);
-}
-
-/**
- * Create tower data
- * @param {string} userId
- * @returns {object} Created tower row
- */
-function createTower(userId) {
-    db.prepare(`
-        INSERT INTO tower_data (userId, floor, times, buyTimes, climbTimes, events)
-        VALUES (?, 0, 10, 0, 0, '[]')
-    `).run(userId);
-    return getTower(userId);
-}
-
-/**
- * Update tower by userId — generic updater
- * @param {string} userId
- * @param {object} fields
- */
-function updateTower(userId, fields) {
-    const keys = Object.keys(fields);
-    if (keys.length === 0) return;
-    const setClauses = keys.map(k => `${k} = @${k}`).join(', ');
-    const values = { userId, ...fields };
-    db.prepare(`UPDATE tower_data SET ${setClauses} WHERE userId = @userId`).run(values);
-}
-
-/**
- * Get tower rank list
- * @param {number} limit
- * @returns {array}
- */
-function getTowerRankList(limit = 100) {
-    return db.prepare('SELECT * FROM tower_data WHERE floor > 0 ORDER BY floor DESC LIMIT ?').all(limit);
-}
-
-// ═══════════════════════════════════════════════════════════════
-// EXPEDITION DATA OPERATIONS
-// ═══════════════════════════════════════════════════════════════
-
-/**
- * Get all expeditions for a user
- * @param {string} userId
- * @returns {array}
- */
-function getExpeditions(userId) {
-    return db.prepare('SELECT * FROM expedition_data WHERE userId = ?').all(userId);
-}
-
-/**
- * Get expedition by id
- * @param {number} id
- * @returns {object|null}
- */
-function getExpeditionById(id) {
-    return db.prepare('SELECT * FROM expedition_data WHERE id = ?').get(id);
-}
-
-/**
- * Create expedition
- * @param {object} params
- * @returns {object} Created expedition row
- */
-function createExpedition(params) {
-    const stmt = db.prepare(`
-        INSERT INTO expedition_data (userId, machineId, heroId, lessonIds, teams)
-        VALUES (@userId, @machineId, @heroId, @lessonIds, @teams)
-    `);
-    const info = stmt.run({
-        userId: params.userId,
-        machineId: params.machineId || 0,
-        heroId: params.heroId || 0,
-        lessonIds: params.lessonIds || '[]',
-        teams: params.teams || '[]'
-    });
-    return db.prepare('SELECT * FROM expedition_data WHERE id = ?').get(info.lastInsertRowid);
-}
-
-/**
- * Update expedition by id — generic updater
- * @param {number} expeditionDbId
- * @param {object} fields
- */
-function updateExpedition(expeditionDbId, fields) {
-    const keys = Object.keys(fields);
-    if (keys.length === 0) return;
-    const setClauses = keys.map(k => `${k} = @${k}`).join(', ');
-    const values = { id: expeditionDbId, ...fields };
-    db.prepare(`UPDATE expedition_data SET ${setClauses} WHERE id = @id`).run(values);
-}
-
-/**
- * Delete expedition by id
- * @param {number} expeditionDbId
- * @returns {boolean}
- */
-function deleteExpedition(expeditionDbId) {
-    const info = db.prepare('DELETE FROM expedition_data WHERE id = ?').run(expeditionDbId);
-    return info.changes > 0;
-}
-
-// ═══════════════════════════════════════════════════════════════
-// BATTLE DATA OPERATIONS
-// ═══════════════════════════════════════════════════════════════
-
-/**
- * Get battle by battleId
- * @param {string} battleId
- * @returns {object|null}
- */
-function getBattle(battleId) {
-    return db.prepare('SELECT * FROM battle_data WHERE battleId = ?').get(battleId);
-}
-
-/**
- * Get active battles for a user
- * @param {string} userId
- * @returns {array}
- */
-function getBattles(userId) {
-    return db.prepare('SELECT * FROM battle_data WHERE userId = ? AND status = 0').all(userId);
-}
-
-/**
- * Create battle
- * @param {object} params
- * @returns {object} Created battle row
- */
-function createBattle(params) {
-    const stmt = db.prepare(`
-        INSERT INTO battle_data (battleId, userId, battleField, seed, team, startTime, status)
-        VALUES (@battleId, @userId, @battleField, @seed, @team, @startTime, @status)
-    `);
-    stmt.run({
-        battleId: params.battleId,
-        userId: params.userId,
-        battleField: params.battleField,
-        seed: params.seed || '',
-        team: params.team || '{}',
-        startTime: params.startTime || Date.now(),
-        status: params.status || 0
-    });
-    return getBattle(params.battleId);
-}
-
-/**
- * Update battle by battleId — generic updater
- * @param {string} battleId
- * @param {object} fields
- */
-function updateBattle(battleId, fields) {
-    const keys = Object.keys(fields);
-    if (keys.length === 0) return;
-    const setClauses = keys.map(k => `${k} = @${k}`).join(', ');
-    const values = { battleId, ...fields };
-    db.prepare(`UPDATE battle_data SET ${setClauses} WHERE battleId = @battleId`).run(values);
-}
-
-/**
- * Delete battle by battleId
- * @param {string} battleId
- * @returns {boolean}
- */
-function deleteBattle(battleId) {
-    const info = db.prepare('DELETE FROM battle_data WHERE battleId = ?').run(battleId);
-    return info.changes > 0;
-}
-
-/**
- * Cleanup old battles (status != 0 and older than 1 hour)
- * @returns {number} Number of deleted battles
- */
-function cleanupOldBattles() {
-    const cutoff = Date.now() - 60 * 60 * 1000;
-    const info = db.prepare('DELETE FROM battle_data WHERE status != 0 AND startTime < ?').run(cutoff);
-    return info.changes;
 }
 
 // ═══════════════════════════════════════════════════════════════
 // BALL WAR DATA OPERATIONS
 // ═══════════════════════════════════════════════════════════════
 
-/**
- * Get ball war data for a user
- * @param {string} userId
- * @returns {object|null}
- */
-function getBallWar(userId) {
+function getBallWarData(userId) {
     return db.prepare('SELECT * FROM ball_war_data WHERE userId = ?').get(userId);
 }
 
-/**
- * Create or update ball war data (upsert)
- * @param {string} userId
- * @param {object} fields
- */
-function upsertBallWar(userId, fields) {
-    const stmt = db.prepare(`
-        INSERT INTO ball_war_data (userId, state, signedUp, times, defence)
-        VALUES (@userId, @state, @signedUp, @times, @defence)
-        ON CONFLICT(userId) DO UPDATE SET
-            state = @state, signedUp = @signedUp, times = @times, defence = @defence
-    `);
-    stmt.run({
-        userId,
-        state: fields.state || 0,
-        signedUp: fields.signedUp || 0,
-        times: fields.times || 3,
-        defence: fields.defence || '{}'
-    });
-}
-
-/**
- * Update ball war by userId — generic updater
- * @param {string} userId
- * @param {object} fields
- */
-function updateBallWar(userId, fields) {
-    const keys = Object.keys(fields);
-    if (keys.length === 0) return;
-    const setClauses = keys.map(k => `${k} = @${k}`).join(', ');
-    const values = { userId, ...fields };
-    db.prepare(`UPDATE ball_war_data SET ${setClauses} WHERE userId = @userId`).run(values);
-}
-
 // ═══════════════════════════════════════════════════════════════
-// ENTRUST DATA OPERATIONS
+// BATTLE DATA OPERATIONS
 // ═══════════════════════════════════════════════════════════════
 
-/**
- * Get all entrusts for a user
- * @param {string} userId
- * @returns {array}
- */
-function getEntrusts(userId) {
-    return db.prepare('SELECT * FROM entrust_data WHERE userId = ?').all(userId);
-}
-
-/**
- * Get entrust by id
- * @param {number} id
- * @returns {object|null}
- */
-function getEntrustById(id) {
-    return db.prepare('SELECT * FROM entrust_data WHERE id = ?').get(id);
-}
-
-/**
- * Create entrust
- * @param {object} params
- * @returns {object} Created entrust row
- */
-function createEntrust(params) {
-    const stmt = db.prepare(`
-        INSERT INTO entrust_data (userId, entrustIndex, heroInfo, status, finishTime)
-        VALUES (@userId, @entrustIndex, @heroInfo, @status, @finishTime)
-    `);
-    const info = stmt.run({
+function createBattle(params) {
+    db.prepare(`
+        INSERT INTO battle_data (battleId, userId, battleField, seed, team, startTime, status)
+        VALUES (@battleId, @userId, @battleField, @seed, @team, @startTime, 0)
+    `).run({
+        battleId: params.battleId,
         userId: params.userId,
-        entrustIndex: params.entrustIndex || 0,
-        heroInfo: params.heroInfo || '{}',
-        status: params.status || 0,
-        finishTime: params.finishTime || 0
+        battleField: params.battleField,
+        seed: params.seed || '',
+        team: params.team || '{}',
+        startTime: Date.now()
     });
-    return db.prepare('SELECT * FROM entrust_data WHERE id = ?').get(info.lastInsertRowid);
 }
 
-/**
- * Update entrust by id — generic updater
- * @param {number} entrustDbId
- * @param {object} fields
- */
-function updateEntrust(entrustDbId, fields) {
-    const keys = Object.keys(fields);
-    if (keys.length === 0) return;
-    const setClauses = keys.map(k => `${k} = @${k}`).join(', ');
-    const values = { id: entrustDbId, ...fields };
-    db.prepare(`UPDATE entrust_data SET ${setClauses} WHERE id = @id`).run(values);
+function getBattle(battleId) {
+    return db.prepare('SELECT * FROM battle_data WHERE battleId = ?').get(battleId);
 }
 
-/**
- * Delete entrust by id
- * @param {number} entrustDbId
- * @returns {boolean}
- */
-function deleteEntrust(entrustDbId) {
-    const info = db.prepare('DELETE FROM entrust_data WHERE id = ?').run(entrustDbId);
-    return info.changes > 0;
-}
-
-// ═══════════════════════════════════════════════════════════════
-// RESONANCE DATA OPERATIONS
-// ═══════════════════════════════════════════════════════════════
-
-/**
- * Get all resonance data for a user
- * @param {string} userId
- * @returns {array}
- */
-function getResonances(userId) {
-    return db.prepare('SELECT * FROM resonance_data WHERE userId = ?').all(userId);
-}
-
-/**
- * Get resonance by id
- * @param {number} id
- * @returns {object|null}
- */
-function getResonanceById(id) {
-    return db.prepare('SELECT * FROM resonance_data WHERE id = ?').get(id);
-}
-
-/**
- * Get resonance by cabinId + seatId
- * @param {string} userId
- * @param {number} cabinId
- * @param {number} seatId
- * @returns {object|null}
- */
-function getResonanceBySeat(userId, cabinId, seatId) {
-    return db.prepare('SELECT * FROM resonance_data WHERE userId = ? AND cabinId = ? AND seatId = ?').get(userId, cabinId, seatId);
-}
-
-/**
- * Create resonance
- * @param {object} params
- * @returns {object} Created resonance row
- */
-function createResonance(params) {
-    const stmt = db.prepare(`
-        INSERT INTO resonance_data (userId, cabinId, seatId, heroId)
-        VALUES (@userId, @cabinId, @seatId, @heroId)
-    `);
-    const info = stmt.run({
-        userId: params.userId,
-        cabinId: params.cabinId,
-        seatId: params.seatId,
-        heroId: params.heroId || 0
-    });
-    return db.prepare('SELECT * FROM resonance_data WHERE id = ?').get(info.lastInsertRowid);
-}
-
-/**
- * Update resonance by id — generic updater
- * @param {number} resonanceDbId
- * @param {object} fields
- */
-function updateResonance(resonanceDbId, fields) {
-    const keys = Object.keys(fields);
-    if (keys.length === 0) return;
-    const setClauses = keys.map(k => `${k} = @${k}`).join(', ');
-    const values = { id: resonanceDbId, ...fields };
-    db.prepare(`UPDATE resonance_data SET ${setClauses} WHERE id = @id`).run(values);
-}
-
-/**
- * Delete resonance by id
- * @param {number} resonanceDbId
- * @returns {boolean}
- */
-function deleteResonance(resonanceDbId) {
-    const info = db.prepare('DELETE FROM resonance_data WHERE id = ?').run(resonanceDbId);
-    return info.changes > 0;
-}
-
-// ═══════════════════════════════════════════════════════════════
-// SUPER SKILL DATA OPERATIONS
-// ═══════════════════════════════════════════════════════════════
-
-/**
- * Get all super skills for a user
- * @param {string} userId
- * @returns {array}
- */
-function getSuperSkills(userId) {
-    return db.prepare('SELECT * FROM super_skill_data WHERE userId = ?').all(userId);
-}
-
-/**
- * Get super skill by id
- * @param {number} id
- * @returns {object|null}
- */
-function getSuperSkillById(id) {
-    return db.prepare('SELECT * FROM super_skill_data WHERE id = ?').get(id);
-}
-
-/**
- * Get super skill by skillId
- * @param {string} userId
- * @param {number} skillId
- * @returns {object|null}
- */
-function getSuperSkillBySkillId(userId, skillId) {
-    return db.prepare('SELECT * FROM super_skill_data WHERE userId = ? AND skillId = ?').get(userId, skillId);
-}
-
-/**
- * Create super skill
- * @param {object} params
- * @returns {object} Created super skill row
- */
-function createSuperSkill(params) {
-    const stmt = db.prepare(`
-        INSERT INTO super_skill_data (userId, skillId, level, evolveLevel)
-        VALUES (@userId, @skillId, @level, @evolveLevel)
-    `);
-    const info = stmt.run({
-        userId: params.userId,
-        skillId: params.skillId,
-        level: params.level || 1,
-        evolveLevel: params.evolveLevel || 0
-    });
-    return db.prepare('SELECT * FROM super_skill_data WHERE id = ?').get(info.lastInsertRowid);
-}
-
-/**
- * Update super skill by id — generic updater
- * @param {number} superSkillDbId
- * @param {object} fields
- */
-function updateSuperSkill(superSkillDbId, fields) {
-    const keys = Object.keys(fields);
-    if (keys.length === 0) return;
-    const setClauses = keys.map(k => `${k} = @${k}`).join(', ');
-    const values = { id: superSkillDbId, ...fields };
-    db.prepare(`UPDATE super_skill_data SET ${setClauses} WHERE id = @id`).run(values);
-}
-
-/**
- * Delete super skill by id
- * @param {number} superSkillDbId
- * @returns {boolean}
- */
-function deleteSuperSkill(superSkillDbId) {
-    const info = db.prepare('DELETE FROM super_skill_data WHERE id = ?').run(superSkillDbId);
-    return info.changes > 0;
-}
-
-// ═══════════════════════════════════════════════════════════════
-// GEMSTONE DATA OPERATIONS
-// ═══════════════════════════════════════════════════════════════
-
-/**
- * Get all gemstones for a user
- * @param {string} userId
- * @returns {array}
- */
-function getGemstones(userId) {
-    return db.prepare('SELECT * FROM gemstone_data WHERE userId = ?').all(userId);
-}
-
-/**
- * Get gemstone by id
- * @param {number} id
- * @returns {object|null}
- */
-function getGemstoneById(id) {
-    return db.prepare('SELECT * FROM gemstone_data WHERE id = ?').get(id);
-}
-
-/**
- * Create gemstone
- * @param {object} params
- * @returns {object} Created gemstone row
- */
-function createGemstone(params) {
-    const stmt = db.prepare(`
-        INSERT INTO gemstone_data (userId, stoneId, displayId, level, heroId, totalExp, version, jewPosition)
-        VALUES (@userId, @stoneId, @displayId, @level, @heroId, @totalExp, @version, @jewPosition)
-    `);
-    const info = stmt.run({
-        userId: params.userId,
-        stoneId: params.stoneId,
-        displayId: params.displayId || 0,
-        level: params.level || 1,
-        heroId: params.heroId || 0,
-        totalExp: params.totalExp || 0,
-        version: params.version || '',
-        jewPosition: params.jewPosition || 1
-    });
-    return db.prepare('SELECT * FROM gemstone_data WHERE id = ?').get(info.lastInsertRowid);
-}
-
-/**
- * Update gemstone by id — generic updater
- * @param {number} gemstoneDbId
- * @param {object} fields
- */
-function updateGemstone(gemstoneDbId, fields) {
-    const keys = Object.keys(fields);
-    if (keys.length === 0) return;
-    const setClauses = keys.map(k => `${k} = @${k}`).join(', ');
-    const values = { id: gemstoneDbId, ...fields };
-    db.prepare(`UPDATE gemstone_data SET ${setClauses} WHERE id = @id`).run(values);
-}
-
-/**
- * Delete gemstone by id
- * @param {number} gemstoneDbId
- * @returns {boolean}
- */
-function deleteGemstone(gemstoneDbId) {
-    const info = db.prepare('DELETE FROM gemstone_data WHERE id = ?').run(gemstoneDbId);
-    return info.changes > 0;
+function updateBattleStatus(battleId, status) {
+    db.prepare('UPDATE battle_data SET status = ? WHERE battleId = ?').run(status, battleId);
 }
 
 // ═══════════════════════════════════════════════════════════════
 // RANK DATA OPERATIONS
 // ═══════════════════════════════════════════════════════════════
 
-/**
- * Get ranks by type
- * @param {number} rankType
- * @param {number} limit
- * @returns {array}
- */
-function getRanksByType(rankType, limit = 100) {
-    return db.prepare('SELECT * FROM rank_data WHERE rankType = ? ORDER BY rankValue DESC LIMIT ?').all(rankType, limit);
-}
-
-/**
- * Get user rank by type
- * @param {string} userId
- * @param {number} rankType
- * @returns {object|null}
- */
-function getRankByType(userId, rankType) {
-    return db.prepare('SELECT * FROM rank_data WHERE userId = ? AND rankType = ?').get(userId, rankType);
-}
-
-/**
- * Get all ranks for a user
- * @param {string} userId
- * @returns {array}
- */
-function getRanks(userId) {
-    return db.prepare('SELECT * FROM rank_data WHERE userId = ?').all(userId);
-}
-
-/**
- * Create rank entry
- * @param {object} params
- * @returns {object} Created rank row
- */
-function createRank(params) {
-    const stmt = db.prepare(`
-        INSERT INTO rank_data (rankType, userId, rankValue, rankLevel)
-        VALUES (@rankType, @userId, @rankValue, @rankLevel)
-    `);
-    const info = stmt.run({
-        rankType: params.rankType,
-        userId: params.userId,
-        rankValue: params.rankValue || 0,
-        rankLevel: params.rankLevel || 0
-    });
-    return db.prepare('SELECT * FROM rank_data WHERE id = ?').get(info.lastInsertRowid);
-}
-
-/**
- * Update rank by id — generic updater
- * @param {number} rankDbId
- * @param {object} fields
- */
-function updateRank(rankDbId, fields) {
-    const keys = Object.keys(fields);
-    if (keys.length === 0) return;
-    const setClauses = keys.map(k => `${k} = @${k}`).join(', ');
-    const values = { id: rankDbId, ...fields };
-    db.prepare(`UPDATE rank_data SET ${setClauses} WHERE id = @id`).run(values);
-}
-
-/**
- * Delete rank by id
- * @param {number} rankDbId
- * @returns {boolean}
- */
-function deleteRank(rankDbId) {
-    const info = db.prepare('DELETE FROM rank_data WHERE id = ?').run(rankDbId);
-    return info.changes > 0;
-}
-
-/**
- * Upsert rank (update if exists, create if not)
- * @param {string} userId
- * @param {number} rankType
- * @param {object} fields
- */
-function upsertRank(userId, rankType, fields) {
-    const existing = getRankByType(userId, rankType);
-    if (existing) {
-        updateRank(existing.id, fields);
-    } else {
-        createRank({ userId, rankType, ...fields });
-    }
+function getRankByType(rankType, limit) {
+    return db.prepare('SELECT * FROM rank_data WHERE rankType = ? ORDER BY rankValue DESC LIMIT ?').all(rankType, limit || 50);
 }
 
 // ═══════════════════════════════════════════════════════════════
-// UTILITY OPERATIONS
+// SUPER SKILL DATA OPERATIONS
+// ═══════════════════════════════════════════════════════════════
+
+function getSuperSkills(userId) {
+    return db.prepare('SELECT * FROM super_skill_data WHERE userId = ?').all(userId);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// GEMSTONE DATA OPERATIONS
+// ═══════════════════════════════════════════════════════════════
+
+function getGemstones(userId) {
+    return db.prepare('SELECT * FROM gemstone_data WHERE userId = ?').all(userId);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// RESONANCE DATA OPERATIONS
+// ═══════════════════════════════════════════════════════════════
+
+function getResonance(userId) {
+    return db.prepare('SELECT * FROM resonance_data WHERE userId = ?').all(userId);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// EXPEDITION DATA OPERATIONS
+// ═══════════════════════════════════════════════════════════════
+
+function getExpedition(userId) {
+    return db.prepare('SELECT * FROM expedition_data WHERE userId = ?').all(userId);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ENTRUST DATA OPERATIONS
+// ═══════════════════════════════════════════════════════════════
+
+function getEntrust(userId) {
+    return db.prepare('SELECT * FROM entrust_data WHERE userId = ?').all(userId);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ONLINE USER TRACKING
 // ═══════════════════════════════════════════════════════════════
 
 /**
- * Delete all data for a user (used for account deletion)
- * @param {string} userId
- * @returns {void}
- */
-function deleteAllUserData(userId) {
-    const deleteMany = db.transaction(() => {
-        db.prepare('DELETE FROM hero_data WHERE userId = ?').run(userId);
-        db.prepare('DELETE FROM item_data WHERE userId = ?').run(userId);
-        db.prepare('DELETE FROM equip_data WHERE userId = ?').run(userId);
-        db.prepare('DELETE FROM weapon_data WHERE userId = ?').run(userId);
-        db.prepare('DELETE FROM imprint_data WHERE userId = ?').run(userId);
-        db.prepare('DELETE FROM genki_data WHERE userId = ?').run(userId);
-        db.prepare('DELETE FROM guild_member_data WHERE userId = ?').run(userId);
-        db.prepare('DELETE FROM friend_data WHERE userId = ?').run(userId);
-        db.prepare('DELETE FROM friend_blacklist WHERE userId = ?').run(userId);
-        db.prepare('DELETE FROM arena_data WHERE userId = ?').run(userId);
-        db.prepare('DELETE FROM mail_data WHERE userId = ?').run(userId);
-        db.prepare('DELETE FROM shop_data WHERE userId = ?').run(userId);
-        db.prepare('DELETE FROM dungeon_data WHERE userId = ?').run(userId);
-        db.prepare('DELETE FROM tower_data WHERE userId = ?').run(userId);
-        db.prepare('DELETE FROM expedition_data WHERE userId = ?').run(userId);
-        db.prepare('DELETE FROM battle_data WHERE userId = ?').run(userId);
-        db.prepare('DELETE FROM ball_war_data WHERE userId = ?').run(userId);
-        db.prepare('DELETE FROM entrust_data WHERE userId = ?').run(userId);
-        db.prepare('DELETE FROM resonance_data WHERE userId = ?').run(userId);
-        db.prepare('DELETE FROM super_skill_data WHERE userId = ?').run(userId);
-        db.prepare('DELETE FROM gemstone_data WHERE userId = ?').run(userId);
-        db.prepare('DELETE FROM rank_data WHERE userId = ?').run(userId);
-        db.prepare('DELETE FROM user_data WHERE userId = ?').run(userId);
-    });
-    deleteMany();
-}
-
-/**
- * Get online user count
+ * Get count of online users
  * @returns {number}
  */
 function getOnlineCount() {
-    const result = db.prepare('SELECT COUNT(*) as count FROM user_data WHERE online = 1').get();
-    return result.count;
+    const row = db.prepare('SELECT COUNT(*) as count FROM user_data WHERE online = 1').get();
+    return row ? row.count : 0;
 }
 
 /**
- * Get total user count
- * @returns {number}
+ * Get all online user IDs
+ * @returns {array}
  */
-function getTotalUserCount() {
-    const result = db.prepare('SELECT COUNT(*) as count FROM user_data').get();
-    return result.count;
+function getOnlineUserIds() {
+    const rows = db.prepare('SELECT userId FROM user_data WHERE online = 1').all();
+    return rows.map(r => r.userId);
 }
 
 // ═══════════════════════════════════════════════════════════════
-// COMPOSITE / CONVENIENCE FUNCTIONS
-// Digunakan oleh handlers — menggabungkan beberapa operasi dasar
+// COMPLETE NEW USER CREATION (transaction)
 // ═══════════════════════════════════════════════════════════════
 
 /**
- * Create complete user — transaction: user_data + tower_data + arena_data + ball_war_data
- * Dipanggil oleh enterGame handler saat user baru pertama kali login.
- * SQLite DEFAULT constraints menangani semua default values.
+ * Create complete new user dengan semua data relasional
+ * Menggunakan transaction untuk atomicity
+ * Game constants dibaca dari constant.json via jsonLoader
+ *
+ * Fungsi ini BUKAN deadcode — diperlukan untuk INSERT ke tabel relasional:
+ * - user_data (dengan nilai dari constant.json)
+ * - hero_data (hero awal dari constant.json startHero)
+ * - item_data (7 mandatory items)
+ * - dungeon_data (8 tipe dungeon)
+ * - tower_data, arena_data, ball_war_data
+ *
+ * SQLite DEFAULT menangani kolom yang TIDAK di-INSERT secara eksplisit.
+ * Tapi kolom yang nilainya bergantung pada constant.json HARUS di-INSERT.
  *
  * @param {string} userId
  * @param {string} nickName
@@ -2374,286 +987,294 @@ function getTotalUserCount() {
  * @returns {object} Created user row
  */
 function createCompleteUser(userId, nickName, loginToken, serverId, language) {
-    const createAll = db.transaction(() => {
-        // 1. Insert user_data — hanya kolom yang perlu di-INSERT eksplisit
-        //    Semua kolom lain pakai SQLite DEFAULT
-        db.prepare(`
-            INSERT INTO user_data (userId, nickName, loginToken, serverId, language, createTime, lastLoginTime, online)
-            VALUES (?, ?, ?, ?, ?, ?, ?, 1)
-        `).run(userId, nickName, loginToken, serverId, language || 'en', Date.now(), Date.now());
+    // Read game constants from constant.json
+    const jsonLoader = require('./jsonLoader');
+    const constantData = jsonLoader.get('constant');
+    const c1 = (constantData && constantData['1']) || {};
 
-        // 2. Auto-create tower_data row (userId PK, DEFAULT menangani sisanya)
-        db.prepare(`
-            INSERT INTO tower_data (userId) VALUES (?)
-        `).run(userId);
+    const startHero = String(c1.startHero || '1205');
+    const startHeroLevel = Number(c1.startHeroLevel || 3);
+    const startUserLevel = Number(c1.startUserLevel || 1);
+    const startUserExp = Number(c1.startUserExp || 0);
+    const startDiamond = Number(c1.startDiamond || 0);
+    const startGold = Number(c1.startGold || 0);
+    const startChapter = Number(c1.startChapter || 801);
+    const startLesson = Number(c1.startLesson || 10101);
+    const arenaAttackTimes = Number(c1.arenaAttackTimes || 5);
+    const karinTowerBattleTimes = Number(c1.karinTowerBattleTimes || 10);
+    const dragonBallWarTimesMax = Number(c1.dragonBallWarTimesMax || 3);
 
-        // 3. Auto-create arena_data row (userId PK, DEFAULT menangani sisanya)
-        db.prepare(`
-            INSERT INTO arena_data (userId) VALUES (?)
-        `).run(userId);
-
-        // 4. Auto-create ball_war_data row (userId PK, DEFAULT menangani sisanya)
-        db.prepare(`
-            INSERT INTO ball_war_data (userId) VALUES (?)
-        `).run(userId);
+    // Build scheduleData from constant.json
+    const scheduleData = JSON.stringify({
+        _arenaAttackTimes: arenaAttackTimes,
+        _arenaBuyTimesCount: 0,
+        _strongEnemyTimes: Number(c1.bossAttackTimes || 6),
+        _strongEnemyBuyCount: 0,
+        _karinTowerBattleTimes: karinTowerBattleTimes,
+        _karinTowerBuyTimesCount: 0,
+        _cellGameTimes: Number(c1.cellGameTimes || 1),
+        _cellGameBuyTimesCount: 0,
+        _templeTestTimes: Number(c1.templeTestTimes || 10),
+        _templeTestBuyTimesCount: 0,
+        _expDungeonTimes: Number(c1.expDungeonTimes || 2),
+        _expDungeonBuyTimes: 0,
+        _evolveDungeonTimes: Number(c1.evolveDungeonTimes || 2),
+        _evolveDungeonBuyTimes: 0,
+        _energyDungeonTimes: Number(c1.energyDungeonTimes || 2),
+        _energyDungeonBuyTimes: 0,
+        _metalDungeonTimes: Number(c1.metalDungeonTimes || 2),
+        _metalDungeonBuyTimes: 0,
+        _zStoneDungeonTimes: Number(c1.zStoneDungeonTimes || 2),
+        _zStoneDungeonBuyTimes: 0,
+        _equipDungeonTimes: Number(c1.equipDungeonTimes || 2),
+        _equipDungeonBuyTimes: 0,
+        _signDungeonTimes: Number(c1.signDungeonTimes || 2),
+        _signDungeonBuyTimes: 0,
+        _bossFightTimes: Number(c1.bossFightTimesMax || 3),
+        _bossFightBuyTimes: 0,
+        _mahaAdventureTimes: Number(c1.mahaAdventureTimesMax || 5),
+        _mahaAdventureBuyTimes: 0,
+        _trainingTimes: Number(c1.trainingTimesMax || 10),
+        _trainingBuyTimes: 0,
+        _guildBOSSTimes: Number(c1.guildBOSSTimes || 2),
+        _guildBOSSBuyTimes: 0,
+        _guildGrabTimes: Number(c1.guildGrabTimes || 3),
+        _mineActionPoint: Number(c1.mineActionPointMax || 50),
+        _dragonBallWarTimes: dragonBallWarTimesMax,
+        _dragonBallWarBuyTimes: 0,
+        _expeditionTimes: Number(c1.expeditionBattleTimes || 10),
+        _snakeDungeonTimes: Number(c1.snakeTimes || 1),
+        _topBattleTimes: 0,
+        _topBattleBuyTimes: 0,
+        _gravityTestTimes: Number(c1.gravityTestRewardpreview || 50),
+        _timeTrainTimes: 0,
+        _timeTrainBuyTimes: 0,
+        _marketRefreshTimes: Number(c1.marketRefreshTimeMax || 5),
+        _vipMarketRefreshTimes: Number(c1.vipMarketRefreshTimeMax || 5),
+        _rewardHelpTimes: Number(c1.rewardHelpRewardEveryday || 10),
+        _goldBuyTimes: Number(c1.goldBuyFree || 20)
     });
 
-    createAll();
+    // Build timesData
+    const now = Date.now();
+    const timesData = JSON.stringify({
+        _marketLastRefreshTime: now,
+        _vipMarketLastRefreshTime: now,
+        _karinTowerLastRefreshTime: now,
+        _trainingLastRefreshTime: now,
+        _dragonBallWarLastRefreshTime: now,
+        _expeditionLastRefreshTime: now,
+        _templeTestLastRefreshTime: now,
+        _mahaAdventureLastBattleTime: 0,
+        _mineLastRefreshTime: now,
+        _timeTrainLastRefreshTime: now,
+        _gravityTestLastRefreshTime: now
+    });
+
+    // Build battleMedalData
+    const battleMedalData = JSON.stringify({
+        _level: 1, _exp: 0, _todayExp: 0, _buyTimes: 0, _taskData: []
+    });
+
+    // Build giftInfoData
+    const giftInfoData = JSON.stringify({
+        _firstRechargeGot: 0, _monthCardGot: 0, _bigMonthCardGot: 0, _lifelongCardGot: 0,
+        _monthCardEndTime: 0, _bigMonthCardEndTime: 0, _lifelongCardEndTime: 0,
+        _monthCardDay: 0, _bigMonthCardDay: 0, _lifelongCardDay: 0
+    });
+
+    const createUserAndRelations = db.transaction(() => {
+        // 1. Create user_data row — nilai dari constant.json
+        db.prepare(`
+            INSERT INTO user_data (
+                userId, nickName, headImageId, headBoxId, level, exp,
+                vipLevel, vipExp, vipExpAll, diamond, gold,
+                loginToken, serverId, createTime, lastLoginTime, language,
+                lessonId, chapterId, backpackLevel, firstEnter,
+                scheduleData, timesData, battleMedalData, giftInfoData,
+                arenaRank, arenaTimes, towerFloor, towerTimes, online
+            ) VALUES (
+                ?, ?, ?, ?, ?, ?,
+                0, 0, 0, ?, ?,
+                ?, ?, ?, ?, ?,
+                ?, ?, 1, 1,
+                ?, ?, ?, ?,
+                0, ?, 0, ?, 1
+            )
+        `).run(
+            userId,
+            nickName,
+            Number(startHero),       // headImageId = start hero
+            0,                        // headBoxId
+            startUserLevel,
+            startUserExp,
+            startDiamond,
+            startGold,
+            loginToken,
+            serverId,
+            now,                      // createTime
+            now,                      // lastLoginTime
+            language || 'en',
+            startLesson,
+            startChapter,
+            scheduleData,
+            timesData,
+            battleMedalData,
+            giftInfoData,
+            arenaAttackTimes,         // arenaTimes
+            karinTowerBattleTimes     // towerTimes
+        );
+
+        // 2. Create default hero (dari constant.json startHero)
+        db.prepare(`
+            INSERT INTO hero_data (userId, displayId, level, quality, evolveLevel, star, skinId, activeSkill, qigongLevel, selfBreakLevel, selfBreakType, connectHeroId, position, power)
+            VALUES (?, ?, ?, 1, 0, 0, 0, '{}', 0, 0, 0, 0, 1, 0)
+        `).run(
+            userId,
+            Number(startHero),
+            startHeroLevel
+        );
+
+        // 3. Create default items (7 mandatory items dari constant.json)
+        const itemStmt = db.prepare(`
+            INSERT INTO item_data (userId, itemId, num, displayId)
+            VALUES (?, ?, ?, 0)
+        `);
+        itemStmt.run(userId, 104, startUserLevel);   // playerLevel
+        itemStmt.run(userId, 103, startUserExp);      // playerExp
+        itemStmt.run(userId, 101, startDiamond);      // diamond
+        itemStmt.run(userId, 102, startGold);         // gold
+        itemStmt.run(userId, 106, 0);                 // vipLevel
+        itemStmt.run(userId, 105, 0);                 // vipExp
+        itemStmt.run(userId, 107, 0);                 // vipExpAll
+
+        // 4. Create default dungeon progress (8 tipe)
+        const dungeonTypes = [1, 2, 3, 4, 5, 6, 7, 8];
+        const dungeonStmt = db.prepare(`
+            INSERT INTO dungeon_data (userId, dungeonType, level, sweepLevel, times, buyTimes)
+            VALUES (?, ?, 0, 0, 0, 0)
+        `);
+        for (const dt of dungeonTypes) {
+            dungeonStmt.run(userId, dt);
+        }
+
+        // 5. Create default tower data
+        db.prepare(`
+            INSERT INTO tower_data (userId, floor, times, buyTimes, climbTimes, events)
+            VALUES (?, 0, ?, 0, 0, '[]')
+        `).run(userId, karinTowerBattleTimes);
+
+        // 6. Create default arena data
+        db.prepare(`
+            INSERT INTO arena_data (userId, rank, times, buyTimes, team, lastRefreshTime)
+            VALUES (?, 0, ?, 0, '{}', 0)
+        `).run(userId, arenaAttackTimes);
+
+        // 7. Create default ball_war_data
+        db.prepare(`
+            INSERT INTO ball_war_data (userId, state, signedUp, times, defence)
+            VALUES (?, 0, 0, ?, '{}')
+        `).run(userId, dragonBallWarTimesMax);
+    });
+
+    createUserAndRelations();
     return getUser(userId);
 }
 
-/**
- * Get guild info by userId — JOIN guild_member_data + guild_data
- * Digunakan oleh enterGame untuk mendapatkan guildUUID dan guildName
- *
- * @param {string} userId
- * @returns {object|null} { guildUUID, guildName, ... } or null
- */
-function getGuildByUser(userId) {
-    const stmt = db.prepare(`
-        SELECT g.guildUUID, g.guildName, g.iconId, g.level as guildLevel,
-               m.position as memberPosition, m.joinTime, m.donateNum
-        FROM guild_member_data m
-        JOIN guild_data g ON g.guildUUID = m.guildUUID
-        WHERE m.userId = ?
-    `);
-    return stmt.get(userId) || null;
-}
-
-/**
- * Get shop data for enterGame response
- * Mengembalikan semua shop entries untuk user dalam format yang bisa
- * langsung dipakai oleh client
- *
- * @param {string} userId
- * @returns {array}
- */
-function getShopData(userId) {
-    return getShops(userId);
-}
-
-/**
- * Get dungeon progress for enterGame response
- * Mengembalikan semua dungeon entries untuk user
- *
- * @param {string} userId
- * @returns {array}
- */
-function getDungeonProgress(userId) {
-    return getDungeons(userId);
-}
-
-/**
- * Get arena data for enterGame response
- * Alias untuk getArena — dipanggil oleh handler
- *
- * @param {string} userId
- * @returns {object|null}
- */
-function getArenaData(userId) {
-    return getArena(userId);
-}
-
-/**
- * Get tower data for enterGame response
- * Alias untuk getTower — dipanggil oleh handler
- *
- * @param {string} userId
- * @returns {object|null}
- */
-function getTowerData(userId) {
-    return getTower(userId);
-}
-
-/**
- * Get ball war data for enterGame response
- * Alias untuk getBallWar — dipanggil oleh handler
- *
- * @param {string} userId
- * @returns {object|null}
- */
-function getBallWarData(userId) {
-    return getBallWar(userId);
-}
-
-/**
- * Get all online user IDs
- * Digunakan oleh daily reset scheduler untuk push notify
- *
- * @returns {array} Array of userId strings
- */
-function getOnlineUserIds() {
-    const rows = db.prepare('SELECT userId FROM user_data WHERE online = 1').all();
-    return rows.map(r => r.userId);
-}
-
-// ═══════════════════════════════════════════════════════════════
-// EXPORTS
-// ═══════════════════════════════════════════════════════════════
-
 module.exports = {
-    // User
+    db,
+
+    // User operations
     getUser,
     getUserByToken,
     setUserOnline,
     updateUserFields,
     userExists,
-    createUser,
-    // Hero
+
+    // Hero operations
     getHeroes,
-    getHeroById,
-    getHeroByDisplayId,
     createHero,
     updateHero,
-    deleteHero,
-    // Item
+
+    // Item operations
     getItems,
     getItem,
     setItem,
     addItem,
     removeItem,
     createItems,
-    deleteItem,
-    // Equip
+
+    // Equip operations
     getEquips,
-    getEquipById,
-    getEquipsByHeroId,
     createEquip,
-    updateEquip,
-    deleteEquip,
-    // Weapon
+
+    // Weapon operations
     getWeapons,
-    getWeaponById,
     createWeapon,
-    updateWeapon,
-    deleteWeapon,
-    // Imprint
+
+    // Imprint operations
     getImprints,
-    getImprintById,
-    createImprint,
-    updateImprint,
-    deleteImprint,
-    // Genki
+
+    // Genki operations
     getGenkis,
-    getGenkiById,
-    createGenki,
-    updateGenki,
-    deleteGenki,
-    // Guild
+
+    // Guild operations
     getGuild,
-    getGuilds,
-    getGuildByIdOrName,
-    createGuild,
-    updateGuild,
-    deleteGuild,
-    // Guild Member
+    getGuildByUser,
     getGuildMembers,
-    getGuildMemberByUserId,
-    createGuildMember,
-    updateGuildMember,
-    deleteGuildMember,
-    // Friend
+
+    // Friend operations
     getFriends,
-    getFriend,
-    createFriend,
-    updateFriend,
-    deleteFriend,
-    // Friend Blacklist
     getBlacklist,
-    createBlacklist,
-    deleteBlacklist,
-    // Arena
-    getArena,
-    upsertArena,
-    updateArena,
-    getArenaRankList,
-    // Mail
+
+    // Mail operations
     getMails,
-    getMailById,
     createMail,
-    updateMail,
-    deleteMail,
-    deleteExpiredMails,
-    // Shop
-    getShopByType,
-    getShops,
-    getShopGoods,
-    upsertShopGoods,
-    updateShopGoods,
-    deleteShopGoods,
-    // Dungeon
-    getDungeons,
+
+    // Shop operations
+    getShopData,
+
+    // Dungeon operations
+    getDungeonProgress,
     getDungeonByType,
     upsertDungeon,
-    updateDungeon,
-    deleteDungeon,
-    // Tower
-    getTower,
-    createTower,
-    updateTower,
-    getTowerRankList,
-    // Expedition
-    getExpeditions,
-    getExpeditionById,
-    createExpedition,
-    updateExpedition,
-    deleteExpedition,
-    // Battle
-    getBattle,
-    getBattles,
-    createBattle,
-    updateBattle,
-    deleteBattle,
-    cleanupOldBattles,
-    // Ball War
-    getBallWar,
-    upsertBallWar,
-    updateBallWar,
-    // Entrust
-    getEntrusts,
-    getEntrustById,
-    createEntrust,
-    updateEntrust,
-    deleteEntrust,
-    // Resonance
-    getResonances,
-    getResonanceById,
-    getResonanceBySeat,
-    createResonance,
-    updateResonance,
-    deleteResonance,
-    // Super Skill
-    getSuperSkills,
-    getSuperSkillById,
-    getSuperSkillBySkillId,
-    createSuperSkill,
-    updateSuperSkill,
-    deleteSuperSkill,
-    // Gemstone
-    getGemstones,
-    getGemstoneById,
-    createGemstone,
-    updateGemstone,
-    deleteGemstone,
-    // Rank
-    getRanksByType,
-    getRankByType,
-    getRanks,
-    createRank,
-    updateRank,
-    deleteRank,
-    upsertRank,
-    // Utility
-    deleteAllUserData,
-    getOnlineCount,
-    getTotalUserCount,
-    // Composite / Convenience (used by handlers)
-    createCompleteUser,
-    getGuildByUser,
-    getShopData,
-    getDungeonProgress,
+
+    // Arena operations
     getArenaData,
+
+    // Tower operations
     getTowerData,
+
+    // Ball war operations
     getBallWarData,
-    getOnlineUserIds
+
+    // Battle operations
+    createBattle,
+    getBattle,
+    updateBattleStatus,
+
+    // Rank operations
+    getRankByType,
+
+    // Super Skill operations
+    getSuperSkills,
+
+    // Gemstone operations
+    getGemstones,
+
+    // Resonance operations
+    getResonance,
+
+    // Expedition operations
+    getExpedition,
+
+    // Entrust operations
+    getEntrust,
+
+    // Online tracking
+    getOnlineCount,
+    getOnlineUserIds,
+
+    // Bulk creation
+    createCompleteUser
 };
