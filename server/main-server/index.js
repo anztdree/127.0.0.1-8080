@@ -147,55 +147,58 @@ function registerHandler(type, action, handlerFn) {
 const handlerFs = require('fs');
 
 const handlersDir = path.join(__dirname, 'handlers');
-if (handlerFs.existsSync(handlersDir)) {
-    const handlerFiles = handlerFs.readdirSync(handlersDir).filter(f => f.endsWith('.js'));
-    for (const file of handlerFiles) {
-        const handlerFn = require(path.join(handlersDir, file));
-        // Filename convention: enterGame.js → type='user', action='enterGame'
-        // Override dengan module.handlerKey jika ada
-        const handlerKey = handlerFn.handlerKey || `user.${file.replace('.js', '')}`;
-        const [type, action] = handlerKey.split('.');
-        registerHandler(type, action, handlerFn);
+
+/**
+ * Recursive handler loader
+ * Convention: folder name = type, file name (without .js) = action
+ * e.g. handlers/user/enterGame.js → type='user', action='enterGame'
+ * Override with module.exports.handlerKey if defined
+ */
+function loadHandlers(dir) {
+    if (!handlerFs.existsSync(dir)) return 0;
+
+    const entries = handlerFs.readdirSync(dir, { withFileTypes: true });
+    let count = 0;
+
+    for (const entry of entries) {
+        const fullPath = path.join(dir, entry.name);
+
+        if (entry.isDirectory()) {
+            // Recurse into subdirectory
+            count += loadHandlers(fullPath);
+        } else if (entry.name.endsWith('.js')) {
+            try {
+                const handlerFn = require(fullPath);
+
+                // Derive type from parent folder, action from filename
+                // e.g. /path/to/handlers/user/enterGame.js → type='user', action='enterGame'
+                const relPath = path.relative(handlersDir, fullPath);
+                const parts = relPath.split(path.sep);
+                const type = parts.length > 1 ? parts[0] : 'user';
+                const action = entry.name.replace('.js', '');
+
+                // Allow override via module.exports.handlerKey
+                const handlerKey = handlerFn.handlerKey || `${type}.${action}`;
+                const [hType, hAction] = handlerKey.split('.');
+
+                registerHandler(hType, hAction, handlerFn);
+                count++;
+            } catch (err) {
+                logger.log('ERROR', 'HANDLER', `Failed to load handler: ${fullPath}`);
+                logger.detail('data', ['error', err.message]);
+            }
+        }
     }
-    logger.log('INFO', 'HANDLER', `Loaded ${handlerFiles.length} handler(s) from handlers/`);
+
+    return count;
+}
+
+const handlerCount = loadHandlers(handlersDir);
+if (handlerCount > 0) {
+    logger.log('INFO', 'HANDLER', `Loaded ${handlerCount} handler(s) from handlers/`);
 } else {
-    logger.log('WARN', 'HANDLER', 'handlers/ directory not found');
+    logger.log('WARN', 'HANDLER', 'No handlers loaded from handlers/');
 }
-
-/**
- * Handler: user.registChat
- * Referensi: main-server.md v4.0 Section 3.1a, 8.1
- */
-function handleRegistChat(request, session) {
-    const { userId } = request;
-
-    logger.log('INFO', 'REGCHAT', 'registChat request');
-    logger.detail('data', ['userId', userId]);
-
-    // RegistChat hanya mengembalikan status sukses
-    // Chat-Server handle di port 8002
-    return responseHelper.buildSuccess({ registChat: 1 });
-}
-
-/**
- * Handler: user.getBulletinBrief
- * Referensi: main-server.md v4.0 Section 3.1a, 8.1
- */
-function handleGetBulletinBrief(request, session) {
-    const userId = request.userId;
-
-    logger.log('INFO', 'ENTER', 'getBulletinBrief request');
-    logger.detail('data', ['userId', userId]);
-
-    // Get bulletin dari noticeContent.json
-    const noticeContent = jsonLoader.get('noticeContent');
-
-    return responseHelper.buildSuccess(noticeContent || {});
-}
-
-// Register built-in handlers (non-file handlers)
-registerHandler('user', 'registChat', handleRegistChat);
-registerHandler('user', 'getBulletinBrief', handleGetBulletinBrief);
 
 // ═══════════════════════════════════════════════════════════════
 // SOCKET.IO CONNECTION HANDLER
