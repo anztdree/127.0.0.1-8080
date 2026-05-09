@@ -27,13 +27,19 @@ function resolveResourcePath() {
     }
 
     // 2. Deploy path (common setup)
-    candidates.push('/var/www/html/127.0.0.1-8000/resource/json');
+    candidates.push('/var/www/html/resource/json');
 
     // 3. Relative from this file
-    candidates.push(path.join(__dirname, '..', '..', '127.0.0.1-8000', 'resource', 'json'));
+    candidates.push(path.join(__dirname, '..', '..', 'html', 'resource', 'json'));
 
     // 4. Repo fallback
     candidates.push(path.join(__dirname, '..', '..', 'repo', 'resource', 'json'));
+
+    // 5. repo-game fallback (current project structure)
+    candidates.push(path.join(__dirname, '..', '..', '..', 'repo-game', 'resource', 'json'));
+
+    // 6. download fallback
+    candidates.push(path.join(__dirname, '..', '..', '..', 'download', 'resource', 'json'));
 
     for (const p of candidates) {
         try {
