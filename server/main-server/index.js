@@ -8,8 +8,7 @@
  * Database: Pure LocalStorage API (db.js)
  * Protocol: handler.process (single event for all actions)
  *
- * Handlers: user/enterGame, user/registChat, user/getBulletinBrief,
- *           friend/friendServerAction, heroImage/getAll
+ * Handlers: user/enterGame
  *
  * ═══════════════════════════════════════════════════════════════
  * BUG FIX LOG
@@ -18,10 +17,6 @@
  * [FIX-003] Circular reference safety in buildDataResponse
  *   Added try-catch around JSON.stringify with detailed error logging
  *   If circular detected, identifies exact field causing the issue
- *
- * [FIX-004] friendServerAction handler stub
- *   Server cannot start without this file — created minimal stub
- *   Returns ret=4 (unknown action) until proper implementation
  *
  * [FIX-005] Super detail logging throughout
  *   Every step logged with context, timing, and data sizes
@@ -35,22 +30,6 @@ const config = require('./config');
 const db = require('./db');
 const tea = require('./tea');
 const enterGame = require('./handlers/user/enterGame');
-const registChat = require('./handlers/user/registChat');
-const getBulletinBrief = require('./handlers/user/getBulletinBrief');
-
-// [FIX-004] friendServerAction — use try-catch so server can start even if file missing
-let friendServerAction;
-try {
-    friendServerAction = require('./handlers/friend/friendServerAction');
-} catch (err) {
-    logger.log('WARN', 'FRIEND', 'friendServerAction.js NOT FOUND — using stub (returns ret=4)');
-    friendServerAction = function(request, ctx) {
-        ctx.logger.log('WARN', 'FRIEND', `friendServerAction STUB called — action=${request.action || 'unknown'}`);
-        return ctx.buildErrorResponse(4);
-    };
-}
-
-const heroImageGetAll = require('./handlers/heroImage/getAll');
 
 // ─── Socket.IO 2.5.1 Setup ───
 const io = require('socket.io')(config.port, {
@@ -318,15 +297,7 @@ async function validateLoginToken(loginToken, userId) {
 // Handler registry: { type: { action: handlerFn } }
 const ACTION_HANDLERS = {
     user: {
-        enterGame: enterGame,
-        registChat: registChat,
-        getBulletinBrief: getBulletinBrief
-    },
-    friend: {
-        friendServerAction: friendServerAction
-    },
-    heroImage: {
-        getAll: heroImageGetAll
+        enterGame: enterGame
     }
 };
 
