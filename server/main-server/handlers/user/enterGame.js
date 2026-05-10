@@ -123,6 +123,29 @@
  * [FIX-004] Super detail logging — every step, every field, every value
  *   CAUSE: Previous logs too vague, cannot debug silent errors
  *   FIX: Step-by-step logging with field counts, data sizes, validation checks
+ *
+ * [FIX-005] imprint._items, weapon._items, genki._items — ARRAY vs OBJECT
+ *   TRACE: L114925 (imprint), L130938 (weapon), L132158 (genki) — all use for(var o in n)
+ *   CAUSE: for...in iterates OBJECT keys, not array indices.
+ *     Server sent [] (empty array) → for...in on array iterates index strings "0","1"...
+ *     For existing users with items stored as array indices → WRONG key format on client
+ *   FIX: Changed from [] to {} for all three _items containers
+ *
+ * [FIX-006] hero._heroStar wrong value for new starter hero
+ *   TRACE: L134098 — u[d].star == o.heroStar lookup in wakeup config
+ *   CAUSE: heroConfig.wakeupMax is a max LEVEL value, NOT a star count.
+ *     Client uses _heroStar as star number to match against config entries.
+ *     Sending wakeupMax (e.g. 80) → no config match → wrong level cap
+ *   FIX: _heroStar = 0 (new hero starts at 0 stars, always)
+ *
+ * [FIX-007] Dead fields removal — client never reads these (0 refs in 244K+ lines)
+ *   TRACE: Full-text search of main.min(unminfy).js for each field name
+ *   REMOVED:
+ *     summon._logicInfo, summon._haveCommonGuide, summon._haveSuperGuide, summon._firstDiamond10
+ *     hero._resonanceType, hero._version (in hero context)
+ *     training._enemyHp
+ *     scheduleInfo._commentedHeroes
+ *   NOTE: These may be needed for server-side logic — store in DB separately if needed
  */
 
 // ─── Currency/Attribute IDs — main.min.js L82352-82360 ───
@@ -564,15 +587,8 @@ function buildNewUserData(userId, request, ctx) {
     // Also: SummonSingleton.setSummomLogList reads e.summonLog
     const summonEnergy = (summonRes['1'] && summonRes['1'].summonEnergy) || 10;
     const summonTimes = {};
-    const summonLogicInfo = {};
     for (const [poolId, poolData] of Object.entries(summonRes)) {
         summonTimes[poolId] = 0;
-        summonLogicInfo[poolId] = {
-            _summonSPCount: 0,
-            _summonSPSubCount: 0,
-            _noSPCount: 0,
-            _noSSPCount: 0
-        };
     }
 
     ctx.logger.log('DEBUG', 'ENTER', `[BUILD] Summon config: energy=${summonEnergy} pools=${Object.keys(summonTimes).length}`);
@@ -664,19 +680,19 @@ function buildNewUserData(userId, request, ctx) {
         backpackLevel: 1,
 
         // ═══ 6. imprint — setSign ═══
-        // Traced: setSign reads e.imprint._items — iterates for(o in n), each item → setSignInfoModel
-        // _items is ARRAY [] (not object), each element has sign properties
+        // Traced: setSign (L114925) — for(var o in n) iterates e.imprint._items as OBJECT
+        // _items is OBJECT {} (NOT array) — client uses for...in
         imprint: {
             _id: userId,
-            _items: []
+            _items: {}
         },
 
         // ═══ 7. weapon — EquipInfoManager.readByData ═══
-        // Traced: readByData reads e.weapon._items — iterates for(s in i), each → WeaponDataModel.deserialize
-        // _items is ARRAY [] (not object)
+        // Traced: readByData (L130938) — for(var s in i) iterates e.weapon._items as OBJECT
+        // _items is OBJECT {} (NOT array) — client uses for...in
         weapon: {
             _id: userId,
-            _items: []
+            _items: {}
         },
 
         // ═══ 8. summon — setSummon ═══
@@ -684,13 +700,9 @@ function buildNewUserData(userId, request, ctx) {
         summon: {
             _id: userId,
             _energy: summonEnergy,
-            _haveCommonGuide: false,
-            _haveSuperGuide: false,
             _canCommonFreeTime: now,
             _canSuperFreeTime: now,
             _summonTimes: summonTimes,
-            _logicInfo: summonLogicInfo,
-            _firstDiamond10: false,
             _wishList: [],
             _wishVersion: 0
         },
@@ -774,7 +786,6 @@ function buildNewUserData(userId, request, ctx) {
             _dragonExchangeSSSPoolId: 0,
             _clickTimeGift: false,
             _trainingBuyCount: 0,
-            _commentedHeroes: {},
             _bossCptTimes: constant.bossAttackTimes || 6,
             _bossCptBuyCount: 0,
             bossFightTime: 0,
@@ -953,7 +964,6 @@ function buildNewUserData(userId, request, ctx) {
             _surpriseReward: null,
             _questionId: 0,
             _enemyId: 0,
-            _enemyHp: {},
             _award: null
         },
 
@@ -1322,10 +1332,11 @@ function buildNewUserData(userId, request, ctx) {
         },
 
         // ═══ 92. genki — EquipInfoManager.readByData reads e.genki ═══
-        // Traced: if(e.genki) → genkiDataModel.deserialize(e.genki)
+        // Traced: GenkiModel.deserialize (L132158) — for(var o in n) iterates e.genki._items as OBJECT
+        // _items is OBJECT {} (NOT array) — client uses for...in
         genki: {
             _id: userId,
-            _items: [],
+            _items: {},
             _curSmeltNormalExp: 0,
             _curSmeltSuperExp: 0
         },
@@ -1390,7 +1401,7 @@ function buildStarterHero(heroId, displayId, level, heroConfig, now, constant) {
             _level: level,
             _evolveLevel: 0
         },
-        _heroStar: heroConfig.wakeupMax || 0,
+        _heroStar: 0,
         _superSkillLevel: 0,
         _potentialLevel: {},
         _superSkillResetCount: 0,
@@ -1417,9 +1428,7 @@ function buildStarterHero(heroId, displayId, level, heroConfig, now, constant) {
         _expeditionMaxLevel: 0,
         _gemstoneSuitId: 0,
         _linkTo: [],
-        _linkFrom: '',
-        _resonanceType: 0,
-        _version: heroConfig.version ? String(heroConfig.version) : ''
+        _linkFrom: ''
     };
 }
 
