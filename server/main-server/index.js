@@ -8,7 +8,7 @@
  * Database: Pure LocalStorage API (db.js)
  * Protocol: handler.process (single event for all actions)
  *
- * Handlers: user/enterGame
+ * Handlers: user/enterGame, user/registChat
  *
  * ═══════════════════════════════════════════════════════════════
  * BUG FIX LOG
@@ -30,6 +30,7 @@ const config = require('./config');
 const db = require('./db');
 const tea = require('./tea');
 const enterGame = require('./handlers/user/enterGame');
+const registChat = require('./handlers/user/registChat');
 
 // ─── Socket.IO 2.5.1 Setup ───
 const io = require('socket.io')(config.port, {
@@ -333,7 +334,8 @@ async function validateLoginToken(loginToken, userId) {
 // Handler registry: { type: { action: handlerFn } }
 const ACTION_HANDLERS = {
     user: {
-        enterGame: enterGame
+        enterGame: enterGame,
+        registChat: registChat
     }
 };
 
