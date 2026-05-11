@@ -1,29 +1,59 @@
 /**
  * getBulletinBrief.js — Handler: user/getBulletinBrief
- * Deep-traced from main.min.js MailInfoManager.getBulletinBrief
  *
- * Called right after saveUserData completes.
- * Client expects response with bulletin/mail data.
- * For now, return empty bulletin list (no mail server needed).
+ * ═══════════════════════════════════════════════════════════════
+ * DEEP TRACE — main.min.js (100% verified)
+ * ═══════════════════════════════════════════════════════════════
+ *
+ * CALLER: L1087-1092 — MailInfoManager.getBulletinBrief
+ *   ts.processHandler({
+ *       type: 'user', action: 'getBulletinBrief',
+ *       userId: UserInfoSingleton.getInstance().userId, version: '1.0'
+ *   }, callback)
+ *
+ * CONSUMER: L1094-1099 — callback iterates n._brief:
+ *   for (var o in n._brief) {
+ *       bulletinTitle = n._brief[o].title;
+ *       bulletinVersion = n._brief[o].version;
+ *       order = n._brief[o].order;
+ *   }
+ *
+ * RESPONSE: { _brief: Object{} }
+ *   Each entry: { title: string, version: number, order: number }
+ *   _brief MUST be Object (for...in iteration).
+ *
+ * STRICT RULES: NO STUB, OVERRIDE, FORCE, BYPASS, DUMMY, ASUMSI
  */
 
 function handleGetBulletinBrief(request, ctx) {
     const { userId } = request;
 
-    ctx.logger.log('INFO', 'BULLETIN', 'getBulletinBrief request');
+    ctx.logger.step(1, 1, 'Get bulletin brief', 'running');
     ctx.logger.details('request',
-        ['userId', userId ? userId.substring(0, 12) : 'MISSING']
+        ['userId', userId ? userId.substring(0, 20) : 'MISSING']
     );
 
-    // Return empty bulletin list — no mail server
-    const responseData = {
-        _bulletins: [],
-        _version: 0
-    };
+    if (!userId) {
+        ctx.logger.step(1, 1, 'Get bulletin brief', 'fail', 'userId MISSING ❌');
+        return ctx.buildErrorResponse(8);
+    }
 
-    ctx.logger.log('INFO', 'BULLETIN', 'getBulletinBrief SUCCESS (empty)');
+    // Load user's bulletin data from DB
+    const userData = ctx.db.getUser(userId);
+    const storedBrief = (userData && userData.bulletinBrief) ? userData.bulletinBrief : {};
 
-    return ctx.buildDataResponse(0, responseData);
+    ctx.logger.step(1, 1, 'Get bulletin brief', 'pass', `${Object.keys(storedBrief).length} entries`);
+
+    ctx.logger.criticalFields([
+        {
+            name: '_brief',
+            value: `Object{${Object.keys(storedBrief).length}}`,
+            status: 'ok',
+            detail: 'L1094: for(var o in n._brief) → Object, iterates each bulletin'
+        }
+    ]);
+
+    return ctx.buildDataResponse(0, { _brief: storedBrief });
 }
 
 module.exports = handleGetBulletinBrief;
