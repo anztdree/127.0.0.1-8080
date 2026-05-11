@@ -146,6 +146,18 @@
  *     training._enemyHp
  *     scheduleInfo._commentedHeroes
  *   NOTE: These may be needed for server-side logic — store in DB separately if needed
+ *
+ * [FIX-008] lastTeam[9]._team hero pre-placed — tutorial STUCK at guide 2106
+ *   TRACE: main.min.js L96167 — firstLoginSetMyTeam(e)
+ *     for(var l in i) { u._heroId = i[l]._heroId; u._position = i[l]._position; a.push(u); }
+ *     → iterates _team object keys → creates BattleTeamItem for each → pushes to array
+ *     If _team has hero entries → client creates team with heroes pre-placed
+ *   CAUSE: Server sent {0: {_heroId, _position: 0}} in lastTeam[9]._team for new user
+ *     Client L104862: tutorial sets HANGUP team via setMyTeamByType AFTER battle
+ *     But if team already has heroes → tutorial flow breaks at guide 2106
+ *   FIX: Send _team: {} (empty object) for new users
+ *     Client iterates {} → pushes nothing → o._team = [] → tutorial teaches placement correctly
+ *   EVIDENCE: Critical Fields Audit caught this: lastTeam[9]._team = {1} HERO PRE-PLACED!
  */
 
 // ─── Currency/Attribute IDs — main.min.js L82352-82360 ───
@@ -327,148 +339,225 @@ async function handleEnterGame(request, ctx) {
     const startTime = Date.now();
     const { loginToken, userId, serverId, version, language, gameVersion } = request;
 
-    ctx.logger.log('INFO', 'ENTER', '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     ctx.logger.log('INFO', 'ENTER', 'enterGame REQUEST RECEIVED');
     ctx.logger.details('request',
         ['userId', userId || 'MISSING'],
         ['serverId', String(serverId)],
-        ['loginToken', loginToken ? loginToken.substring(0, 12) + '...' : 'MISSING'],
-        ['version', version || ''],
-        ['language', language || ''],
+        ['loginToken', loginToken ? loginToken.substring(0, 15) + '...' : 'MISSING'],
         ['gameVersion', gameVersion || '']
     );
 
     // ─── Step 1: Validate required fields ───
-    ctx.logger.log('DEBUG', 'ENTER', '[STEP-1] Validating required fields...');
+    let warningCount = 0;
+    let errorCount = 0;
+    ctx.logger.step(1, 10, 'Required fields check', 'running');
     if (!loginToken || !userId || serverId === undefined) {
-        ctx.logger.log('WARN', 'ENTER', `[STEP-1] FAIL → loginToken=${!!loginToken} userId=${!!userId} serverId=${serverId !== undefined} → ret=8`);
+        errorCount++;
+        ctx.logger.errorBanner({
+            module: 'ENTER',
+            step: '01/10 Required Fields Check',
+            message: 'Required fields MISSING — request rejected',
+            impact: 'Cannot authenticate user — game cannot proceed',
+            fix: 'Client must send loginToken + userId + serverId'
+        });
         return ctx.buildErrorResponse(8);
     }
-    ctx.logger.log('DEBUG', 'ENTER', '[STEP-1] OK — all required fields present');
+    ctx.logger.step(1, 10, 'Required fields check', 'pass', 'All present');
 
     // ─── Step 2: Validate loginToken via SDK-Server ───
-    ctx.logger.log('DEBUG', 'ENTER', '[STEP-2] Validating loginToken via SDK-Server...');
+    ctx.logger.step(2, 10, 'Token auth via SDK-Server', 'running');
     const tokenStart = Date.now();
     const tokenValid = await ctx.validateLoginToken(loginToken, userId);
     const tokenDuration = Date.now() - tokenStart;
     if (!tokenValid) {
-        ctx.logger.log('WARN', 'ENTER', `[STEP-2] FAIL → loginToken invalid (SDK check took ${tokenDuration}ms) → ret=37`);
+        errorCount++;
+        ctx.logger.errorBanner({
+            module: 'ENTER',
+            step: '02/10 Token Auth via SDK-Server',
+            message: 'loginToken INVALID — authentication rejected',
+            trace: 'SDK-Server API',
+            impact: 'User cannot enter game — security block',
+            fix: 'Return error code 37 to client'
+        });
+        ctx.logger.step(2, 10, 'Token auth via SDK-Server', 'fail', tokenDuration + 'ms ❌');
         return ctx.buildErrorResponse(37);
     }
-    ctx.logger.log('DEBUG', 'ENTER', `[STEP-2] OK — loginToken valid (${tokenDuration}ms)`);
+    ctx.logger.step(2, 10, 'Token auth via SDK-Server', 'pass', tokenDuration + 'ms ✅');
 
     // ─── Step 3: Validate serverId ───
-    ctx.logger.log('DEBUG', 'ENTER', `[STEP-3] Validating serverId: got=${serverId} expected=${ctx.config.serverId}`);
+    ctx.logger.step(3, 10, 'ServerId validation', 'running');
     if (parseInt(serverId) !== ctx.config.serverId) {
-        ctx.logger.log('WARN', 'ENTER', `[STEP-3] FAIL → serverId mismatch → ret=4`);
+        errorCount++;
+        ctx.logger.errorBanner({
+            module: 'ENTER',
+            step: '03/10 ServerId Validation',
+            message: 'serverId MISMATCH — got ' + serverId + ', want ' + ctx.config.serverId,
+            impact: 'User connected to wrong server instance',
+            fix: 'Return error code 4 to client'
+        });
+        ctx.logger.step(3, 10, 'ServerId validation', 'fail', 'MISMATCH ❌');
         return ctx.buildErrorResponse(4);
     }
-    ctx.logger.log('DEBUG', 'ENTER', '[STEP-3] OK — serverId matches');
+    ctx.logger.step(3, 10, 'ServerId validation', 'pass', serverId + ' == ' + ctx.config.serverId + ' ✅');
 
     // ─── Step 4: Check new vs existing user ───
-    ctx.logger.log('DEBUG', 'ENTER', '[STEP-4] Checking user existence in DB...');
+    const collectedWarnings = []; // v3.0: collect warnings for warningSection()
+    ctx.logger.step(4, 10, 'User existence check', 'running');
     const existingData = ctx.db.getUser(userId);
     const isNewUser = !existingData;
 
     if (isNewUser) {
-        ctx.logger.log('INFO', 'ENTER', `[STEP-4] NEW USER — userId=${userId} not found in DB`);
+        ctx.logger.step(4, 10, 'User existence check', 'new', 'NEW USER 🌟');
     } else {
         const existingKeys = Object.keys(existingData).length;
-        ctx.logger.log('INFO', 'ENTER', `[STEP-4] EXISTING USER — userId=${userId} found in DB (${existingKeys} keys)`);
-        // Log which fields exist in stored data
+        ctx.logger.step(4, 10, 'User existence check', 'pass', 'EXISTING USER (' + existingKeys + ' keys)');
         ctx.logger.log('DEBUG', 'ENTER', `[STEP-4] Existing data keys: ${Object.keys(existingData).join(', ')}`);
         // Check if stored training has _award (potential circular source)
         if (existingData.training && existingData.training._award !== undefined) {
-            ctx.logger.log('WARN', 'ENTER', `[STEP-4] EXISTING training._award EXISTS — value type=${typeof existingData.training._award} — potential circular ref source`);
+            collectedWarnings.push({
+                id: 'W001',
+                message: 'training._award EXISTS in stored data — potential circular ref',
+                got: 'type=' + typeof existingData.training._award,
+                impact: 'Client bug L121387 may create nesting loop on re-login',
+                fix: 'stripCircularReferences will sanitize before response'
+            });
+            warningCount++;
         }
     }
 
     // ─── Step 5: Build or load user data ───
     let userData;
+    const buildStart = Date.now();
     if (isNewUser) {
-        ctx.logger.log('DEBUG', 'ENTER', '[STEP-5] Building NEW user data...');
-        const buildStart = Date.now();
+        ctx.logger.step(5, 10, 'Build user data', 'running');
         userData = buildNewUserData(userId, request, ctx);
         const buildDuration = Date.now() - buildStart;
-        const buildKeys = Object.keys(userData).length;
-        ctx.logger.log('DEBUG', 'ENTER', `[STEP-5] NEW user data built: ${buildKeys} keys (${buildDuration}ms)`);
+        ctx.logger.step(5, 10, 'Build user data', 'ok', Object.keys(userData).length + ' keys (' + buildDuration + 'ms)');
     } else {
-        ctx.logger.log('DEBUG', 'ENTER', '[STEP-5] Updating EXISTING user data (deep clone first)...');
-        const updateStart = Date.now();
+        ctx.logger.step(5, 10, 'Build user data', 'running');
         userData = updateExistingUser(existingData, request, ctx);
-        const updateDuration = Date.now() - updateStart;
-        ctx.logger.log('DEBUG', 'ENTER', `[STEP-5] Existing user data updated (${updateDuration}ms)`);
+        const buildDuration = Date.now() - buildStart;
+        ctx.logger.step(5, 10, 'Build user data', 'pass', Object.keys(userData).length + ' keys (' + buildDuration + 'ms)');
     }
 
     // ─── Step 6: Circular reference safety check ───
-    ctx.logger.log('DEBUG', 'ENTER', '[STEP-6] Running circular reference safety check...');
+    ctx.logger.step(6, 10, 'Circular reference check', 'running');
     const circRemoved = stripCircularReferences(userData, ctx.logger);
     if (circRemoved > 0) {
-        ctx.logger.log('WARN', 'ENTER', `[STEP-6] REMOVED ${circRemoved} circular reference(s) from userData`);
+        warningCount += circRemoved;
+        ctx.logger.warnCallout(circRemoved + ' circular reference(s) DETECTED and REMOVED', {
+            source: 'main.min.js L121387 — PadipataInfoManager.setPadipataModel',
+            action: 'Stripped self-referencing _award fields (removed=' + circRemoved + ')',
+            reason: 'Client bug: _award = entire training object → creates nesting loop on re-login',
+            module: 'CIRCULAR'
+        });
+        ctx.logger.step(6, 10, 'Circular reference check', 'warn', circRemoved + ' circular ref(s) removed ⚠️');
     } else {
-        ctx.logger.log('DEBUG', 'ENTER', '[STEP-6] No circular references detected');
+        ctx.logger.step(6, 10, 'Circular reference check', 'pass', '0 circular refs ✅');
     }
 
-    // ─── Step 7: Validate userData structure ───
-    ctx.logger.log('DEBUG', 'ENTER', '[STEP-7] Validating userData structure...');
+    // ─── Step 7: Validate userData structure + Critical Fields Audit ───
+    ctx.logger.step(7, 10, 'Structure validation', 'running');
     validateUserData(userData, isNewUser, ctx.logger);
 
+    // v3.0: Critical Fields Audit — ALWAYS shows regardless of LOG_LEVEL
+    const auditFields = [];
+    if (isNewUser && userData.lastTeam && userData.lastTeam._lastTeamInfo && userData.lastTeam._lastTeamInfo[9]) {
+        const teamKeys = Object.keys(userData.lastTeam._lastTeamInfo[9]._team || {}).length;
+        auditFields.push({ name: 'lastTeam[9]._team', value: '{' + teamKeys + '}', status: teamKeys === 0 ? 'ok' : 'fail', detail: teamKeys === 0 ? 'EMPTY — tutorial safe (guide 2106)' : 'HERO PRE-PLACED! → tutorial STUCK' });
+    }
+    const hasAward = userData.training && userData.training.hasOwnProperty('_award');
+    auditFields.push({ name: 'training._award', value: hasAward ? String(userData.training._award === null ? 'null' : 'object') : 'MISSING', status: hasAward ? 'ok' : 'fail', detail: hasAward ? 'present — FIX-001 safe' : 'MISSING → client L121387 assigns _award=entire param' });
+    const hasLevel = !!(userData.user && userData.user._attribute && userData.user._attribute._items && userData.user._attribute._items[PLAYERLEVELID]);
+    auditFields.push({ name: 'user._attribute._items[' + PLAYERLEVELID + ']', value: hasLevel ? 'present' : 'MISSING', status: hasLevel ? 'ok' : 'fail', detail: hasLevel ? 'Level=' + userData.user._attribute._items[PLAYERLEVELID]._num : 'NO LEVEL → client cannot render UI' });
+    const imprintOk = userData.imprint && userData.imprint._items && !Array.isArray(userData.imprint._items);
+    auditFields.push({ name: 'imprint._items', value: imprintOk ? 'Object{}' : 'MISSING', status: imprintOk ? 'ok' : 'fail', detail: 'FIX-005: client L114925 uses for...in → needs Object' });
+    const weaponOk = userData.weapon && userData.weapon._items && !Array.isArray(userData.weapon._items);
+    auditFields.push({ name: 'weapon._items', value: weaponOk ? 'Object{}' : 'MISSING', status: weaponOk ? 'ok' : 'fail', detail: 'FIX-005: client L130938 uses for...in → needs Object' });
+    const genkiOk = userData.genki && userData.genki._items && !Array.isArray(userData.genki._items);
+    auditFields.push({ name: 'genki._items', value: genkiOk ? 'Object{}' : 'MISSING', status: genkiOk ? 'ok' : 'fail', detail: 'FIX-005: client L132158 uses for...in → needs Object' });
+    const criticalStats = ctx.logger.criticalFields(auditFields);
+    if (criticalStats.failed > 0) errorCount += criticalStats.failed;
+    if (criticalStats.warned > 0) warningCount += criticalStats.warned;
+    ctx.logger.step(7, 10, 'Structure validation', criticalStats.failed > 0 ? 'warn' : 'pass', Object.keys(userData).length + ' keys audited' + (criticalStats.warned > 0 ? ' (' + criticalStats.warned + ' warnings)' : ''));
+
+    // ─── Warning Section — display all collected warnings ───
+    if (collectedWarnings.length > 0) {
+        ctx.logger.warningSection(collectedWarnings);
+    }
+
     // ─── Step 8: Verify JSON.stringify works BEFORE saving ───
-    ctx.logger.log('DEBUG', 'ENTER', '[STEP-8] Pre-flight JSON.stringify check...');
+    ctx.logger.step(8, 10, 'JSON serialization test', 'running');
     let jsonSize = 0;
     try {
         const jsonStr = JSON.stringify(userData);
         jsonSize = jsonStr.length;
-        ctx.logger.log('DEBUG', 'ENTER', `[STEP-8] JSON.stringify OK — size=${jsonSize} bytes`);
+        ctx.logger.step(8, 10, 'JSON serialization test', 'pass', 'OK (' + jsonSize.toLocaleString() + ' bytes)');
     } catch (err) {
-        ctx.logger.log('ERROR', 'ENTER', `[STEP-8] JSON.stringify FAILED: ${err.message}`);
-        // Identify which field causes the failure
+        errorCount++;
+        const badFields = [];
         const keys = Object.keys(userData);
-        for (const key of keys) {
-            try {
-                JSON.stringify(userData[key]);
-            } catch (innerErr) {
-                ctx.logger.log('ERROR', 'ENTER', `[STEP-8] Circular ref in field: "${key}" → ${innerErr.message}`);
-            }
-        }
+        for (const key of keys) { try { JSON.stringify(userData[key]); } catch (e) { badFields.push(key); } }
+        ctx.logger.errorBanner({
+            module: 'ENTER', step: '08/10 JSON Serialization Test',
+            message: 'JSON.stringify FAILED — circular reference in ' + badFields.length + ' field(s)',
+            trace: 'stripCircularReferences missed something',
+            impact: 'Response CANNOT be sent — client receives nothing',
+            fix: badFields.length > 0 ? 'Check fields: ' + badFields.join(', ') : 'Unknown field',
+            err: err
+        });
+        ctx.logger.step(8, 10, 'JSON serialization test', 'fail', err.message);
         return ctx.buildErrorResponse(1);
     }
 
     // ─── Step 9: Save user data ───
-    ctx.logger.log('DEBUG', 'ENTER', `[STEP-9] Saving user data to DB (${jsonSize} bytes)...`);
+    ctx.logger.step(9, 10, 'Database save', 'running');
     const saveStart = Date.now();
     ctx.db.saveUser(userId, userData);
-    const saveDuration = Date.now() - saveStart;
-    ctx.logger.log('DEBUG', 'ENTER', `[STEP-9] User data saved (${saveDuration}ms)`);
+    ctx.logger.step(9, 10, 'Database save', 'pass', (Date.now() - saveStart) + 'ms 💾');
 
     // ─── Step 10: Build response ───
-    ctx.logger.log('DEBUG', 'ENTER', '[STEP-10] Building response (buildDataResponse)...');
+    ctx.logger.step(10, 10, 'Response build', 'running');
     let response;
     try {
         response = ctx.buildDataResponse(0, userData);
     } catch (err) {
-        ctx.logger.log('ERROR', 'ENTER', `[STEP-10] buildDataResponse FAILED: ${err.message}`);
+        errorCount++;
+        ctx.logger.errorBanner({
+            module: 'ENTER', step: '10/10 Response Build',
+            message: 'buildDataResponse FAILED: ' + err.message,
+            impact: 'User data is valid but response serialization failed',
+            fix: 'Return error code 1 to client', err: err
+        });
+        ctx.logger.step(10, 10, 'Response build', 'fail', err.message);
         return ctx.buildErrorResponse(1);
     }
+    ctx.logger.step(10, 10, 'Response build', 'pass', 'OK 📤');
 
-    // ─── Final summary ───
+    // ─── Final Summary — v3.0 Summary Card ───
     const totalDuration = Date.now() - startTime;
     const keyCount = Object.keys(userData).length;
-    const compressedStr = response.compress ? 'YES' : 'NO';
     const dataBytes = typeof response.data === 'string' ? response.data.length : 0;
+    const heroCount = userData.heros && userData.heros._heros ? Object.keys(userData.heros._heros).length : 0;
+    const diamondCount = userData.user && userData.user._attribute && userData.user._attribute._items && userData.user._attribute._items[DIAMONDID] ? (userData.user._attribute._items[DIAMONDID]._num || 0) : 0;
+    const userLevel = userData.user && userData.user._attribute && userData.user._attribute._items && userData.user._attribute._items[PLAYERLEVELID] ? (userData.user._attribute._items[PLAYERLEVELID]._num || 0) : 0;
 
-    ctx.logger.log('INFO', 'ENTER', '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    ctx.logger.log('INFO', 'ENTER', `enterGame ${isNewUser ? 'NEW' : 'EXISTING'} user — COMPLETE`);
-    ctx.logger.details('result',
-        ['userId', userId],
-        ['type', isNewUser ? 'NEW' : 'EXISTING'],
-        ['dataKeys', String(keyCount)],
-        ['jsonBytes', String(jsonSize)],
-        ['compressed', compressedStr],
-        ['responseBytes', String(dataBytes)],
-        ['totalDuration', totalDuration + 'ms']
-    );
-    ctx.logger.log('INFO', 'ENTER', '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    ctx.logger.summaryCard({
+        title: 'ENTER GAME COMPLETE',
+        userId: userId,
+        userType: isNewUser ? 'New User' : 'Returning User',
+        fields: keyCount,
+        heroes: heroCount,
+        diamond: diamondCount,
+        level: userLevel,
+        jsonSize: jsonSize,
+        respSize: dataBytes,
+        compressed: response.compress,
+        duration: totalDuration,
+        critical: criticalStats,
+        warnings: warningCount,
+        errors: errorCount
+    });
 
     return response;
 }
@@ -840,14 +929,17 @@ function buildNewUserData(userId, request, ctx) {
         currency: config.currency,
 
         // ═══ 18. lastTeam — UserInfoSingleton.firstLoginSetMyTeam(e.lastTeam._lastTeamInfo) ═══
-        // Traced: _lastTeamInfo keyed by LAST_TEAM_TYPE number, _team keyed by position
+        // Traced: L96167 — for(var n in e) iterates _lastTeamInfo, for(var l in i) iterates _team
+        //   Creates BattleTeamItem for each entry in _team → pushes to array → sets o._team = a[]
+        // LAST_TEAM_TYPE.HANGUP = 9 — hangup/AFK team used by tutorial
+        // FIX-008: _team MUST be {} for new users — tutorial guide 2106 expects empty team
+        //   Client L104862: setMyTeamByType(HANGUP, battleHero, superSkill) — sets team AFTER tutorial battle
+        //   If heroes pre-placed here → tutorial flow STUCK (guide 2106 cannot proceed)
         lastTeam: {
             _id: userId,
             _lastTeamInfo: {
                 [9]: {
-                    _team: {
-                        [0]: { _heroId: heroId, _position: 0 }
-                    },
+                    _team: {},
                     _superSkill: []
                 }
             }
