@@ -47,7 +47,7 @@ const actionCounters = new Map();
 // ─── Initialize serverOpenDate ───
 if (!config.serverOpenDate) {
     config.serverOpenDate = Date.now();
-    logger.log('INFO', 'CONFIG', `serverOpenDate initialized: ${config.serverOpenDate}`);
+    logger.log('INFO', 'CONFIG', `serverOpenDate auto-initialized: ${config.serverOpenDate}`);
 }
 
 // ─── Resource JSON Loader ───
@@ -60,31 +60,40 @@ function loadResource(name) {
         const raw = require('fs').readFileSync(filePath, 'utf-8');
         const data = JSON.parse(raw);
         resourceCache[name] = data;
-        logger.log('INFO', 'CONFIG', `Resource loaded: ${name}.json (${Object.keys(data).length} entries, ${raw.length} bytes)`);
+        logger.log('INFO', 'CONFIG', `Resource loaded: ${chalk.cyan(name + '.json')}`);
+        logger.details('resource',
+            ['entries', String(Object.keys(data).length)],
+            ['bytes', String(raw.length)],
+            ['path', filePath]
+        );
         return data;
     } catch (err) {
-        logger.log('WARN', 'CONFIG', `Resource not found: ${name}.json — ${err.message}`);
-        logger.log('DEBUG', 'CONFIG', `  → resourcePath=${config.resourcePath}`);
+        logger.log('WARN', 'CONFIG', `Resource NOT found: ${chalk.cyan(name + '.json')}`);
+        logger.details('error',
+            ['path', config.resourcePath],
+            ['reason', err.message]
+        );
         return null;
     }
 }
 
 // Pre-load critical resources
+logger.headerThin('LOADING RESOURCES');
 const constantJson = loadResource('constant');
 const heroJson = loadResource('hero');
 const summonJson = loadResource('summon');
 
 // Warn if critical resources are missing
 if (!constantJson) {
-    logger.log('ERROR', 'CONFIG', 'constant.json is MISSING — default values will be used for new users');
-    logger.log('ERROR', 'CONFIG', '  → Resource path searched: ' + config.resourcePath);
+    logger.log('ERROR', 'CONFIG', chalk.red('CRITICAL: constant.json is MISSING') + ' — defaults will be used');
 }
 if (!heroJson) {
-    logger.log('ERROR', 'CONFIG', 'hero.json is MISSING — starter hero will use minimal defaults');
+    logger.log('ERROR', 'CONFIG', chalk.red('CRITICAL: hero.json is MISSING') + ' — starter hero will be minimal');
 }
 if (!summonJson) {
-    logger.log('ERROR', 'CONFIG', 'summon.json is MISSING — summon defaults will be used');
+    logger.log('WARN', 'CONFIG', chalk.yellow('WARNING: summon.json is MISSING') + ' — summon defaults will be used');
 }
+logger.headerEnd();
 
 // ─── UUID Generator ───
 const { v4: uuidv4 } = require('uuid');
@@ -111,7 +120,12 @@ function safeStringify(obj, label) {
                 try {
                     JSON.stringify(obj[key]);
                 } catch (innerErr) {
-                    logger.log('ERROR', 'COMPRESS', `[safeStringify] Circular ref in field: "${key}" → ${innerErr.message}`);
+                    logger.log('ERROR', 'COMPRESS', `[safeStringify] Circular ref in field: "${key}"`);
+                    logger.details('field',
+                        ['name', key],
+                        ['type', typeof obj[key]],
+                        ['error', innerErr.message]
+                    );
 
                     // Try to go one level deeper
                     if (obj[key] && typeof obj[key] === 'object') {
@@ -120,7 +134,10 @@ function safeStringify(obj, label) {
                             try {
                                 JSON.stringify(obj[key][subKey]);
                             } catch (deepErr) {
-                                logger.log('ERROR', 'COMPRESS', `[safeStringify]   └─ Circular in "${key}.${subKey}" → ${deepErr.message}`);
+                                logger.details('nested',
+                                    ['path', `${key}.${subKey}`],
+                                    ['error', deepErr.message]
+                                );
                             }
                         }
                     }
@@ -160,32 +177,33 @@ function buildDataResponse(ret, dataObj) {
     const result = safeStringify(dataObj, 'buildDataResponse');
 
     if (result.error) {
-        logger.log('ERROR', 'COMPRESS', `[buildDataResponse] CANNOT stringify data — circular ref in field: ${result.circularField || 'unknown'}`);
-        logger.log('ERROR', 'COMPRESS', '[buildDataResponse] Returning error response ret=1 to prevent server crash');
+        logger.log('ERROR', 'COMPRESS', chalk.red(`CANNOT stringify — circular ref in: ${result.circularField || 'unknown'}`));
+        logger.log('ERROR', 'COMPRESS', 'Returning error response ret=1 to prevent server crash');
 
         // Try to strip the problematic field and retry
         if (result.circularField && dataObj[result.circularField]) {
-            logger.log('WARN', 'COMPRESS', `[buildDataResponse] Attempting to strip field "${result.circularField}" and retry...`);
-            const stripped = JSON.parse(JSON.stringify(dataObj)); // this will fail too if circular
-            // Actually we can't parse, so let's just delete the field and try again
+            logger.log('WARN', 'COMPRESS', `Attempting to strip field "${result.circularField}" and retry...`);
             const backup = dataObj[result.circularField];
             delete dataObj[result.circularField];
 
             const retry = safeStringify(dataObj, 'buildDataResponse (after strip)');
             if (retry.json) {
-                logger.log('WARN', 'COMPRESS', `[buildDataResponse] SUCCESS after stripping "${result.circularField}" — response will be incomplete`);
-                // Restore the field
+                logger.log('WARN', 'COMPRESS', chalk.yellow(`SUCCESS after stripping "${result.circularField}" — response incomplete`));
                 dataObj[result.circularField] = backup;
 
                 if (retry.json.length > config.compressionThreshold) {
                     const compressed = LZString.compressToUTF16(retry.json);
-                    logger.log('DEBUG', 'COMPRESS', `Compressed: ${retry.json.length} → ${compressed.length} chars`);
+                    const reduction = Math.round((1 - compressed.length / retry.json.length) * 100);
+                    logger.details('compress',
+                        ['original', retry.json.length + ' chars'],
+                        ['compressed', compressed.length + ' chars'],
+                        ['reduction', reduction + '%']
+                    );
                     return buildResponse(ret, compressed, true);
                 }
                 return buildResponse(ret, retry.json, false);
             }
 
-            // Restore even on failure
             dataObj[result.circularField] = backup;
         }
 
@@ -196,7 +214,13 @@ function buildDataResponse(ret, dataObj) {
     if (jsonStr.length > config.compressionThreshold) {
         const compressed = LZString.compressToUTF16(jsonStr);
         const reduction = Math.round((1 - compressed.length / jsonStr.length) * 100);
-        logger.log('DEBUG', 'COMPRESS', `Compressed: ${jsonStr.length} → ${compressed.length} chars (${reduction}% reduction)`);
+        logger.log('DEBUG', 'COMPRESS', `Compressing response data...`);
+        logger.details('compress',
+            ['original', jsonStr.length + ' chars'],
+            ['compressed', compressed.length + ' chars'],
+            ['reduction', reduction + '%'],
+            ['threshold', config.compressionThreshold + ' chars']
+        );
         return buildResponse(ret, compressed, true);
     }
     return buildResponse(ret, jsonStr, false);
@@ -219,7 +243,7 @@ function verifyUserWithSDKServer(userId) {
             timeout: 5000
         };
 
-        logger.log('DEBUG', 'SDKAPI', `[verifyUserWithSDKServer] HTTP GET → http://127.0.0.1:9999/user/info/${userId.substring(0, 12)}...`);
+        logger.log('DEBUG', 'SDKAPI', `HTTP GET → http://127.0.0.1:9999/user/info/${userId.substring(0, 16)}...`);
 
         const req = http.request(options, (res) => {
             let body = '';
@@ -229,22 +253,25 @@ function verifyUserWithSDKServer(userId) {
                 if (res.statusCode === 200) {
                     try {
                         const data = JSON.parse(body);
-                        logger.log('INFO', 'SDKAPI', `SDK-Server user verified`);
-                        logger.details('verify',
+                        logger.log('INFO', 'SDKAPI', chalk.green(`User verified via SDK-Server`));
+                        logger.details('response',
                             ['userId', userId],
                             ['httpStatus', String(res.statusCode)],
-                            ['responseBytes', String(body.length)],
+                            ['bodySize', String(body.length) + ' bytes'],
                             ['duration', duration + 'ms']
                         );
                         resolve(data);
                     } catch (err) {
                         logger.log('WARN', 'SDKAPI', `SDK-Server response parse failed: ${err.message}`);
-                        logger.log('DEBUG', 'SDKAPI', `  → Response body (first 200 chars): ${body.substring(0, 200)}`);
+                        logger.details('error',
+                            ['body', body.substring(0, 200)],
+                            ['duration', duration + 'ms']
+                        );
                         resolve(null);
                     }
                 } else {
-                    logger.log('WARN', 'SDKAPI', `SDK-Server user not found: HTTP ${res.statusCode}`);
-                    logger.details('verify',
+                    logger.log('WARN', 'SDKAPI', chalk.yellow(`SDK-Server user not found: HTTP ${res.statusCode}`));
+                    logger.details('response',
                         ['userId', userId],
                         ['httpStatus', String(res.statusCode)],
                         ['duration', duration + 'ms']
@@ -255,13 +282,18 @@ function verifyUserWithSDKServer(userId) {
         });
 
         req.on('error', (err) => {
-            logger.log('ERROR', 'SDKAPI', `SDK-Server verify failed: ${err.message}`);
-            logger.log('DEBUG', 'SDKAPI', `  → Is SDK-Server running on port 9999?`);
+            const duration = Date.now() - startTime;
+            logger.errorWithStack('SDKAPI', `SDK-Server verify failed`, err);
+            logger.log('DEBUG', 'SDKAPI', '  → Is SDK-Server running on port 9999?');
+            logger.details('error',
+                ['duration', duration + 'ms'],
+                ['code', err.code || '?']
+            );
             resolve(null);
         });
 
         req.on('timeout', () => {
-            logger.log('ERROR', 'SDKAPI', `SDK-Server verify TIMEOUT (5000ms) — is server running?`);
+            logger.log('ERROR', 'SDKAPI', chalk.red('SDK-Server TIMEOUT (5000ms)'));
             req.destroy();
         });
         req.end();
@@ -274,19 +306,23 @@ function verifyUserWithSDKServer(userId) {
 
 async function validateLoginToken(loginToken, userId) {
     if (!loginToken || !userId) {
-        logger.log('WARN', 'VALIDATE', '[validateLoginToken] Missing loginToken or userId');
+        logger.log('WARN', 'VALIDATE', 'Missing loginToken or userId');
         return false;
     }
     const userInfo = await verifyUserWithSDKServer(userId);
     if (!userInfo) {
-        logger.log('WARN', 'VALIDATE', `[validateLoginToken] SDK-Server returned null for userId=${userId}`);
+        logger.log('WARN', 'VALIDATE', `SDK-Server returned null for userId=${userId}`);
         return false;
     }
     if (userInfo.loginToken !== loginToken) {
-        logger.log('WARN', 'VALIDATE', `[validateLoginToken] loginToken mismatch for userId=${userId}`);
-        logger.log('DEBUG', 'VALIDATE', `  → Expected: ${loginToken.substring(0, 12)}... Got: ${(userInfo.loginToken || '').substring(0, 12)}...`);
+        logger.log('WARN', 'VALIDATE', `loginToken mismatch for userId=${userId}`);
+        logger.details('compare',
+            ['expected', (loginToken || '').substring(0, 16) + '...'],
+            ['got', (userInfo.loginToken || '').substring(0, 16) + '...']
+        );
         return false;
     }
+    logger.log('DEBUG', 'VALIDATE', `Token validated OK for userId=${userId}`);
     return true;
 }
 
@@ -321,13 +357,13 @@ io.on('connection', (socket) => {
     });
     actionCounters.set(socketId, 0);
 
-    logger.log('INFO', 'SOCKET', `Client connected`);
     logger.socketEvent('connect', socketId, clientIp, transport);
     logger.details('session',
-        ['sid', socketId.substring(0, 16)],
+        ['socketId', socketId],
         ['ip', clientIp],
         ['transport', transport],
-        ['totalSessions', String(sessions.size)]
+        ['totalSessions', String(sessions.size)],
+        ['activeUsers', String([...sessions.values()].filter(s => s.userId).length)]
     );
 
     // ─── TEA HANDSHAKE ───
@@ -337,8 +373,8 @@ io.on('connection', (socket) => {
 
     logger.log('INFO', 'TEA', `Sending verify challenge`);
     logger.details('challenge',
-        ['sid', socketId.substring(0, 8)],
-        ['challenge', challenge.substring(0, 16) + '...']
+        ['challenge', challenge],
+        ['socketId', socketId.substring(0, 16) + '...']
     );
 
     socket.emit('verify', challenge);
@@ -353,14 +389,21 @@ io.on('connection', (socket) => {
             return;
         }
 
-        logger.log('DEBUG', 'TEA', `[verify] Received encrypted response (${typeof encrypted === 'string' ? encrypted.length + ' chars' : typeof encrypted})`);
+        logger.log('DEBUG', 'TEA', `[verify] Received encrypted response`);
+        logger.details('input',
+            ['type', typeof encrypted],
+            ['length', encrypted ? String(encrypted.length) : '0']
+        );
 
         let decrypted = '';
         try {
             decrypted = tea.decrypt(encrypted, config.teaKey);
         } catch (err) {
             logger.errorWithStack('TEA', `Decrypt failed`, err);
-            logger.log('DEBUG', 'TEA', `  → Input was ${typeof encrypted}, length=${encrypted ? encrypted.length : 0}`);
+            logger.details('input',
+                ['type', typeof encrypted],
+                ['length', encrypted ? String(encrypted.length) : '0']
+            );
             callback({ ret: 38 });
             socket.disconnect();
             return;
@@ -371,18 +414,18 @@ io.on('connection', (socket) => {
 
         if (decrypted === currentSession.challenge) {
             currentSession.verified = true;
-            logger.log('INFO', 'TEA', `TEA verification SUCCESS`);
-            logger.details('verify',
-                ['sid', socketId.substring(0, 8)],
+            logger.log('INFO', 'TEA', chalk.green.bold('TEA verification SUCCESS'));
+            logger.details('result',
+                ['socketId', socketId.substring(0, 16) + '...'],
                 ['duration', duration + 'ms'],
                 ['transport', socket.conn.transport.name]
             );
             callback({ ret: 0 });
         } else {
-            logger.log('WARN', 'TEA', `TEA verification FAILED — challenge mismatch`);
-            logger.details('verify',
-                ['expected', currentSession.challenge.substring(0, 16) + '...'],
-                ['got', decrypted.substring(0, 16) + '...'],
+            logger.log('WARN', 'TEA', chalk.red.bold('TEA verification FAILED — challenge mismatch'));
+            logger.details('compare',
+                ['expected', currentSession.challenge.substring(0, 24) + '...'],
+                ['got', decrypted.substring(0, 24) + '...'],
                 ['duration', duration + 'ms']
             );
             callback({ ret: 38 });
@@ -392,24 +435,29 @@ io.on('connection', (socket) => {
 
     // ─── handler.process ───
     socket.on('handler.process', async (request, callback) => {
+        const handlerStart = Date.now();
         const actionCounter = (actionCounters.get(socketId) || 0) + 1;
         actionCounters.set(socketId, actionCounter);
 
         const action = request.action || 'UNKNOWN';
         const actionType = request.type || '';
+        const fullAction = actionType ? `${actionType}::${action}` : action;
 
-        logger.log('INFO', 'HANDLER', `[${actionCounter}] handler.process → ${actionType}::${action}`);
+        // ─── REQUEST LOG ───
+        logger.actionLog('req', fullAction, 'OK');
         logger.details('request',
             ['action', action],
             ['type', actionType],
-            ['uid', (request.userId || '?').substring(0, 12)],
-            ['counter', String(actionCounter)]
+            ['userId', (request.userId || '?').substring(0, 20)],
+            ['counter', String(actionCounter)],
+            ['serverId', String(request.serverId || '?')]
         );
+        logger.requestDump(request);
 
         // Validate: socket must be TEA-verified
         const currentSession = sessions.get(socketId);
         if (!currentSession || !currentSession.verified) {
-            logger.log('WARN', 'HANDLER', `Socket not TEA-verified → ret=38`);
+            logger.log('WARN', 'HANDLER', chalk.red('Socket not TEA-verified') + ' → ret=38');
             if (typeof callback === 'function') {
                 callback(buildErrorResponse(38));
             }
@@ -419,8 +467,11 @@ io.on('connection', (socket) => {
         // Find handler by type + action
         const typeHandlers = ACTION_HANDLERS[actionType];
         if (!typeHandlers) {
-            logger.log('WARN', 'HANDLER', `Unknown type: "${actionType}" — no handlers registered`);
-            logger.log('DEBUG', 'HANDLER', `  → Available types: ${Object.keys(ACTION_HANDLERS).join(', ')}`);
+            logger.log('WARN', 'HANDLER', chalk.yellow(`Unknown type`) + ` "${actionType}" — no handlers registered for this type`);
+            logger.details('registered',
+                ['types', Object.keys(ACTION_HANDLERS).join(', ')],
+                ['action', action]
+            );
             if (typeof callback === 'function') {
                 callback(buildErrorResponse(4));
             }
@@ -429,8 +480,11 @@ io.on('connection', (socket) => {
 
         const handler = typeHandlers[action];
         if (!handler) {
-            logger.log('WARN', 'HANDLER', `Unknown action: "${actionType}::${action}" — no handler registered`);
-            logger.log('DEBUG', 'HANDLER', `  → Available actions for "${actionType}": ${Object.keys(typeHandlers).join(', ')}`);
+            logger.log('WARN', 'HANDLER', chalk.yellow(`Unknown action`) + ` "${actionType}::${action}"`);
+            logger.details('available',
+                ['actions', Object.keys(typeHandlers).join(', ')],
+                ['requested', action]
+            );
             if (typeof callback === 'function') {
                 callback(buildErrorResponse(4));
             }
@@ -443,7 +497,6 @@ io.on('connection', (socket) => {
         }
 
         try {
-            const handlerStart = Date.now();
             const ctx = {
                 db,
                 config,
@@ -464,28 +517,25 @@ io.on('connection', (socket) => {
             const response = await handler(request, ctx);
             const handlerDuration = Date.now() - handlerStart;
 
-            // Log response
-            const statusStr = response.ret === 0 ? 'OK' : `ERR=${response.ret}`;
-            logger.actionLog('res', `${actionType}::${action}`, response.ret === 0 ? 'OK' : 'ERR',
-                null, `ret=${response.ret} duration=${handlerDuration}ms ${statusStr}`);
-
-            if (response.ret !== 0) {
-                logger.log('WARN', 'HANDLER', `[${actionType}::${action}] returned ret=${response.ret} — client will see error`);
-            }
+            // ─── RESPONSE LOG ───
+            const dataLen = typeof response.data === 'string' ? response.data.length : 0;
+            const isCompressed = response.compress || false;
+            logger.actionLog('res', fullAction, response.ret === 0 ? 'OK' : 'ERR', null,
+                `ret=${response.ret} ${dataLen} chars ${isCompressed ? '(LZ)' : '(raw)'} ${handlerDuration}ms`);
+            logger.responseSummary(response.ret, dataLen, isCompressed, handlerDuration);
+            logger.timing('handler', handlerStart);
 
             if (typeof callback === 'function') {
                 callback(response);
             }
         } catch (err) {
-            logger.errorWithStack('HANDLER', `Action "${actionType}::${action}" threw UNHANDLED error`, err);
-            logger.log('ERROR', 'HANDLER', `  → Error name: ${err.name}`);
-            logger.log('ERROR', 'HANDLER', `  → Error message: ${err.message}`);
-            if (err.stack) {
-                const stackLines = err.stack.split('\n').slice(0, 6);
-                stackLines.forEach((line, i) => {
-                    logger.log('DEBUG', 'HANDLER', `  → Stack[${i}]: ${line.trim()}`);
-                });
-            }
+            const handlerDuration = Date.now() - handlerStart;
+            logger.errorWithStack('HANDLER', `Action "${fullAction}" threw UNHANDLED error`, err);
+            logger.details('error',
+                ['name', err.name],
+                ['message', err.message],
+                ['duration', handlerDuration + 'ms']
+            );
             if (typeof callback === 'function') {
                 callback(buildErrorResponse(1));
             }
@@ -500,9 +550,15 @@ io.on('connection', (socket) => {
         const verified = s ? s.verified : false;
         const actionCount = actionCounters.get(socketId) || 0;
 
-        logger.log('INFO', 'SOCKET', `Client disconnected`);
         logger.socketEvent('disconnect', socketId, s ? s.ip : '?', s ? s.transport : '?',
-            `uid=${userId.substring(0, 12)} alive=${aliveMs}ms actions=${actionCount} verified=${verified} reason=${reason}`);
+            `reason=${reason}`);
+        logger.details('session',
+            ['userId', userId.substring(0, 20)],
+            ['alive', aliveMs + 'ms'],
+            ['actions', String(actionCount)],
+            ['verified', String(verified)],
+            ['reason', reason]
+        );
 
         sessions.delete(socketId);
         actionCounters.delete(socketId);
@@ -514,10 +570,11 @@ io.on('connection', (socket) => {
         if (s) {
             s.transport = transport.name;
         }
-        logger.log('DEBUG', 'SOCKET', `Transport upgraded → ${transport.name}`);
+        logger.log('DEBUG', 'SOCKET', `Transport upgraded → ${chalk.cyan(transport.name)}`);
         logger.details('upgrade',
-            ['sid', socketId.substring(0, 8)],
-            ['transport', transport.name]
+            ['socketId', socketId.substring(0, 16) + '...'],
+            ['from', 'polling'],
+            ['to', transport.name]
         );
     });
 });
@@ -526,44 +583,66 @@ io.on('connection', (socket) => {
 // SERVER STARTUP
 // ═══════════════════════════════════════════════════════════════
 
-logger.boundary('🚀', 'SUPER WARRIOR Z — MAIN SERVER');
-logger.details('server',
+logger.header('SUPER WARRIOR Z — MAIN SERVER');
+
+console.log('');
+logger.table([
     ['Port', String(config.port)],
     ['Socket.IO', '2.5.1'],
-    ['TEA', 'ON (key=verification)'],
+    ['TEA', 'ON (verification)'],
     ['DB', path.join(__dirname, 'data', 'main_server.json')],
     ['SDK API', config.sdkServerUrl],
     ['server0Time', String(config.server0Time)],
     ['serverOpenDate', String(config.serverOpenDate)],
     ['resourcePath', config.resourcePath],
-    ['chatUrl', config.chatUrl],
-    ['dungeonUrl', config.dungeonUrl]
-);
+    ['chatUrl', config.chatUrl || '(none)'],
+    ['dungeonUrl', config.dungeonUrl || '(none)'],
+    ['LOG_LEVEL', process.env.LOG_LEVEL || 'INFO']
+]);
+
+logger.headerEnd();
 
 // Log resource status
-logger.log('INFO', 'CONFIG', 'Resource JSON status:');
-logger.details('resources',
-    ['constant.json', constantJson ? `${Object.keys(constantJson).length} entries` : 'MISSING'],
-    ['hero.json', heroJson ? `${Object.keys(heroJson).length} entries` : 'MISSING'],
-    ['summon.json', summonJson ? `${Object.keys(summonJson).length} entries` : 'MISSING']
-);
+logger.log('INFO', 'CONFIG', chalk.bold('Resource JSON status:'));
+logger.table([
+    ['constant.json', constantJson ? chalk.green(`${Object.keys(constantJson).length} entries`) : chalk.red('MISSING')],
+    ['hero.json', heroJson ? chalk.green(`${Object.keys(heroJson).length} entries`) : chalk.red('MISSING')],
+    ['summon.json', summonJson ? chalk.green(`${Object.keys(summonJson).length} entries`) : chalk.yellow('MISSING')]
+]);
 
-logger.boundaryEnd('🚀');
+logger.separator('═');
 
+// Log registered handlers
 console.log('');
-logger.log('INFO', 'HANDLER', 'Actions registered');
+logger.log('INFO', 'HANDLER', chalk.bold('Registered action handlers:'));
+console.log('');
 let totalHandlers = 0;
-for (const [type, actions] of Object.entries(ACTION_HANDLERS)) {
-    const actionList = Object.keys(actions);
-    for (let i = 0; i < actionList.length; i++) {
+const types = Object.keys(ACTION_HANDLERS);
+for (let t = 0; t < types.length; t++) {
+    const type = types[t];
+    const actions = Object.keys(ACTION_HANDLERS[type]);
+    for (let a = 0; a < actions.length; a++) {
         totalHandlers++;
-        const isLast = (i === actionList.length - 1) && (type === Object.keys(ACTION_HANDLERS).slice(-1)[0]);
-        const connector = isLast ? '└' : '├';
-        console.log(`  ${connector} ⚙️ ${chalk.cyan('handler.process')} → ${chalk.white(type + '::' + actionList[i])}`);
+        const isLastAction = (a === actions.length - 1);
+        const isLastType = (t === types.length - 1);
+        const isVeryLast = isLastAction && isLastType;
+
+        const connector = isVeryLast ? '└' : '├';
+        const branch = isLastAction && !isLastType ? '│ ' : '  ';
+        const icon = isVeryLast ? chalk.green('>>') : chalk.cyan('>>');
+        const typeStr = chalk.magenta(type);
+        const actionStr = chalk.white(actions[a]);
+        const handlerPath = chalk.gray('handlers/' + type + '/' + actions[a] + '.js');
+
+        console.log(`  ${connector} ${icon} ${typeStr}::${actionStr}  ${handlerPath}`);
     }
 }
+console.log('');
 logger.details('handlers', ['total', String(totalHandlers)]);
 
+logger.headerEnd();
+
 console.log('');
-logger.log('INFO', 'SERVER', `Ready — listening on http://127.0.0.1:${config.port}`);
+logger.log('INFO', 'SERVER', chalk.green.bold(`Ready — listening on http://127.0.0.1:${config.port}`));
 logger.log('INFO', 'SERVER', `Waiting for Socket.IO connections...`);
+console.log('');
