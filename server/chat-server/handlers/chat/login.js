@@ -61,13 +61,16 @@ function handleChatLogin(request, ctx) {
     }
 
     // ─── Store session mapping ───
-    // Register this socket as belonging to userId
-    ctx.sessions.set(ctx.socket.id, {
-        userId: userId,
-        serverId: serverId,
-        rooms: [],
-        connectedAt: Date.now()
-    });
+    // UPDATE existing session — DO NOT overwrite! The session was created in
+    // the connection handler and already has verified:true from TEA handshake.
+    // Overwriting would lose the verified flag → joinRoom fails with ret=38.
+    const existingSession = ctx.sessions.get(ctx.socket.id);
+    if (existingSession) {
+        existingSession.userId = userId;
+        existingSession.serverId = serverId;
+        existingSession.rooms = existingSession.rooms || [];
+        // verified flag preserved from TEA handshake
+    }
 
     // Also store reverse mapping: userId → socketId
     ctx.userSockets.set(userId, ctx.socket.id);
