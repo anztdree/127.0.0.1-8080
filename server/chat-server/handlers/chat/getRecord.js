@@ -6,12 +6,15 @@
  * ═══════════════════════════════════════════════════════════════
  *
  * CALLER:
- *   L91695-91711: BroadcastSingleton.getTeamDungeonInfoRecord()
+ *   L91695-91712: BroadcastSingleton.getTeamDungeonInfoRecord()
+ *     → Digunakan untuk mengambil pesan team dungeon yang terlewat
+ *       saat pemain kembali ke lobby setelah dungeon selesai.
+ *
  *     ts.processHandlerWithChat({
  *         type: 'chat',
  *         action: 'getRecord',
  *         userId: o,
- *         roomId: n,        // teamDungeonChatRoom
+ *         roomId: n,              // teamDungeonChatRoom
  *         startTime: t.teamDungeonInfoStartTime,
  *         version: '1.0'
  *     }, function (t) {
@@ -22,23 +25,24 @@
  *         }
  *     });
  *
- * Used to fetch message history for a specific room since a given time.
- * Primarily used for team dungeon info records.
- *
  * RESPONSE FIELDS:
- *   _record: Object { 0: msgObj, 1: msgObj, ... }
- *     Same format as joinRoom response.
- *     Client iterates: for (var n in t._record) { ChatDataBaseClass.getData(t._record[n]) }
+ *   _record: Object { "0": msgObj, "1": msgObj, ... }
+ *     Sama format dengan joinRoom response.
+ *     Client iterasi: for (var n in t._record) { ChatDataBaseClass.getData(t._record[n]) }
  *     MUST be Object (not Array) — for...in iteration.
  *
- * Each msgObj (ChatDataBaseClass.getData L92110):
+ * Setiap msgObj (ChatDataBaseClass.getData L92110):
  *   _time, _kind, _name, _content, _id, _image, _param, _type,
  *   _headEffect, _headBox, _oriServerId, _serverId, _showMain
+ *
+ * SERVER BEHAVIOR:
+ *   1. Query pesan dari SQLite: room_id = roomId AND server_time > startTime
+ *   2. Return {_record: Object{index: msgObj, ...}}
  *
  * REQUEST FIELDS:
  *   userId   : string — requesting user
  *   roomId   : string — room to get records from
- *   startTime: number — only return messages AFTER this timestamp
+ *   startTime: number — only return messages AFTER this timestamp (strictly >)
  *   version  : string — always '1.0'
  *
  * STRICT RULES: NO STUB, OVERRIDE, FORCE, BYPASS, DUMMY, ASUMSI
@@ -55,67 +59,43 @@ function handleGetRecord(request, ctx) {
         ['startTime', String(sinceTime || 0)]
     );
 
-    // ─── Validate ───
+    // ─── STEP 1: Validate ───
     if (!userId || !roomId) {
         ctx.logger.step(1, 2, 'Get record', 'fail', 'userId or roomId MISSING ❌');
-        ctx.logger.errorBanner({
-            module: 'CHAT_GET_RECORD',
-            step: '01/02 Get Record',
-            message: 'userId or roomId is MISSING',
-            impact: 'Client cannot load team dungeon message history',
-            fix: 'userId from UserInfoSingleton, roomId from serverItem.teamDungeonChatRoom'
-        });
         return ctx.buildErrorResponse(8);
     }
 
     ctx.logger.step(1, 2, 'Get record', 'pass', `roomId="${roomId}"`);
 
-    // ─── STEP 2: Build filtered record ───
+    // ─── STEP 2: Query pesan dari SQLite ───
     ctx.logger.step(2, 2, 'Filter messages', 'running');
 
-    const record = {};
-    const roomMessages = ctx.roomStore.get(roomId);
     const filterTime = sinceTime ? Number(sinceTime) : 0;
-    let count = 0;
 
-    if (roomMessages && roomMessages.length > 0) {
-        for (let i = 0; i < roomMessages.length; i++) {
-            // Return messages AFTER startTime (strictly greater)
-            if (roomMessages[i]._time > filterTime) {
-                record[String(count)] = roomMessages[i];
-                count++;
-            }
-        }
+    /**
+     * Get pesan setelah startTime (strictly greater than).
+     * L91707: for (var n in t._record) — iterasi semua pesan
+     *
+     * Pesan diurutkan oldest-first (ASC) dari SQLite.
+     * Client memproses semua pesan yang dikembalikan.
+     */
+    const messages = ctx.db.getMessagesSince(roomId, filterTime);
+
+    const record = {};
+    for (let i = 0; i < messages.length; i++) {
+        record[String(i)] = messages[i];
     }
 
     const duration = Date.now() - startTime;
 
-    ctx.logger.step(2, 2, 'Filter messages', 'pass', `${count} messages since ${filterTime}`);
+    ctx.logger.step(2, 2, 'Filter messages', 'pass',
+        `${messages.length} messages since ${filterTime}`);
     ctx.logger.details('response',
         ['roomId', roomId],
         ['sinceTime', String(filterTime)],
-        ['_record', `${count} message(s)`],
-        ['totalInRoom', String(roomMessages ? roomMessages.length : 0)]
+        ['_record', `${messages.length} message(s)`],
+        ['duration', duration + 'ms']
     );
-
-    // ─── Critical Fields Audit ───
-    ctx.logger.criticalFields([
-        {
-            name: '_record',
-            value: `Object{${count}}`,
-            status: 'ok',
-            detail: 'L91707: for(var n in t._record) → Object format, iterated by client'
-        }
-    ]);
-
-    ctx.logger.summaryCard({
-        title: 'GET RECORD COMPLETE',
-        userId: userId,
-        fields: 1,
-        roomId: roomId,
-        messages: count,
-        duration: duration
-    });
 
     return ctx.buildDataResponse(0, { _record: record });
 }

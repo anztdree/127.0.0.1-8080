@@ -15,11 +15,18 @@
  *           version: '1.0'
  *         }, function (e) { t && t(e); })
  *
- * Used when player leaves a chat room (e.g., leaves guild, leaves team dungeon).
- * Callback receives response but doesn't read specific fields.
+ * Used when player leaves a chat room dynamically:
+ *   L136548: teamDungeonExpireCallBack → leave team room
+ *   L136559: teamDungeonFinishCallBack → leave team room
+ *   L136817: doTeamDungeonQuiteClean → leave team room
+ *   L199916: guild dissolve → leave guild room, guildRoomId = void 0
+ *   L200024: guild leave → leave guild room, guildRoomId = void 0
  *
- * RESPONSE: ret=0, no data fields required.
- * Server removes socket from Socket.IO room.
+ * RESPONSE: ret=0, data={} (empty — client tidak baca field apapun)
+ *
+ * SERVER BEHAVIOR:
+ *   1. socket.leave(roomId)
+ *   2. Update session room list
  *
  * REQUEST FIELDS:
  *   userId : string — from UserInfoSingleton
@@ -41,13 +48,6 @@ function handleLeaveRoom(request, ctx) {
     // ─── Validate ───
     if (!userId || !roomId) {
         ctx.logger.step(1, 1, 'Leave room', 'fail', 'userId or roomId MISSING ❌');
-        ctx.logger.errorBanner({
-            module: 'CHAT_LEAVE_ROOM',
-            step: '01/01 Leave Room',
-            message: 'userId or roomId is MISSING',
-            impact: 'Socket stays in room — receives unwanted messages',
-            fix: 'userId from UserInfoSingleton, roomId from serverItem'
-        });
         return ctx.buildErrorResponse(8);
     }
 
