@@ -104,6 +104,13 @@ const heroLevelAttrJson = loadResource('heroLevelAttr');
 const heroTypeParamJson = loadResource('heroTypeParam');
 const heroQualityParamJson = loadResource('heroQualityParam');
 
+// Pre-load heroPower config (used by hero/getAttrs power calculation)
+// heroPower.json: 31 attr weights per heroType for combat power formula
+const heroPowerJson = loadResource('heroPower');
+
+// Pre-load zPower config (used by zPower cost feature — L84802)
+const zPowerQualityParaJson = loadResource('zPowerQualityPara');
+
 // Warn if critical resources are missing
 if (!constantJson) {
     logger.log('ERROR', 'CONFIG', chalk.red('CRITICAL: constant.json is MISSING') + ' — defaults will be used');
@@ -122,6 +129,12 @@ if (!heroTypeParamJson) {
 }
 if (!heroQualityParamJson) {
     logger.log('WARN', 'CONFIG', chalk.yellow('WARNING: heroQualityParam.json is MISSING') + ' — getAttrs will fail');
+}
+if (!zPowerQualityParaJson) {
+    logger.log('WARN', 'CONFIG', chalk.yellow('WARNING: zPowerQualityPara.json is MISSING') + ' — zPower cost feature will fail');
+}
+if (!heroPowerJson) {
+    logger.log('WARN', 'CONFIG', chalk.red('WARNING: heroPower.json is MISSING') + ' — getAttrs power=0 for all heroes');
 }
 logger.headerEnd();
 
@@ -666,7 +679,9 @@ logger.table([
     ['summon.json', summonJson ? chalk.green(`${Object.keys(summonJson).length} entries`) : chalk.yellow('MISSING')],
     ['heroLevelAttr.json', heroLevelAttrJson ? chalk.green(`${Object.keys(heroLevelAttrJson).length} entries`) : chalk.yellow('MISSING')],
     ['heroTypeParam.json', heroTypeParamJson ? chalk.green(`${Object.keys(heroTypeParamJson).length} entries`) : chalk.yellow('MISSING')],
-    ['heroQualityParam.json', heroQualityParamJson ? chalk.green(`${Object.keys(heroQualityParamJson).length} entries`) : chalk.yellow('MISSING')]
+    ['heroQualityParam.json', heroQualityParamJson ? chalk.green(`${Object.keys(heroQualityParamJson).length} entries`) : chalk.yellow('MISSING')],
+    ['zPowerQualityPara.json', zPowerQualityParaJson ? chalk.green(`${Object.keys(zPowerQualityParaJson).length} entries`) : chalk.yellow('MISSING')],
+    ['heroPower.json', heroPowerJson ? chalk.green(`${Object.keys(heroPowerJson).length} entries`) : chalk.red('MISSING')]
 ]);
 
 logger.separator('═');
