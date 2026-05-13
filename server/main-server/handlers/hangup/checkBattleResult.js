@@ -6,14 +6,15 @@
  * ═══════════════════════════════════════════════════════════════
  *
  * CHAIN: saveGuideTeam callback → checkBattleResult
+ *         OR: hangUpBattleEndCallBack → checkBattleResult
  *
- * TUTORIAL CALL (L104875-104880):
+ * ── TUTORIAL CALL (L104875-104880, L105815-105820) ──
  *   ts.processHandler({
  *       type: 'hangup', action: 'checkBattleResult',
  *       userId, version: '1.0', isGuide: true
  *   }, callback)
  *
- * REGULAR HANGUP CALL (L97739-97748):
+ * ── REGULAR HANGUP CALL (L97739-97748) ──
  *   ts.processHandler({
  *       type: 'hangup', action: 'checkBattleResult',
  *       userId, battleId, version: '1.0',
@@ -22,127 +23,370 @@
  *       runaway: a
  *   }, callback)
  *
- * TUTORIAL CONSUMER (L104882-104900):
+ * ── TUTORIAL CONSUMER (L104882-104912) ──
  *   e._battleResult      → L104882: 0 == e._battleResult → win/lose
  *   e._changeInfo._items → L104884: reward items (for...in iteration)
  *       s[l]._id, s[l]._num
- *   e._curLess           → L104892: current lesson ID
- *   e._maxPassLesson     → L104893: max passed lesson
+ *   e._curLess           → L104892: OnHookSingleton.lastSection
+ *   e._maxPassLesson     → L104893: OnHookSingleton.maxPassLesson
  *
- * REGULAR CONSUMER (L97750-97751):
+ * ── REGULAR CONSUMER (L97750-97751) ──
  *   e._battleResult      → win/lose flag
- *   e._curLess           → L97751: current lesson
- *   e._maxPassLesson     → L97751: max passed lesson
- *   e._maxPassChapter    → L97751: max passed chapter
+ *   e._changeInfo._items → L97686: getBattleAwardItems(t) iterates _items
+ *   e._curLess           → L97751: OnHookSingleton.lastSection
+ *   e._maxPassLesson     → L97751: OnHookSingleton.maxPassLesson
+ *   e._maxPassChapter    → L97751: OnHookSingleton.maxPassChapter
  *
- * RESPONSE FIELDS:
- *   _battleResult     : number — 0 = win, 1 = lose
- *   _changeInfo       : { _items: { 0: {_id, _num}, ... } } — reward items
- *   _curLess          : number — current lesson/chapter
- *   _maxPassLesson    : number — highest lesson passed
- *   _maxPassChapter   : number — highest chapter passed (regular only)
+ * ── REWARD FORMAT (L97686-97708 getBattleAwardItems) ──
+ *   e._changeInfo._items = { "0": {_id, _num}, "1": {_id, _num}, ... }
+ *   _num = NEW TOTAL of item after reward (not delta)
+ *   Special IDs: 103=EXP, 104=LEVEL, 101=DIAMOND, 102=GOLD
+ *   131=EXP CAPSULE, 132=EVOLVE CAPSULE, 3001-3500=EQUIPMENT
  *
- * For 50%: Tutorial mode → always return win (0) with basic rewards.
- * Regular mode → return win with defaults.
+ * ── LESSON CONFIG (lesson.json) ──
+ *   award1-num5 + num1-num5 = battle rewards
+ *   nextID = next lesson to advance to
+ *   nextChapter = chapter of next lesson
+ *   thisChapter = current chapter
+ *   lessonType: 1=normal, 2=hard, 3=boss
+ *
+ * ═══════════════════════════════════════════════════════════════
+ * FIX LOG
+ * ═══════════════════════════════════════════════════════════════
+ *
+ * [FIX-001] DB path: read from userData.hangup NOT userData.hangupTeam
+ *   enterGame stores progress at: userData.hangup._curLess, _maxPassLesson, _maxPassChapter
+ *   hangupTeam is ONLY for team composition (team[], supers[])
+ *   OLD: userData.hangupTeam.curLesson → always fallback to 1 (wrong)
+ *   NEW: userData.hangup._curLess → reads actual lesson progress
+ *
+ * [FIX-002] Battle validation: honor checkResult from client
+ *   Client sends checkResult: 0=win, 1=lose
+ *   runaway=true also means lose
+ *   OLD: always _battleResult=0 (forced win)
+ *   NEW: respect checkResult, tutorial always win
+ *
+ * [FIX-003] Load lesson.json for rewards and progression
+ *   Each lesson has award1-5 + num1-5 defined in lesson.json
+ *   nextID determines what lesson to advance to
+ *   OLD: empty _changeInfo._items (no rewards)
+ *   NEW: compute rewards from lesson config, add to current items
+ *
+ * [FIX-004] Item tracking: update totalProps._items with new totals
+ *   Server tracks authoritative item state in userData.totalProps._items
+ *   Rewards are ADDED to current totals, saved back to DB
+ *   Client reads _changeInfo._items and sets local state via resetTtemsCallBack
+ *
+ * [FIX-005] Progression uses lesson.json nextID/nextChapter
+ *   On win: _curLess = lessonConfig.nextID (next lesson)
+ *           _maxPassLesson = max(old, currentLessonId)
+ *           _maxPassChapter = max(old, lessonConfig.thisChapter)
+ *   OLD: curLess + 1 (arbitrary, ignores lesson chain)
+ *   NEW: use nextID from config (natural progression)
+ *
+ * [FIX-006] Tutorial vs regular separation
+ *   Tutorial: always win, use tutorialLesson from constant.json
+ *   Regular: respect checkResult, use actual curLess from user data
  *
  * STRICT RULES: NO STUB, OVERRIDE, FORCE, BYPASS, DUMMY, ASUMSI
  */
 
-function handleCheckBattleResult(request, ctx) {
-    const { userId, isGuide } = request;
+// ─── Currency/Attribute IDs — main.min.js L116237 ───
+const DIAMONDID = 101;
+const GOLDID = 102;
+const PLAYEREXPERIENCEID = 103;
+const PLAYERLEVELID = 104;
 
-    ctx.logger.step(1, 2, 'Check battle result', 'running');
+function handleCheckBattleResult(request, ctx) {
+    const { userId, isGuide, battleId, checkResult, runaway } = request;
+
+    // ═══════════════════════════════════════════════════════════════
+    // STEP 1: Validate request
+    // ═══════════════════════════════════════════════════════════════
+    ctx.logger.step(1, 5, 'Validate request', 'running');
     ctx.logger.details('request',
         ['userId', userId ? userId.substring(0, 20) : 'MISSING'],
-        ['isGuide', String(isGuide || false)],
-        ['battleId', String(request.battleId || '(none)')],
-        ['checkResult', String(request.checkResult ?? '(none)')]
+        ['isGuide', String(!!isGuide)],
+        ['battleId', String(battleId || '(none)')],
+        ['checkResult', String(checkResult ?? '(none)')],
+        ['runaway', String(runaway ?? '(none)')],
+        ['super', String(request.super || '(none)')]
     );
 
     if (!userId) {
-        ctx.logger.step(1, 2, 'Check battle result', 'fail', 'userId MISSING ❌');
+        ctx.logger.step(1, 5, 'Validate request', 'fail', 'userId MISSING');
         return ctx.buildErrorResponse(8);
     }
 
-    ctx.logger.step(1, 2, 'Check battle result', 'pass', `isGuide=${!!isGuide}`);
+    ctx.logger.step(1, 5, 'Validate request', 'pass');
 
-    // ─── STEP 2: Build battle result ───
-    ctx.logger.step(2, 2, 'Build result', 'running');
-
-    /**
-     * For tutorial (isGuide=true):
-     *   L104882: 0 == e._battleResult → TRUE → tutorial battle always won
-     *   L104884: e._changeInfo._items → reward items (for...in iteration)
-     *   L104892: e._curLess → lesson progress
-     *   L104893: e._maxPassLesson → max lesson passed
-     *
-     * For regular hangup:
-     *   Same fields + _maxPassChapter
-     */
+    // ═══════════════════════════════════════════════════════════════
+    // STEP 2: Load user data and resources
+    // ═══════════════════════════════════════════════════════════════
+    ctx.logger.step(2, 5, 'Load data', 'running');
 
     const userData = ctx.db.getUser(userId);
-    let curLess = 1;
-    let maxPassLesson = 1;
-    let maxPassChapter = 1;
-
-    if (userData && userData.hangupTeam) {
-        curLess = userData.hangupTeam.curLesson || 1;
-        maxPassLesson = userData.hangupTeam.maxPassLesson || 1;
-        maxPassChapter = userData.hangupTeam.maxPassChapter || 1;
-
-        // Advance progress
-        maxPassLesson = Math.max(maxPassLesson, curLess + 1);
-        userData.hangupTeam.curLesson = maxPassLesson;
-        userData.hangupTeam.maxPassLesson = maxPassLesson;
-        ctx.db.saveUser(userId, userData);
+    if (!userData) {
+        ctx.logger.step(2, 5, 'Load data', 'fail', 'userData NOT FOUND in DB');
+        return ctx.buildErrorResponse(8);
     }
 
+    // Load lesson.json
+    const lessonData = ctx.loadResource('lesson');
+    if (!lessonData) {
+        ctx.logger.step(2, 5, 'Load data', 'fail', 'lesson.json NOT FOUND');
+        return ctx.buildErrorResponse(1);
+    }
+
+    // Load constant.json for tutorialLesson
+    const constant = ctx.constantJson;
+    const tutorialLessonStr = (constant && constant['1'] && constant['1'].tutorialLesson) || '10101,10102';
+    const tutorialLessons = tutorialLessonStr.split(',').map(s => parseInt(s.trim()));
+
+    ctx.logger.step(2, 5, 'Load data', 'pass', `lesson.json=${Object.keys(lessonData).length} entries`);
+
+    // ═══════════════════════════════════════════════════════════════
+    // STEP 3: Read current progress from userData.hangup
+    // ═══════════════════════════════════════════════════════════════
+    ctx.logger.step(3, 5, 'Read progress', 'running');
+
+    // FIX-001: Read from hangup NOT hangupTeam
+    // enterGame stores: userData.hangup._curLess, _maxPassLesson, _maxPassChapter
+    const hangup = userData.hangup || {};
+    let curLess = hangup._curLess || 10101;
+    let maxPassLesson = hangup._maxPassLesson || 0;
+    let maxPassChapter = hangup._maxPassChapter || 0;
+
+    ctx.logger.details('progress',
+        ['curLess', String(curLess)],
+        ['maxPassLesson', String(maxPassLesson)],
+        ['maxPassChapter', String(maxPassChapter)],
+        ['source', 'userData.hangup']
+    );
+    ctx.logger.step(3, 5, 'Read progress', 'pass', `lesson=${curLess}`);
+
+    // ═══════════════════════════════════════════════════════════════
+    // STEP 4: Determine battle outcome
+    // ═══════════════════════════════════════════════════════════════
+    ctx.logger.step(4, 5, 'Determine outcome', 'running');
+
+    // FIX-002: Validate checkResult from client
+    // FIX-006: Tutorial always wins (L104882: 0 == e._battleResult → true)
+    let isWin;
+    if (isGuide) {
+        isWin = true;
+        ctx.logger.details('outcome',
+            ['mode', 'TUTORIAL (forced win)'],
+            ['isGuide', 'true']
+        );
+    } else {
+        // Regular battle: honor client's checkResult
+        // checkResult === 0 → win, checkResult === 1 → lose
+        // runaway === true → also counts as lose
+        if (runaway === true) {
+            isWin = false;
+        } else {
+            isWin = (checkResult === 0);
+        }
+        ctx.logger.details('outcome',
+            ['mode', 'REGULAR'],
+            ['checkResult', String(checkResult)],
+            ['runaway', String(runaway)],
+            ['isWin', String(isWin)]
+        );
+    }
+
+    const battleResult = isWin ? 0 : 1;
+    ctx.logger.step(4, 5, 'Determine outcome', 'pass', `${isWin ? 'WIN' : 'LOSE'} (${battleResult})`);
+
+    // ═══════════════════════════════════════════════════════════════
+    // STEP 5: Build response with rewards and progression
+    // ═══════════════════════════════════════════════════════════════
+    ctx.logger.step(5, 5, 'Build response', 'running');
+
+    // Determine which lesson config to use
+    // For tutorial: use the current tutorialLesson from constant.json
+    // For regular: use the lesson the player is currently on
+    let lessonId;
+    if (isGuide) {
+        // Tutorial: use first tutorial lesson (10101)
+        // Player progresses through tutorialLesson list
+        lessonId = String(tutorialLessons[0]);
+    } else {
+        lessonId = String(curLess);
+    }
+
+    const lessonConfig = lessonData[lessonId];
+    if (!lessonConfig) {
+        ctx.logger.step(5, 5, 'Build response', 'fail', `lesson ${lessonId} NOT FOUND in lesson.json`);
+        return ctx.buildErrorResponse(1);
+    }
+
+    // FIX-003: Build rewards from lesson config
+    // lesson.json has: award1-5, num1-5
+    // _changeInfo._items format: { "0": {_id, _num}, "1": {_id, _num}, ... }
+    const changeItems = {};
+    let rewardCount = 0;
+
+    // Read current item totals from userData.totalProps._items
+    const currentItems = (userData.totalProps && userData.totalProps._items) || {};
+
+    if (isWin) {
+        ctx.logger.details('rewards',
+            ['lesson', lessonId],
+            ['lessonName', lessonConfig.name || '?'],
+            ['lessonType', String(lessonConfig.lessonType || '?')],
+            ['thisChapter', String(lessonConfig.thisChapter)],
+            ['nextID', String(lessonConfig.nextID || '(endpoint)')]
+        );
+
+        for (let i = 1; i <= 5; i++) {
+            const awardKey = 'award' + i;
+            const numKey = 'num' + i;
+            const itemId = lessonConfig[awardKey];
+            const qty = lessonConfig[numKey];
+
+            if (itemId && qty) {
+                const itemIndex = String(rewardCount);
+                // FIX-004: _num = NEW TOTAL (current + reward)
+                const currentNum = currentItems[itemId] ? (currentItems[itemId]._num || 0) : 0;
+                const newTotal = currentNum + qty;
+
+                changeItems[itemIndex] = {
+                    _id: itemId,
+                    _num: newTotal
+                };
+
+                // Update userData.totalProps._items with new total
+                if (!userData.totalProps) userData.totalProps = { _items: {} };
+                if (!userData.totalProps._items) userData.totalProps._items = {};
+                userData.totalProps._items[itemId] = { _id: itemId, _num: newTotal };
+
+                // Also update user._attribute._items for currency types
+                if (userData.user && userData.user._attribute && userData.user._attribute._items) {
+                    if (userData.user._attribute._items[itemId]) {
+                        userData.user._attribute._items[itemId]._num = newTotal;
+                    }
+                }
+
+                ctx.logger.details('reward',
+                    ['#' + i, `item=${itemId} qty=+${qty} old=${currentNum} new=${newTotal}`]
+                );
+                rewardCount++;
+            }
+        }
+
+        // FIX-005: Update progression using lesson.json nextID/nextChapter
+        // On win: advance to next lesson
+        const nextLessonId = lessonConfig.nextID;
+        const nextChapter = lessonConfig.nextChapter;
+        const thisChapter = lessonConfig.thisChapter;
+
+        if (nextLessonId) {
+            // There is a next lesson — advance
+            curLess = nextLessonId;
+        }
+        // else: this is the last lesson (endpoint like 17417), stay here
+
+        // Update maxPassLesson: highest lesson ID ever passed
+        maxPassLesson = Math.max(maxPassLesson, parseInt(lessonId));
+
+        // Update maxPassChapter: highest chapter ever passed
+        if (thisChapter) {
+            maxPassChapter = Math.max(maxPassChapter, thisChapter);
+        }
+
+        ctx.logger.details('progression',
+            ['curLess', String(curLess)],
+            ['maxPassLesson', String(maxPassLesson)],
+            ['maxPassChapter', String(maxPassChapter)],
+            ['nextLessonId', String(nextLessonId || '(endpoint)')],
+            ['source', 'lesson.json nextID/thisChapter']
+        );
+    } else {
+        // LOSE — no rewards, no progression
+        ctx.logger.details('rewards', ['status', 'LOSE — no rewards given']);
+    }
+
+    // Update userData.hangup with new progression
+    if (!userData.hangup) userData.hangup = {};
+    userData.hangup._curLess = curLess;
+    userData.hangup._maxPassLesson = maxPassLesson;
+    userData.hangup._maxPassChapter = maxPassChapter;
+
+    // Save to DB
+    ctx.db.saveUser(userId, userData);
+
+    ctx.logger.step(5, 5, 'Build response', 'pass', `${isWin ? 'WIN' : 'LOSE'} rewards=${rewardCount} lesson=${curLess}`);
+
+    // ═══════════════════════════════════════════════════════════════
+    // BUILD FINAL RESPONSE
+    // ═══════════════════════════════════════════════════════════════
+
     const responseData = {
-        _battleResult: 0,  // 0 = win — tutorial must succeed
+        _battleResult: battleResult,
         _curLess: curLess,
         _maxPassLesson: maxPassLesson,
-        _maxPassChapter: maxPassChapter,
         _changeInfo: {
-            _items: {}  // Empty rewards for now — no items given in tutorial
+            _items: changeItems
         }
     };
 
-    ctx.logger.step(2, 2, 'Build result', 'pass', `win lesson=${curLess} maxLesson=${maxPassLesson}`);
+    // _maxPassChapter: only sent in regular mode (tutorial doesn't read it)
+    if (!isGuide) {
+        responseData._maxPassChapter = maxPassChapter;
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // VERIFIED RESPONSE FIELDS vs main.min.js
+    // ═══════════════════════════════════════════════════════════════
 
     ctx.logger.criticalFields([
         {
             name: '_battleResult',
-            value: '0 (win)',
+            value: String(battleResult),
             status: 'ok',
-            detail: 'L104882: 0 == e._battleResult → true → tutorial continues'
+            detail: isGuide
+                ? 'L104882: 0 == e._battleResult -> true (tutorial forced win)'
+                : 'L97750: 0 == t._battleResult ? true : false (regular battle)'
         },
         {
             name: '_changeInfo._items',
-            value: 'Object{} (empty)',
-            status: 'ok',
-            detail: 'L104884: for(var l in s) → Object, items {_id, _num}'
+            value: Object.keys(changeItems).length + ' items',
+            status: isWin ? 'ok' : 'empty(lose)',
+            detail: 'L97686: getBattleAwardItems iterates _changeInfo._items for {_id, _num}'
         },
         {
             name: '_curLess',
             value: String(curLess),
             status: 'ok',
-            detail: 'L104892: OnHookSingleton.lastSection = e._curLess'
+            detail: 'L104892/L97751: OnHookSingleton.lastSection = e._curLess'
         },
         {
             name: '_maxPassLesson',
             value: String(maxPassLesson),
             status: 'ok',
-            detail: 'L104893: OnHookSingleton.maxPassLesson = e._maxPassLesson'
+            detail: 'L104893/L97751: OnHookSingleton.maxPassLesson = e._maxPassLesson'
         }
     ]);
 
+    if (!isGuide) {
+        ctx.logger.criticalFields([{
+            name: '_maxPassChapter',
+            value: String(maxPassChapter),
+            status: 'ok',
+            detail: 'L97751: OnHookSingleton.maxPassChapter = e._maxPassChapter (regular only)'
+        }]);
+    }
+
     ctx.logger.summaryCard({
-        title: 'CHECK BATTLE RESULT COMPLETE',
+        title: 'CHECK BATTLE RESULT',
         userId: userId,
-        fields: 4,
-        result: 'WIN',
+        fields: 4 + (isGuide ? 0 : 1),
+        result: isWin ? 'WIN' : 'LOSE',
         lesson: curLess,
-        duration: 0
+        rewards: rewardCount,
+        mode: isGuide ? 'TUTORIAL' : 'REGULAR'
     });
 
     return ctx.buildDataResponse(0, responseData);
