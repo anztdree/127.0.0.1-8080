@@ -8,7 +8,7 @@
  * Database: Pure LocalStorage API (db.js)
  * Protocol: handler.process (single event for all actions)
  *
- * Handlers: user/enterGame, user/registChat, user/getBulletinBrief,
+ * Handlers: user/enterGame, user/registChat, user/getBulletinBrief+readBulletin,
  *           friend/friendServerAction, heroImage/getAll, hero/getAttrs,
  *           userMsg/getMsgList, guide/saveGuide,
  *           hangup/saveGuideTeam, hangup/checkBattleResult
@@ -34,11 +34,15 @@ const db = require('./db');
 const tea = require('./tea');
 const enterGame = require('./handlers/user/enterGame');
 const registChat = require('./handlers/user/registChat');
-const getBulletinBrief = require('./handlers/user/getBulletinBrief');
+const bulletinHandlers = require('./handlers/user/getBulletinBrief');
 const friendServerAction = require('./handlers/friend/friendServerAction');
 const heroImageGetAll = require('./handlers/heroImage/getAll');
 const heroGetAttrs = require('./handlers/hero/getAttrs');
 const userMsgGetMsgList = require('./handlers/userMsg/getMsgList');
+const userMsgGetMsg = require('./handlers/userMsg/getMsg');
+const userMsgSendMsg = require('./handlers/userMsg/sendMsg');
+const userMsgReadMsg = require('./handlers/userMsg/readMsg');
+const userMsgDelFriendMsg = require('./handlers/userMsg/delFriendMsg');
 const guideSaveGuide = require('./handlers/guide/saveGuide');
 const hangupSaveGuideTeam = require('./handlers/hangup/saveGuideTeam');
 const hangupCheckBattleResult = require('./handlers/hangup/checkBattleResult');
@@ -347,7 +351,8 @@ const ACTION_HANDLERS = {
     user: {
         enterGame: enterGame,
         registChat: registChat,
-        getBulletinBrief: getBulletinBrief
+        getBulletinBrief: bulletinHandlers.getBulletinBrief,
+        readBulletin: bulletinHandlers.readBulletin
     },
     friend: {
         friendServerAction: friendServerAction
@@ -359,7 +364,11 @@ const ACTION_HANDLERS = {
         getAttrs: heroGetAttrs
     },
     userMsg: {
-        getMsgList: userMsgGetMsgList
+        getMsgList: userMsgGetMsgList,
+        getMsg: userMsgGetMsg,
+        sendMsg: userMsgSendMsg,
+        readMsg: userMsgReadMsg,
+        delFriendMsg: userMsgDelFriendMsg
     },
     guide: {
         saveGuide: guideSaveGuide
