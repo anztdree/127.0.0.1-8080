@@ -1,6 +1,5 @@
 ```
-root@localhost:/var/www/html/server/main-server# maim
-bash: maim: command not found                                                                        root@localhost:/var/www/html/server/main-server# main
+
 [DB] Loaded 14 records from /var/www/html/server/main-server/data/main_server.json (141492 bytes)    🟢 08:21:17.893 INFO  📋 CONFIG   ▸ serverOpenDate auto-initialized: 1778660477893
 
   ┌─ LOADING RESOURCES ───────────────────────────────────┐
