@@ -1,4 +1,6 @@
 ```
+
+[DB] Loaded 11 records from /var/www/html/server/main-server/data/main_server.json (110797 bytes)
 🟢 02:08:25.107 INFO  📋 CONFIG   ▸ serverOpenDate auto-initialized: 1778638105107
 
   ┌─ LOADING RESOURCES ───────────────────────────────────┐
@@ -304,4 +306,261 @@
   ➕ NEW CONNECTION ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─
 🟢 02:09:34.308 INFO  🔐 TEA      ▸ Sending verify challenge
 🟢 02:09:34.354 INFO  🔐 TEA      ▸ TEA verification SUCCESS
+
+  ➖ DISCONNECT ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─
+  └ 🔗 reason: reason=ping timeout  sid= Sbm0wP39...
+
+  ➕ NEW CONNECTION ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─
+🟢 02:10:19.394 INFO  🔐 TEA      ▸ Sending verify challenge
+🟢 02:10:19.428 INFO  🔐 TEA      ▸ TEA verification SUCCESS
+
+  ➖ DISCONNECT ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─
+  └ 🔗 reason: reason=ping timeout  sid= Gi_J1hsf...
+
+  ➕ NEW CONNECTION ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─
+🟢 02:17:24.283 INFO  🔐 TEA      ▸ Sending verify challenge
+🟢 02:17:24.373 INFO  🔐 TEA      ▸ TEA verification SUCCESS
+
+  📤 user::enterGame        ──────────────────────────────────
+🟢 02:17:24.428 INFO  ⚔️ ENTER    ▸ enterGame REQUEST RECEIVED
+  [ 1/10] 🔄 Required fields check  █░░░░░░░░░
+  [ 1/10] ✅ Required fields check  █░░░░░░░░░  All present
+  [ 2/10] 🔄 Token auth via SDK-Server  ██░░░░░░░░
+🟢 02:17:24.440 INFO  📡 SDKAPI   ▸ User verified via SDK-Server
+  [ 2/10] ✅ Token auth via SDK-Server  ██░░░░░░░░  12ms ✅
+  [ 3/10] 🔄 ServerId validation  ███░░░░░░░
+  [ 3/10] ✅ ServerId validation  ███░░░░░░░  1 == 1 ✅
+  [ 4/10] 🔄 User existence check  ████░░░░░░
+  [ 4/10] ✅ User existence check  ████░░░░░░  EXISTING USER (100 keys)
+  [ 5/10] 🔄 Build user data  █████░░░░░
+  [ 5/10] ✅ Build user data  █████░░░░░  100 keys (2ms)
+  [ 6/10] 🔄 Circular reference check  ██████░░░░
+  [ 6/10] ✅ Circular reference check  ██████░░░░  0 circular refs ✅
+  [ 7/10] 🔄 Structure validation  ███████░░░
+
+  🔒 CRITICAL FIELDS AUDIT — game will crash/stuck if wrong
+  ──────────────────────────────────────────────
+  ├ 🔒 training._award          = null  present — FIX-001 safe
+  ├ 🔒 user._attribute._items[104] = present  Level=1
+  ├ 🔒 imprint._items           = Object{}  FIX-005: client L114925 uses for...in → needs Object
+  ├ 🔒 weapon._items            = Object{}  FIX-005: client L130938 uses for...in → needs Object
+  └ 🔒 genki._items             = Object{}  FIX-005: client L132158 uses for...in → needs Object
+  ✅ CRITICAL AUDIT: 5/5 PASSED
+
+  [ 7/10] ✅ Structure validation  ███████░░░  100 keys audited
+
+  ⚠️ WARNINGS DETECTED
+  ──────────────────────────────────────────────
+  ⚠️  [W001] training._award EXISTS in stored data — potential circular ref
+       Got:      type=object
+       Impact:   Client bug L121387 may create nesting loop on re-login
+       Fix:      stripCircularReferences will sanitize before response
+  ⚠️ TOTAL WARNINGS: 1
+
+  [ 8/10] 🔄 JSON serialization test  ████████░░
+  [ 8/10] ✅ JSON serialization test  ████████░░  OK (10,079 bytes)
+  [ 9/10] 🔄 Database save  █████████░
+[DB] saveUser("guest_e8fcd7..."): 100 keys, 10079 bytes
+  [ 9/10] ✅ Database save  █████████░  6ms 💾
+  [10/10] 🔄 Response build  ██████████
+  [10/10] ✅ Response build  ██████████  OK 📤
+
+  ═══════════════════════════════════════════
+
+  ✅ ENTER GAME COMPLETE — WITH WARNINGS
+
+  👤 USER:       guest_e8fcd70f9e91ce9e (Returning User)
+  📦 FIELDS:     100
+  🦸 HEROES:     1 hero(es)
+  💎 DIAMOND:    0
+  🏆 LEVEL:      1
+
+  📏 JSON SIZE:  10,079 chars
+  📦 RESP SIZE:  2,398 chars
+  🔐 PROTOCOL:   LZ-STRING
+  ⏱️ TOTAL TIME: 42ms  ██████░░░░░░░░░░
+
+  🔒 CRITICAL:   5/5 PASSED
+  ⚠️ WARNINGS:   1
+  ❌ ERRORS:     0
+
+  ═══════════════════════════════════════════
+
+✅ user::enterGame        OK     ────────────────────────────
+  └ ret=0 2398 chars (LZ) 42ms
+
+  ✅ SUCCESS  📏 data= 2398 chars  📦 proto= LZ-STRING  ⏱️ time= 42ms
+
+  └ ⏱️ handler: 42ms
+
+  📤 user::getBulletinBrief ──────────────────────────────────
+  [ 1/ 1] 🔄 Get bulletin brief  █
+  [ 1/ 1] ✅ Get bulletin brief  █  0 bulletins
+
+  🔒 CRITICAL FIELDS AUDIT — game will crash/stuck if wrong
+  ──────────────────────────────────────────────
+  └ 🔒 _brief                   = Object{0}  L121094: for(var o in n._brief) iterates each bulletin
+  ✅ CRITICAL AUDIT: 1/1 PASSED
+
+✅ user::getBulletinBrief OK     ────────────────────────────
+  └ ret=0 13 chars (raw) 2ms
+
+  ✅ SUCCESS  📏 data= 13 chars  📦 proto= RAW  ⏱️ time= 2ms
+
+  └ ⏱️ handler: 2ms
+
+  📤 friend::friendServerAction ──────────────────────────────────
+  [ 1/ 2] 🔄 Route relay action  █░
+  [ 1/ 2] ✅ Route relay action  █░  relayAction="${relayAction}"
+  [ 2/ 2] 🔄 Handle queryFriends  ██
+  [ 2/ 2] ✅ Handle queryFriends  ██  0 friends
+✅ friend::friendServerAction OK     ────────────────────────────
+  └ ret=0 12 chars (raw) 3ms
+
+  ✅ SUCCESS  📏 data= 12 chars  📦 proto= RAW  ⏱️ time= 3ms
+
+  └ ⏱️ handler: 3ms
+
+  📤 friend::friendServerAction ──────────────────────────────────
+  [ 1/ 2] 🔄 Route relay action  █░
+  [ 1/ 2] ✅ Route relay action  █░  relayAction="${relayAction}"
+  [ 2/ 2] 🔄 Handle queryBlackList  ██
+  [ 2/ 2] ✅ Handle queryBlackList  ██  0 entries
+✅ friend::friendServerAction OK     ────────────────────────────
+  └ ret=0 12 chars (raw) 2ms
+
+  ✅ SUCCESS  📏 data= 12 chars  📦 proto= RAW  ⏱️ time= 2ms
+
+  └ ⏱️ handler: 3ms
+
+  📤 guide::saveGuide       ──────────────────────────────────
+  [ 1/ 2] 🔄 Save guide progress  █░
+  [ 1/ 2] ✅ Save guide progress  █░  type=2 step=2107
+  [ 2/ 2] 🔄 Persist guide data  ██
+[DB] saveUser("guest_e8fcd7..."): 100 keys, 10079 bytes
+  [ 2/ 2] ✅ Persist guide data  ██  saved guide._steps[2]=2107
+✅ guide::saveGuide       OK     ────────────────────────────
+  └ ret=0 2 chars (raw) 6ms
+
+  ✅ SUCCESS  📏 data= 2 chars  📦 proto= RAW  ⏱️ time= 6ms
+
+  └ ⏱️ handler: 6ms
+
+  📤 hangup::saveGuideTeam  ──────────────────────────────────
+  [ 1/ 2] 🔄 Save guide team  █░
+  [ 1/ 2] ✅ Save guide team  █░  team=5 heroes
+  [ 2/ 2] 🔄 Persist team data  ██
+[DB] saveUser("guest_e8fcd7..."): 101 keys, 10194 bytes
+  [ 2/ 2] ✅ Persist team data  ██  saved to DB
+✅ hangup::saveGuideTeam  OK     ────────────────────────────
+  └ ret=0 2 chars (raw) 6ms
+
+  ✅ SUCCESS  📏 data= 2 chars  📦 proto= RAW  ⏱️ time= 6ms
+
+  └ ⏱️ handler: 7ms
+
+  📤 hangup::checkBattleResult ──────────────────────────────────
+  [ 1/ 5] 🔄 Validate request  █░░░░
+  [ 1/ 5] ✅ Validate request  █░░░░
+  [ 2/ 5] 🔄 Load data  ██░░░
+🟢 02:17:25.058 INFO  📋 CONFIG   ▸ Resource loaded: lesson.json
+  [ 2/ 5] ✅ Load data  ██░░░  lesson.json=611 entries
+  [ 3/ 5] 🔄 Read progress  ███░░
+  [ 3/ 5] ✅ Read progress  ███░░  lesson=10101
+  [ 4/ 5] 🔄 Determine outcome  ████░
+  [ 4/ 5] ✅ Determine outcome  ████░  WIN (0)
+  [ 5/ 5] 🔄 Build response  █████
+[DB] saveUser("guest_e8fcd7..."): 101 keys, 10268 bytes
+  [ 5/ 5] ✅ Build response  █████  WIN rewards=5 lesson=10102
+
+  🔒 CRITICAL FIELDS AUDIT — game will crash/stuck if wrong
+  ──────────────────────────────────────────────
+  ├ 🔒 _battleResult            = 0  L104882: 0 == e._battleResult -> true (tutorial forced win)
+  ├ 🔒 _changeInfo._items       = 5 items  L97686: getBattleAwardItems iterates _changeInfo._items for {_id, _num}
+  ├ 🔒 _curLess                 = 10102  L104892/L97751: OnHookSingleton.lastSection = e._curLess
+  └ 🔒 _maxPassLesson           = 10101  L104893/L97751: OnHookSingleton.maxPassLesson = e._maxPassLesson
+  ✅ CRITICAL AUDIT: 4/4 PASSED
+
+
+  ═══════════════════════════════════════════
+
+  ✅ CHECK BATTLE RESULT
+
+  👤 USER:       guest_e8fcd70f9e91ce9e
+  📦 FIELDS:     4
+
+
+
+  ═══════════════════════════════════════════
+
+✅ hangup::checkBattleResult OK     ────────────────────────────
+  └ ret=0 218 chars (raw) 22ms
+
+  ✅ SUCCESS  📏 data= 218 chars  📦 proto= RAW  ⏱️ time= 22ms
+
+  └ ⏱️ handler: 22ms
+
+  📤 buryPoint::guideBattle ──────────────────────────────────
+🟡 02:17:27.164 WARN  ⚙️ HANDLER  ▸ Unknown type "buryPoint" — no handlers registered for this type
+
+  📤 user::registChat       ──────────────────────────────────
+  [ 1/ 3] 🔄 Validate request  █░░
+  [ 1/ 3] ✅ Validate request  █░░  userId=guest_e8fcd70f9e...
+  [ 2/ 3] 🔄 Build response  ██░
+  [ 2/ 3] ✅ Build response  ██░  6 fields prepared
+  [ 3/ 3] 🔄 Return response  ███
+  [ 3/ 3] ✅ Return response  ███  ret=0 1ms
+
+  ⚠️ WARNINGS DETECTED
+  ──────────────────────────────────────────────
+  ⚠️  [W001] chat-server must be running on http://127.0.0.1:8002
+       Impact:   Chat will never connect. Client stops retrying registChat after 15 attempts (45s).
+
+  ⚠️  [W002] chat-server MUST implement TEA handshake (verifyEnable=true)
+       Impact:   Client connection stalls — callback never fires, no chat, no error shown.
+
+  ⚠️  [W003] guildRoomId, teamDungeonChatRoom, teamChatRoom = undefined (by design)
+       Impact:   None — client correctly skips joining these rooms when undefined.
+  ⚠️ TOTAL WARNINGS: 3
+
+
+  🔒 CRITICAL FIELDS AUDIT — game will crash/stuck if wrong
+  ──────────────────────────────────────────────
+  ├ 🔒 _success                 = true  L114470: n._success ? connect chat : retry every 3s (max 15)
+  ├ 🔒 _chatServerUrl           = http://127.0.0.1:8002  L114480→L82537: io.connect(url) — MUST be full URL
+  ├ 🔒 _worldRoomId             = world_1  L114566: chatJoinRequest(worldRoomId) — ALWAYS joined after login
+  ├ 🔒 _guildRoomId             = (undefined)  L114568: if(guildRoomId) join — undefined = skip (no guild)
+  ├ 🔒 _teamDungeonChatRoom     = (undefined)  L114579: if(teamDungeonChatRoom) join — undefined = skip
+  └ 🔒 _teamChatRoom            = (undefined)  L114590: if(teamChatRoomId) join — undefined = skip (no team)
+  ✅ CRITICAL AUDIT: 6/6 PASSED
+
+
+  ═══════════════════════════════════════════
+
+  ✅ REGIST CHAT COMPLETE
+
+  👤 USER:       guest_e8fcd70f9e91ce9e
+  📦 FIELDS:     6
+
+  ⏱️ TOTAL TIME: 1ms  ░░░░░░░░░░░░░░░░
+
+
+  ═══════════════════════════════════════════
+
+✅ user::registChat       OK     ────────────────────────────
+  └ ret=0 83 chars (raw) 6ms
+
+  ✅ SUCCESS  📏 data= 83 chars  📦 proto= RAW  ⏱️ time= 6ms
+
+  └ ⏱️ handler: 7ms
+
+  📤 buryPoint::guideBattle ──────────────────────────────────
+🟡 02:17:38.052 WARN  ⚙️ HANDLER  ▸ Unknown type "buryPoint" — no handlers registered for this type
+
+  ➖ DISCONNECT ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─
+  └ 🔗 reason: reason=ping timeout  sid= OsEMOMr2...
+
+  ➕ NEW CONNECTION ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─
+🟢 02:18:23.078 INFO  🔐 TEA      ▸ Sending verify challenge
+🟢 02:18:23.112 INFO  🔐 TEA      ▸ TEA verification SUCCESS
 ```
