@@ -99,6 +99,11 @@ const constantJson = loadResource('constant');
 const heroJson = loadResource('hero');
 const summonJson = loadResource('summon');
 
+// Pre-load hero attribute config (used by hero/getAttrs handler)
+const heroLevelAttrJson = loadResource('heroLevelAttr');
+const heroTypeParamJson = loadResource('heroTypeParam');
+const heroQualityParamJson = loadResource('heroQualityParam');
+
 // Warn if critical resources are missing
 if (!constantJson) {
     logger.log('ERROR', 'CONFIG', chalk.red('CRITICAL: constant.json is MISSING') + ' — defaults will be used');
@@ -108,6 +113,15 @@ if (!heroJson) {
 }
 if (!summonJson) {
     logger.log('WARN', 'CONFIG', chalk.yellow('WARNING: summon.json is MISSING') + ' — summon defaults will be used');
+}
+if (!heroLevelAttrJson) {
+    logger.log('WARN', 'CONFIG', chalk.yellow('WARNING: heroLevelAttr.json is MISSING') + ' — getAttrs will fail');
+}
+if (!heroTypeParamJson) {
+    logger.log('WARN', 'CONFIG', chalk.yellow('WARNING: heroTypeParam.json is MISSING') + ' — getAttrs will fail');
+}
+if (!heroQualityParamJson) {
+    logger.log('WARN', 'CONFIG', chalk.yellow('WARNING: heroQualityParam.json is MISSING') + ' — getAttrs will fail');
 }
 logger.headerEnd();
 
@@ -649,7 +663,10 @@ logger.log('INFO', 'CONFIG', chalk.bold('Resource JSON status:'));
 logger.table([
     ['constant.json', constantJson ? chalk.green(`${Object.keys(constantJson).length} entries`) : chalk.red('MISSING')],
     ['hero.json', heroJson ? chalk.green(`${Object.keys(heroJson).length} entries`) : chalk.red('MISSING')],
-    ['summon.json', summonJson ? chalk.green(`${Object.keys(summonJson).length} entries`) : chalk.yellow('MISSING')]
+    ['summon.json', summonJson ? chalk.green(`${Object.keys(summonJson).length} entries`) : chalk.yellow('MISSING')],
+    ['heroLevelAttr.json', heroLevelAttrJson ? chalk.green(`${Object.keys(heroLevelAttrJson).length} entries`) : chalk.yellow('MISSING')],
+    ['heroTypeParam.json', heroTypeParamJson ? chalk.green(`${Object.keys(heroTypeParamJson).length} entries`) : chalk.yellow('MISSING')],
+    ['heroQualityParam.json', heroQualityParamJson ? chalk.green(`${Object.keys(heroQualityParamJson).length} entries`) : chalk.yellow('MISSING')]
 ]);
 
 logger.separator('═');
