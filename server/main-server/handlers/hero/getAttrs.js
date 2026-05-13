@@ -55,52 +55,17 @@
  *   hero.json[heroDisplayId]     → hero template config
  *
  * STRICT RULES: NO STUB, OVERRIDE, FORCE, BYPASS, DUMMY, ASUMSI
+ *
+ * ═══════════════════════════════════════════════════════════════
+ * BUG FIX LOG
+ * ═══════════════════════════════════════════════════════════════
+ *
+ * [FIX-001] Resource path — hardcoded relative path replaced with ctx.loadResource()
+ *   OLD: const CONFIG_DIR = path.resolve(__dirname, '../../../resource/json');
+ *   NEW: Uses ctx.loadResource() via centralized config.resourcePath
+ *   REASON: Hardcoded path fragile across deployments; ctx.loadResource()
+ *     uses config.resolveResourcePath() which checks 6 candidate paths
  */
-
-const path = require('path');
-const fs = require('fs');
-
-// ─── Load config JSON files once ───
-const CONFIG_DIR = path.resolve(__dirname, '../../../resource/json');
-
-let _heroJson = null;
-let _heroLevelAttrJson = null;
-let _heroTypeParamJson = null;
-let _heroQualityParamJson = null;
-
-function loadJson(filename) {
-    const filePath = path.join(CONFIG_DIR, filename);
-    if (!fs.existsSync(filePath)) {
-        console.error(`[getAttrs] CONFIG FILE MISSING: ${filePath}`);
-        return null;
-    }
-    try {
-        return JSON.parse(fs.readFileSync(filePath, 'utf8'));
-    } catch (e) {
-        console.error(`[getAttrs] CONFIG PARSE ERROR: ${filename} — ${e.message}`);
-        return null;
-    }
-}
-
-function getHeroJson() {
-    if (!_heroJson) _heroJson = loadJson('hero.json');
-    return _heroJson;
-}
-
-function getHeroLevelAttrJson() {
-    if (!_heroLevelAttrJson) _heroLevelAttrJson = loadJson('heroLevelAttr.json');
-    return _heroLevelAttrJson;
-}
-
-function getHeroTypeParamJson() {
-    if (!_heroTypeParamJson) _heroTypeParamJson = loadJson('heroTypeParam.json');
-    return _heroTypeParamJson;
-}
-
-function getHeroQualityParamJson() {
-    if (!_heroQualityParamJson) _heroQualityParamJson = loadJson('heroQualityParam.json');
-    return _heroQualityParamJson;
-}
 
 // ─── Attribute ID constants (from abilityName.json + HeroAbilityName enum) ───
 const ATTR = {
@@ -145,39 +110,53 @@ const ATTR = {
  *
  * @param {number} heroDisplayId - Hero template ID (key into hero.json)
  * @param {number} level - Hero level
+ * @param {object} ctx - Context with loadResource()
  * @returns {Object|null} Calculated base attrs { hp, attack, armor, speed, talent, energyMax, power }
  */
-function calculateHeroBaseAttrs(heroDisplayId, level) {
-    const heroJson = getHeroJson();
-    const levelAttrJson = getHeroLevelAttrJson();
-    const typeParamJson = getHeroTypeParamJson();
-    const qualityParamJson = getHeroQualityParamJson();
+function calculateHeroBaseAttrs(heroDisplayId, level, ctx) {
+    // ─── Load all required config via centralized loadResource() ───
+    const heroJson = ctx.loadResource('hero');
+    const levelAttrJson = ctx.loadResource('heroLevelAttr');
+    const typeParamJson = ctx.loadResource('heroTypeParam');
+    const qualityParamJson = ctx.loadResource('heroQualityParam');
 
     if (!heroJson || !levelAttrJson || !typeParamJson || !qualityParamJson) {
+        ctx.logger.log('ERROR', 'ATTRS', 'Missing required config JSON(s) — cannot calculate hero attrs');
+        ctx.logger.details('config',
+            ['hero.json', heroJson ? 'OK' : 'MISSING'],
+            ['heroLevelAttr.json', levelAttrJson ? 'OK' : 'MISSING'],
+            ['heroTypeParam.json', typeParamJson ? 'OK' : 'MISSING'],
+            ['heroQualityParam.json', qualityParamJson ? 'OK' : 'MISSING'],
+            ['resourcePath', ctx.config.resourcePath]
+        );
         return null;
     }
 
     // 1. Get hero template config
     const heroConfig = heroJson[String(heroDisplayId)];
     if (!heroConfig) {
+        ctx.logger.log('WARN', 'ATTRS', `Hero template NOT found in hero.json: displayId=${heroDisplayId}`);
         return null;
     }
 
     // 2. Get level-based base stats
     const levelData = levelAttrJson[String(level)];
     if (!levelData) {
+        ctx.logger.log('WARN', 'ATTRS', `Level data NOT found in heroLevelAttr.json: level=${level}`);
         return null;
     }
 
     // 3. Get type multipliers (heroType e.g. "critical", "body", "skill")
     const typeConfig = typeParamJson[heroConfig.heroType];
     if (!typeConfig) {
+        ctx.logger.log('WARN', 'ATTRS', `Type param NOT found: heroType="${heroConfig.heroType}" for hero ${heroDisplayId}`);
         return null;
     }
 
     // 4. Get quality multipliers
     const qualityConfig = qualityParamJson[heroConfig.quality];
     if (!qualityConfig) {
+        ctx.logger.log('WARN', 'ATTRS', `Quality param NOT found: quality="${heroConfig.quality}" for hero ${heroDisplayId}`);
         return null;
     }
 
@@ -284,7 +263,7 @@ function handleHeroGetAttrs(request, ctx) {
         const heroData = userData.heros._heros[heroId];
 
         if (!heroData) {
-            ctx.logger.warn(`Hero ${heroId} not found in userData.heros._heros — returning empty attrs`);
+            ctx.logger.log('WARN', 'ATTRS', `Hero ${heroId} not found in userData.heros._heros — returning empty attrs`);
             attrs[i] = { _items: {} };
             baseAttrs[i] = { _items: {} };
             continue;
@@ -299,11 +278,11 @@ function handleHeroGetAttrs(request, ctx) {
             ['level', String(level)]
         );
 
-        // Calculate base attributes from hero config + level
-        const baseStats = calculateHeroBaseAttrs(heroDisplayId, level);
+        // Calculate base attributes from hero config + level (via ctx.loadResource)
+        const baseStats = calculateHeroBaseAttrs(heroDisplayId, level, ctx);
 
         if (!baseStats) {
-            ctx.logger.warn(`Cannot calculate attrs for heroDisplayId=${heroDisplayId} level=${level} — missing config`);
+            ctx.logger.log('WARN', 'ATTRS', `Cannot calculate attrs for heroDisplayId=${heroDisplayId} level=${level} — missing config`);
             attrs[i] = { _items: {} };
             baseAttrs[i] = { _items: {} };
             continue;
