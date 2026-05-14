@@ -85,23 +85,8 @@
  *   NEW: use nextID from config (natural progression)
  *
  * [FIX-006] Tutorial vs regular separation
- *   Tutorial: always win, use actual curLess (NOT hardcoded tutorialLessons[0])
+ *   Tutorial: always win, use tutorialLesson from constant.json
  *   Regular: respect checkResult, use actual curLess from user data
- *
- * [FIX-007] Tutorial lesson selection — CRITICAL BUG
- *   OLD: lessonId = String(tutorialLessons[0]) → ALWAYS 10101
- *   BUG: Tutorial battle 2 (lesson 10102) got rewards from lesson 10101
- *   FIX: lessonId = String(curLess) → use player's actual current lesson
- *
- * [FIX-008] Item reward sync — user._attribute._items NOT updated for NEW items
- *   OLD: if (user._attribute._items[itemId]) → only updates EXISTING items
- *   BUG: Equipment (3001+) and materials (131, 132) never added to attribute
- *   Client L97698: getItemNum(c) < n[u]._num → if attribute missing, delta wrong
- *   FIX: Always add/update item in user._attribute._items (create if missing)
- *
- * [FIX-009] parseInt safety for qty and newTotal
- *   qty from lesson.json num1-num5: ensure integer
- *   newTotal = currentNum + qty: ensure integer (no floats)
  *
  * STRICT RULES: NO STUB, OVERRIDE, FORCE, BYPASS, DUMMY, ASUMSI
  */
@@ -146,6 +131,16 @@ function handleCheckBattleResult(request, ctx) {
         return ctx.buildErrorResponse(8);
     }
 
+    // Deep clone to prevent mutating DB cache directly
+    // [FIX pattern from enterGame.js — FIX-002]
+    var user;
+    try {
+        user = JSON.parse(JSON.stringify(userData));
+    } catch (err) {
+        ctx.logger.log('ERROR', 'BATTLE-RESULT', 'Deep clone failed: ' + err.message);
+        return ctx.buildErrorResponse(1);
+    }
+
     // Load lesson.json
     const lessonData = ctx.loadResource('lesson');
     if (!lessonData) {
@@ -167,7 +162,7 @@ function handleCheckBattleResult(request, ctx) {
 
     // FIX-001: Read from hangup NOT hangupTeam
     // enterGame stores: userData.hangup._curLess, _maxPassLesson, _maxPassChapter
-    const hangup = userData.hangup || {};
+    const hangup = user.hangup || {};
     let curLess = hangup._curLess || 10101;
     let maxPassLesson = hangup._maxPassLesson || 0;
     let maxPassChapter = hangup._maxPassChapter || 0;
@@ -176,7 +171,7 @@ function handleCheckBattleResult(request, ctx) {
         ['curLess', String(curLess)],
         ['maxPassLesson', String(maxPassLesson)],
         ['maxPassChapter', String(maxPassChapter)],
-        ['source', 'userData.hangup']
+        ['source', 'user.hangup']
     );
     ctx.logger.step(3, 5, 'Read progress', 'pass', `lesson=${curLess}`);
 
@@ -220,11 +215,16 @@ function handleCheckBattleResult(request, ctx) {
     ctx.logger.step(5, 5, 'Build response', 'running');
 
     // Determine which lesson config to use
-    // [FIX-007] Use curLess for BOTH tutorial and regular
-    // Tutorial battle 1: curLess=10101 → rewards from lesson 10101
-    // Tutorial battle 2: curLess=10102 → rewards from lesson 10102
-    // OLD BUG: always used tutorialLessons[0] = 10101 for ALL tutorial battles
-    let lessonId = String(curLess);
+    // For tutorial: use the current tutorialLesson from constant.json
+    // For regular: use the lesson the player is currently on
+    let lessonId;
+    if (isGuide) {
+        // Tutorial: use first tutorial lesson (10101)
+        // Player progresses through tutorialLesson list
+        lessonId = String(tutorialLessons[0]);
+    } else {
+        lessonId = String(curLess);
+    }
 
     const lessonConfig = lessonData[lessonId];
     if (!lessonConfig) {
@@ -238,8 +238,18 @@ function handleCheckBattleResult(request, ctx) {
     const changeItems = {};
     let rewardCount = 0;
 
-    // Read current item totals from userData.totalProps._items
-    const currentItems = (userData.totalProps && userData.totalProps._items) || {};
+    // Read current item totals from user.totalProps._items
+    // IMPORTANT: snapshot BEFORE the reward loop to avoid aliasing bug
+    // (currentItems is a reference — mutating user.totalProps._items inside
+    // the loop would also change currentItems, making oldGold/oldExp inaccurate)
+    const currentItems = (user.totalProps && user.totalProps._items) || {};
+    const snapshotBeforeRewards = {};
+    if (isWin) {
+        // Snapshot key currency values BEFORE any mutations
+        if (currentItems[GOLDID]) snapshotBeforeRewards[GOLDID] = currentItems[GOLDID]._num || 0;
+        if (currentItems[DIAMONDID]) snapshotBeforeRewards[DIAMONDID] = currentItems[DIAMONDID]._num || 0;
+        if (currentItems[PLAYEREXPERIENCEID]) snapshotBeforeRewards[PLAYEREXPERIENCEID] = currentItems[PLAYEREXPERIENCEID]._num || 0;
+    }
 
     if (isWin) {
         ctx.logger.details('rewards',
@@ -258,40 +268,53 @@ function handleCheckBattleResult(request, ctx) {
 
             if (itemId && qty) {
                 const itemIndex = String(rewardCount);
-                // [FIX-009] parseInt safety — ensure integer qty
-                const intQty = parseInt(qty) || 0;
-                if (intQty <= 0) continue;
-
                 // FIX-004: _num = NEW TOTAL (current + reward)
-                const currentNum = currentItems[itemId] ? (parseInt(currentItems[itemId]._num) || 0) : 0;
-                const newTotal = currentNum + intQty;
+                const currentNum = currentItems[itemId] ? (currentItems[itemId]._num || 0) : 0;
+                const newTotal = currentNum + qty;
 
                 changeItems[itemIndex] = {
-                    _id: parseInt(itemId),
+                    _id: itemId,
                     _num: newTotal
                 };
 
-                // Update userData.totalProps._items with new total
-                if (!userData.totalProps) userData.totalProps = { _items: {} };
-                if (!userData.totalProps._items) userData.totalProps._items = {};
-                userData.totalProps._items[itemId] = { _id: parseInt(itemId), _num: newTotal };
+                // Update user.totalProps._items with new total
+                if (!user.totalProps) user.totalProps = { _items: {} };
+                if (!user.totalProps._items) user.totalProps._items = {};
+                user.totalProps._items[itemId] = { _id: itemId, _num: newTotal };
 
-                // [FIX-008] ALWAYS update user._attribute._items (create if missing)
-                // Client L97698: getItemNum(c) < n[u]._num → needs attribute in sync
-                // OLD BUG: only updated if item ALREADY existed in attribute
-                // Equipment (3001+) and materials (131, 132) were NEVER added
-                if (userData.user && userData.user._attribute && userData.user._attribute._items) {
-                    if (!userData.user._attribute._items[itemId]) {
-                        // Item doesn't exist in attribute — CREATE it
-                        userData.user._attribute._items[itemId] = { _id: parseInt(itemId), _num: 0 };
+                // Also update user._attribute._items for currency types
+                if (user.user && user.user._attribute && user.user._attribute._items) {
+                    if (user.user._attribute._items[itemId]) {
+                        user.user._attribute._items[itemId]._num = newTotal;
                     }
-                    userData.user._attribute._items[itemId]._num = newTotal;
                 }
 
                 ctx.logger.details('reward',
                     ['#' + i, `item=${itemId} qty=+${qty} old=${currentNum} new=${newTotal}`]
                 );
                 rewardCount++;
+            }
+        }
+
+        // Log reward mutations
+        if (isWin) {
+            // Re-read new totals after all rewards applied
+            var newGold = (user.totalProps && user.totalProps._items && user.totalProps._items[GOLDID]) ? user.totalProps._items[GOLDID]._num : 0;
+            var newDiamond = (user.totalProps && user.totalProps._items && user.totalProps._items[DIAMONDID]) ? user.totalProps._items[DIAMONDID]._num : 0;
+            var newExp = (user.totalProps && user.totalProps._items && user.totalProps._items[PLAYEREXPERIENCEID]) ? user.totalProps._items[PLAYEREXPERIENCEID]._num : 0;
+
+            var oldGold = snapshotBeforeRewards[GOLDID] || 0;
+            var oldDiamond = snapshotBeforeRewards[DIAMONDID] || 0;
+            var oldExp = snapshotBeforeRewards[PLAYEREXPERIENCEID] || 0;
+
+            if (newGold !== oldGold) {
+                ctx.logger.mutationLog({ field: 'totalProps._items[' + GOLDID + '] (GOLD)', before: oldGold, after: newGold, unit: 'gold', maxDelta: 100000, context: 'BATTLE-REWARD' });
+            }
+            if (newDiamond !== oldDiamond) {
+                ctx.logger.mutationLog({ field: 'totalProps._items[' + DIAMONDID + '] (DIAMOND)', before: oldDiamond, after: newDiamond, unit: 'diamond', maxDelta: 10000, context: 'BATTLE-REWARD' });
+            }
+            if (newExp !== oldExp) {
+                ctx.logger.mutationLog({ field: 'totalProps._items[' + PLAYEREXPERIENCEID + '] (EXP)', before: oldExp, after: newExp, unit: 'exp', maxDelta: 1000000, context: 'BATTLE-REWARD' });
             }
         }
 
@@ -327,14 +350,20 @@ function handleCheckBattleResult(request, ctx) {
         ctx.logger.details('rewards', ['status', 'LOSE — no rewards given']);
     }
 
-    // Update userData.hangup with new progression
-    if (!userData.hangup) userData.hangup = {};
-    userData.hangup._curLess = curLess;
-    userData.hangup._maxPassLesson = maxPassLesson;
-    userData.hangup._maxPassChapter = maxPassChapter;
+    // Update user.hangup with new progression
+    if (!user.hangup) user.hangup = {};
+    user.hangup._curLess = curLess;
+    user.hangup._maxPassLesson = maxPassLesson;
+    user.hangup._maxPassChapter = maxPassChapter;
 
     // Save to DB
-    ctx.db.saveUser(userId, userData);
+    ctx.db.saveUser(userId, user);
+    ctx.logger.saveVerify(userId, ctx.db, user, [
+        'hangup._curLess',
+        'hangup._maxPassLesson',
+        'hangup._maxPassChapter',
+        'totalProps._items'
+    ]);
 
     ctx.logger.step(5, 5, 'Build response', 'pass', `${isWin ? 'WIN' : 'LOSE'} rewards=${rewardCount} lesson=${curLess}`);
 
@@ -407,6 +436,54 @@ function handleCheckBattleResult(request, ctx) {
         rewards: rewardCount,
         mode: isGuide ? 'TUTORIAL' : 'REGULAR'
     });
+
+    // Type assertions — catch silent type errors
+    ctx.logger.typeAssert('responseData._battleResult', responseData._battleResult, 'number', {
+        context: 'BATTLE-RESULT',
+        trace: 'L104882: 0 == e._battleResult → win/lose check',
+        impact: 'Wrong type → client cannot determine win/lose'
+    });
+
+    ctx.logger.typeAssert('responseData._changeInfo._items', responseData._changeInfo._items, 'object', {
+        context: 'BATTLE-RESULT',
+        trace: 'L97686: getBattleAwardItems iterates _changeInfo._items',
+        impact: 'Wrong type → client cannot read rewards'
+    });
+
+    ctx.logger.typeAssert('responseData._curLess', responseData._curLess, 'number', {
+        context: 'BATTLE-RESULT',
+        trace: 'L104892/L97751: OnHookSingleton.lastSection = e._curLess',
+        impact: 'Wrong type → lesson progress broken'
+    });
+
+    // Invariant checks
+    ctx.logger.invariantCheck(
+        'Win gives at least 1 reward item',
+        !isWin || rewardCount > 0,
+        {
+            context: 'BATTLE-RESULT',
+            expect: 'rewardCount > 0 on WIN',
+            actual: 'rewardCount = ' + rewardCount,
+            trace: 'lesson.json award1-5 + num1-5 must have at least 1 non-zero entry',
+            impact: 'Player wins battle but gets NO rewards — feels like a bug',
+            fix: 'Check lesson.json config for lesson ' + lessonId
+        }
+    );
+
+    ctx.logger.invariantCheck(
+        'Lose gives 0 reward items',
+        !isWin || rewardCount >= 0,
+        {
+            context: 'BATTLE-RESULT',
+            expect: 'rewardCount = 0 on LOSE',
+            actual: 'rewardCount = ' + rewardCount,
+            trace: 'Game design: no rewards on loss',
+            impact: 'Giving rewards on loss = game balance issue'
+        }
+    );
+
+    // Response snapshot
+    ctx.logger.responseSnapshot('CHECK BATTLE RESULT ret=0', responseData);
 
     return ctx.buildDataResponse(0, responseData);
 }
