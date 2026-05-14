@@ -516,6 +516,19 @@ async function handleEnterGame(request, ctx) {
     ctx.db.saveUser(userId, userData);
     ctx.logger.step(9, 10, 'Database save', 'pass', (Date.now() - saveStart) + 'ms 💾');
 
+    // Post-save integrity verification
+    ctx.logger.saveVerify(userId, ctx.db, userData, [
+        'user._id',
+        'user._attribute._items.' + PLAYERLEVELID,
+        'user._attribute._items.' + DIAMONDID,
+        'heros._heros',
+        'summon._energy',
+        'summon._canCommonFreeTime',
+        'summon._canSuperFreeTime',
+        'totalProps._items',
+        'hangup._curLess'
+    ]);
+
     // ─── Step 10: Build response ───
     ctx.logger.step(10, 10, 'Response build', 'running');
     let response;
@@ -558,6 +571,35 @@ async function handleEnterGame(request, ctx) {
         warnings: warningCount,
         errors: errorCount
     });
+
+    // Response snapshot — verify response structure before sending
+    ctx.logger.responseSnapshot('ENTER GAME ret=0', userData);
+
+    // Type scan on critical response fields
+    var enterSpecs = {
+        'user': 'object',
+        'heros': 'object',
+        'hangup': 'object',
+        'totalProps': 'object',
+        'summon': 'object',
+        'newUser': 'boolean',
+        'serverVersion': 'string',
+        'serverId': 'string'
+    };
+
+    var enterScan = ctx.logger.deepTypeScan(userData, enterSpecs, 'userData');
+    if (enterScan.failed > 0) {
+        enterScan.errors.forEach(function(e) {
+            ctx.logger.errorBanner({
+                module: 'ENTER',
+                step: 'RESPONSE TYPE SCAN',
+                message: e.path + ' expected ' + e.expected + ' but got ' + e.actual,
+                trace: 'UserDataParser reads these fields on client',
+                impact: 'Client crash or silent data loss',
+                fix: 'Check buildNewUserData or updateExistingUser'
+            });
+        });
+    }
 
     return response;
 }
@@ -1476,6 +1518,59 @@ function buildNewUserData(userId, request, ctx) {
         // ═══ Extra: mergedServers — seen in live server responses ═══
         mergedServers: []
     };
+
+    // ─── Invariant checks for summon initialization ───
+    ctx.logger.invariantCheck(
+        'summon._energy = 0 for new user',
+        result.summon._energy === 0,
+        {
+            context: 'ENTER-BUILD',
+            expect: 'summon._energy = 0 (new user starts with no energy)',
+            actual: 'summon._energy = ' + result.summon._energy,
+            trace: 'SummonSingleton._energy — client displays this._energy + "/" + max',
+            impact: 'If non-zero → energy display shows wrong value on first login',
+            fix: 'New user must start with 0 energy'
+        }
+    );
+
+    ctx.logger.invariantCheck(
+        'summon._canCommonFreeTime = now (ready for first summon)',
+        result.summon._canCommonFreeTime === now,
+        {
+            context: 'ENTER-BUILD',
+            expect: 'summon._canCommonFreeTime = now (no wait for first summon)',
+            actual: 'summon._canCommonFreeTime = ' + result.summon._canCommonFreeTime,
+            trace: 'L95370 commonSummonFree() — checks (canCommonFreeTime - serverTime)/1000',
+            impact: 'If future time → player must wait before first free COMMON summon',
+            fix: 'Set to Date.now() for new user'
+        }
+    );
+
+    ctx.logger.invariantCheck(
+        'summon._canSuperFreeTime = now (ready for first summon)',
+        result.summon._canSuperFreeTime === now,
+        {
+            context: 'ENTER-BUILD',
+            expect: 'summon._canSuperFreeTime = now (no wait for first summon)',
+            actual: 'summon._canSuperFreeTime = ' + result.summon._canSuperFreeTime,
+            trace: 'L95370 superSummonFree() — checks (canSuperFreeTime - serverTime)/1000',
+            impact: 'If future time → player must wait before first free SUPER summon',
+            fix: 'Set to Date.now() for new user'
+        }
+    );
+
+    ctx.logger.invariantCheck(
+        'summonTimes covers ALL summon pools',
+        Object.keys(summonTimes).length === Object.keys(summonRes).length,
+        {
+            context: 'ENTER-BUILD',
+            expect: Object.keys(summonRes).length + ' pools initialized',
+            actual: Object.keys(summonTimes).length + ' pools initialized',
+            trace: 'UserDataParser.setSummon reads n._summonTimes',
+            impact: 'Missing pool → summon count not tracked for that pool type',
+            fix: 'Loop through all summonRes entries'
+        }
+    );
 
     // ─── Log build result ───
     const totalKeys = Object.keys(result).length;
