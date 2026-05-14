@@ -288,28 +288,38 @@ async function handleSummonOneFree(request, ctx) {
     user.heros._heros[heroId] = heroObj;
     var totalHeroes = Object.keys(user.heros._heros).length;
 
-    // 7b: Update summon energy
-    // Traced: L95355 — this._energy = t (response._energy)
+    // ═══ TUTORIAL MODE: DON'T update energy, timer, or summon times ═══
+    // Traced: Tutorial summon is a guided one-time experience.
+    // Real server does NOT consume free timer or add energy during tutorial.
+    // Client: highSummonFree() (L95370) = (canSuperFreeTime - serverTime)/1000 <= 0
+    //   If we set timer here, player must wait 6/24hr after tutorial for first real free summon.
+    // Client: energy display (L95335) = this._energy + '/' + max
+    //   If we add energy here, display shows wrong count after tutorial.
     var oldEnergy = summon._energy || 0;
-    var newEnergy = oldEnergy + summonEnergyGain;
-    summon._energy = newEnergy;
+    var newEnergy = oldEnergy;
+    var newFreeTime = summon[freeTimeField] || now;
 
-    // 7c: Set new free timer
-    // Traced: L95356-95357 — canCommonFreeTime=n, canSuperFreeTime=o
-    var newFreeTime = now + (freeTimerSeconds * 1000);
-    summon[freeTimeField] = newFreeTime;
+    if (!isGuide) {
+        // Normal mode: update energy and free timer
+        newEnergy = oldEnergy + summonEnergyGain;
+        summon._energy = newEnergy;
 
-    // 7d: Increment summon times counter
+        newFreeTime = now + (freeTimerSeconds * 1000);
+        summon[freeTimeField] = newFreeTime;
+    }
+
+    // 7d: Increment summon times counter (both tutorial and normal)
     if (!summon._summonTimes) summon._summonTimes = {};
     if (!summon._summonTimes[poolId]) summon._summonTimes[poolId] = 0;
     summon._summonTimes[poolId]++;
 
     ctx.logger.details('update',
+        ['mode', isGuide ? 'TUTORIAL (no energy/timer update)' : 'NORMAL'],
         ['oldEnergy', String(oldEnergy)],
         ['newEnergy', String(newEnergy)],
-        ['energyGained', String(summonEnergyGain)],
+        ['energyGained', isGuide ? '0 (skipped)' : String(summonEnergyGain)],
         ['freeTimeField', freeTimeField],
-        ['newFreeTime', new Date(newFreeTime).toISOString()],
+        ['newFreeTime', isGuide ? 'UNCHANGED' : new Date(newFreeTime).toISOString()],
         ['summonTimes[' + poolId + ']', String(summon._summonTimes[poolId])],
         ['totalHeroes', String(totalHeroes)]
     );
@@ -329,6 +339,14 @@ async function handleSummonOneFree(request, ctx) {
     //   s = e._addTotal || e._addHeroes → hero array
     //   l = e._energy → summon energy
     //   e._canFreeTime → free timer (L95444)
+    //
+    // _canFreeTime routing (L95444):
+    //   if _canFreeTime exists:
+    //     isFree=true  → canCommonFreeTime = _canFreeTime
+    //     isFree=false → canSuperFreeTime = _canFreeTime
+    //   if _canFreeTime absent → both timers unchanged
+    //
+    // TUTORIAL: don't send _canFreeTime → client keeps both timers unchanged
     var responseData = {
         _addTotal: [{
             _heroId: heroId,
@@ -353,9 +371,15 @@ async function handleSummonOneFree(request, ctx) {
             _fragment: 0
         }],
         _changeInfo: changeInfo,
-        _energy: newEnergy,
-        _canFreeTime: newFreeTime
+        _energy: newEnergy
     };
+
+    // Only send _canFreeTime for NORMAL summons (not tutorial)
+    // Traced: L95444 — if _canFreeTime absent → requestCallBack(s, l, canCommonFreeTime, canSuperFreeTime)
+    //   → both timers kept unchanged (correct for tutorial)
+    if (!isGuide) {
+        responseData._canFreeTime = newFreeTime;
+    }
 
     // ─── Step 10: Save user data ───
     ctx.db.saveUser(userId, user);
@@ -366,18 +390,11 @@ async function handleSummonOneFree(request, ctx) {
     ctx.logger.summaryCard({
         title: 'SUMMON FREE COMPLETE',
         userId: userId,
-        fields: {
-            sType: sType === 1 ? 'COMMON' : 'SUPER',
-            poolId: poolId,
-            isGuide: isGuide ? 'YES (tutorial)' : 'NO (random)',
-            heroId: heroId.substring(0, 12) + '...',
-            displayId: selectedDisplayId,
-            quality: selectedQuality,
-            heroColor: heroColor,
-            energy: newEnergy + ' (+' + summonEnergyGain + ')',
-            freeTimer: new Date(newFreeTime).toISOString(),
-            totalHeroes: totalHeroes
-        }
+        fields: 4,
+        result: isGuide ? 'TUTORIAL' : (sType === 1 ? 'COMMON' : 'SUPER'),
+        heroId: heroId.substring(0, 12) + '...',
+        displayId: String(selectedDisplayId),
+        quality: selectedQuality
     });
 
     return ctx.buildDataResponse(0, responseData);
