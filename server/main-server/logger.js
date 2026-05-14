@@ -1102,6 +1102,355 @@ function warningSection(warnings) {
 }
 
 // ═══════════════════════════════════════════════════════════════
+// v3.1 — TYPE ASSERT — Validate value types at runtime
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * Assert TYPE of a value at a given field path.
+ * PASS → single DEBUG line with ✅; FAIL → errorBanner + details with full context.
+ *
+ * @param {string} fieldPath    - Dot-separated field path (e.g. 'heros._heros')
+ * @param {*}      actualValue  - The value to check
+ * @param {string} expectedType - 'number'|'string'|'object'|'array'|'boolean'
+ * @param {object} [opts]
+ * @param {string} [opts.context]  - Context description
+ * @param {string} [opts.trace]    - main.min.js line reference
+ * @param {string} [opts.consumer] - Client function that consumes this data
+ * @param {string} [opts.impact]   - What will happen if this fails
+ * @returns {boolean} true = pass, false = fail
+ */
+function typeAssert(fieldPath, actualValue, expectedType, opts) {
+    opts = opts || {};
+    var passed = false;
+    var actualType = typeof actualValue;
+
+    switch (expectedType) {
+        case 'number':
+            passed = (actualType === 'number' && !isNaN(actualValue));
+            break;
+        case 'string':
+            passed = (actualType === 'string');
+            break;
+        case 'object':
+            passed = (actualType === 'object' && actualValue !== null && !Array.isArray(actualValue));
+            break;
+        case 'array':
+            passed = Array.isArray(actualValue);
+            break;
+        case 'boolean':
+            passed = (actualType === 'boolean');
+            break;
+        default:
+            passed = false;
+    }
+
+    if (passed) {
+        // PASS: single DEBUG line — only visible at DEBUG log level
+        log('DEBUG', 'VALIDATE', '\u2705 typeAssert PASS: ' + fieldPath + ' is ' + expectedType);
+    } else {
+        // FAIL: always visible — use errorBanner (ERROR level) + details
+        errorBanner({
+            module: opts.context || 'VALIDATE',
+            step: opts.trace || '',
+            message: 'TYPE ASSERTION FAILED: ' + fieldPath,
+            trace: opts.trace || '',
+            consumer: opts.consumer || '',
+            impact: opts.impact || 'Unexpected type may crash client or corrupt data',
+        });
+        details('error',
+            ['field', fieldPath],
+            ['expected', expectedType],
+            ['actual', actualType],
+            ['value', String(actualValue)]
+        );
+    }
+
+    return passed;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// v3.1 — RESPONSE SNAPSHOT — Green box with anomaly flags
+// Audit view of response data with type info and anomaly detection.
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * Response snapshot — green-bordered box showing each key with type info and anomaly flags.
+ * Always visible regardless of LOG_LEVEL (important audit data).
+ *
+ * @param {string} label - Snapshot label
+ * @param {object} data  - Data object to snapshot
+ */
+function responseSnapshot(label, data) {
+    if (!data || typeof data !== 'object') return;
+
+    var keys = Object.keys(data);
+    var total = keys.length;
+
+    colorBox(label, '\u{1F4F8}', 'success');
+
+    keys.forEach(function (key, i) {
+        var isLast = (i === total - 1);
+        var connector = isLast ? '\u2514' : '\u251C';
+        var val = data[key];
+        var keyStr = chalk.white(key.padEnd(28));
+
+        // Type display (same style as objectTree)
+        var typeStr;
+        var anomalyFlag = '';
+
+        if (val === null) {
+            typeStr = chalk.gray('null');
+            anomalyFlag = chalk.yellow(' \u26A0\uFE0F NULL');
+        } else if (val === undefined) {
+            typeStr = chalk.gray('undefined');
+            anomalyFlag = chalk.red(' \u26A0\uFE0F UNDEFINED');
+        } else if (Array.isArray(val)) {
+            typeStr = chalk.cyan('Array[' + val.length + ']');
+            if (val.length === 0) anomalyFlag = chalk.yellow(' \u26A0\uFE0F EMPTY');
+        } else if (typeof val === 'object') {
+            var subKeys = Object.keys(val).length;
+            typeStr = chalk.cyan('Object{' + subKeys + '}');
+        } else if (typeof val === 'boolean') {
+            typeStr = chalk.yellow(String(val));
+        } else if (typeof val === 'number') {
+            typeStr = chalk.yellow(String(val));
+            if (isNaN(val)) anomalyFlag = chalk.red(' \u26A0\uFE0F NaN!');
+            else if (val < 0) anomalyFlag = chalk.yellow(' \u26A0\uFE0F NEGATIVE');
+        } else if (typeof val === 'string') {
+            var preview = val.length > 28 ? val.substring(0, 28) + '...' : val;
+            typeStr = chalk.green('"' + preview + '"');
+        } else {
+            typeStr = chalk.gray(typeof val);
+        }
+
+        console.log('  ' + connector + '   ' + keyStr + ' ' + typeStr + anomalyFlag);
+    });
+
+    boxClose();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// v3.1 — INVARIANT CHECK — Assert boolean conditions by rule name
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * Invariant check — asserts a boolean condition by rule name.
+ * PASS → single DEBUG line; FAIL → warnCallout with full context.
+ *
+ * @param {string}  ruleName  - Name of the invariant rule
+ * @param {*}       condition - Truthy = pass, falsy = fail
+ * @param {object}  [opts]
+ * @param {string}  [opts.context]  - Context description
+ * @param {string}  [opts.expect]   - What was expected
+ * @param {string}  [opts.actual]   - What was actually found
+ * @param {string}  [opts.trace]    - main.min.js line reference
+ * @param {string}  [opts.impact]   - Impact if violated
+ * @param {string}  [opts.fix]      - Suggested fix
+ * @returns {boolean} true = pass, false = fail
+ */
+function invariantCheck(ruleName, condition, opts) {
+    if (condition) {
+        log('DEBUG', 'VALIDATE', '\u2705 invariant PASS: ' + ruleName);
+        return true;
+    }
+
+    // FAIL: warnCallout (WARN level) — always visible at WARN and above
+    var failOpts = {};
+    if (opts) {
+        if (opts.context) failOpts.source = opts.context + (opts.trace ? ' ' + opts.trace : '');
+        if (opts.fix)     failOpts.action = opts.fix;
+        if (opts.actual)  failOpts.reason = 'Expected: ' + (opts.expect || 'truthy') + ', Got: ' + opts.actual;
+        if (opts.impact && opts.actual) {
+            failOpts.reason = failOpts.reason + ' \u2014 ' + opts.impact;
+        } else if (opts.impact) {
+            failOpts.reason = opts.impact;
+        }
+    }
+    warnCallout('INVARIANT VIOLATION: ' + ruleName, failOpts);
+    return false;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// v3.1 — MUTATION LOG — Log value changes with delta + anomalies
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * Log a value mutation with delta calculation and anomaly detection.
+ * Always visible regardless of LOG_LEVEL (important data change).
+ *
+ * @param {object} opts
+ * @param {string} opts.field       - Field name
+ * @param {number} opts.before      - Value before mutation
+ * @param {number} opts.after       - Value after mutation
+ * @param {string} [opts.unit]      - Unit label (e.g. 'gold', 'HP')
+ * @param {number} [opts.maxDelta]  - Maximum allowed delta
+ * @param {boolean}[opts.nonNegative]- If true, after < 0 triggers warning
+ * @param {boolean}[opts.noChange]  - If true, delta === 0 triggers warning
+ * @param {string} [opts.context]   - Context description
+ */
+function mutationLog(opts) {
+    if (!opts) return;
+
+    var delta = (opts.after || 0) - (opts.before || 0);
+    var sign = delta >= 0 ? '+' : '';
+    var unit = opts.unit ? ' ' + opts.unit : '';
+    var deltaStr = sign + delta + unit;
+
+    var anomalyFlag = '';
+
+    if (opts.maxDelta !== undefined && opts.maxDelta !== null && Math.abs(delta) > opts.maxDelta) {
+        anomalyFlag = chalk.red(' \u26A0\uFE0F DELTA TOO LARGE (max=' + opts.maxDelta + ')');
+    }
+    if (opts.nonNegative && opts.after < 0) {
+        anomalyFlag = chalk.red(' \u26A0\uFE0F NEGATIVE RESULT!');
+    }
+    if (opts.noChange && delta === 0) {
+        anomalyFlag = chalk.yellow(' \u26A0\uFE0F NO CHANGE \u2014 mutation had no effect');
+    }
+
+    var beforeStr = String(opts.before) + unit;
+    var afterStr = String(opts.after) + unit;
+    var summary = chalk.cyan(beforeStr) + ' \u2192 ' + chalk.cyan(afterStr) + ' (' + chalk.green(deltaStr) + ')' + anomalyFlag;
+    var context = opts.context ? ' [' + opts.context + ']' : '';
+
+    details('mutation', [opts.field || '?', summary + context]);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// v3.1 — DEEP TYPE SCAN — Batch type validation (no logging)
+// Returns results for caller to handle logging.
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * Deep type scan — compare object field types against expected type specs.
+ * Does NOT log anything; returns results for the caller to handle.
+ *
+ * @param {object} obj    - Object to scan
+ * @param {object} specs  - { fieldName: 'expectedType', ... }
+ * @param {string} prefix - Path prefix for nested fields (e.g. 'responseData')
+ * @returns {{ passed: number, failed: number, errors: Array<{ path, expected, actual, value }> }}
+ */
+function deepTypeScan(obj, specs, prefix) {
+    var result = { passed: 0, failed: 0, errors: [] };
+
+    if (!obj || typeof obj !== 'object' || !specs) return result;
+
+    var specKeys = Object.keys(specs);
+
+    for (var i = 0; i < specKeys.length; i++) {
+        var fieldName = specKeys[i];
+        var expectedType = specs[fieldName];
+        var val = obj[fieldName];
+        var path = prefix ? prefix + '.' + fieldName : fieldName;
+        var match = false;
+        var actualType = typeof val;
+
+        switch (expectedType) {
+            case 'array':
+                match = Array.isArray(val);
+                break;
+            case 'object':
+                match = (actualType === 'object' && val !== null && !Array.isArray(val));
+                break;
+            case 'number':
+                match = (actualType === 'number');
+                break;
+            case 'string':
+                match = (actualType === 'string');
+                break;
+            case 'boolean':
+                match = (actualType === 'boolean');
+                break;
+            default:
+                match = (actualType === expectedType);
+        }
+
+        if (match) {
+            result.passed++;
+        } else {
+            result.failed++;
+            result.errors.push({
+                path: path,
+                expected: expectedType,
+                actual: Array.isArray(val) ? 'array' : (val === null ? 'null' : actualType),
+                value: val,
+            });
+        }
+    }
+
+    return result;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// v3.1 — SAVE VERIFY — Post-save integrity check
+// Reads back saved data from DB and compares critical paths.
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * Walk a dot-separated path on an object to get the leaf value.
+ * @param {object} obj  - Object to walk
+ * @param {string} path - Dot-separated path (e.g. 'heros._heros')
+ * @returns {*} Leaf value, or undefined if path cannot be walked
+ */
+function walkPath(obj, path) {
+    if (!obj || !path) return undefined;
+    var parts = path.split('.');
+    var current = obj;
+    for (var i = 0; i < parts.length; i++) {
+        if (current === null || current === undefined) return undefined;
+        current = current[parts[i]];
+    }
+    return current;
+}
+
+/**
+ * Save verification — read back saved data and compare critical paths.
+ * Verifies data integrity after a database save operation.
+ *
+ * @param {string}   userId        - User ID to verify
+ * @param {object}   db            - Database object with getUser() method
+ * @param {object}   expectedData  - Expected data to compare against
+ * @param {string[]} criticalPaths - Dot-separated paths to compare
+ * @returns {boolean} true = all OK, false = mismatch or error
+ */
+function saveVerify(userId, db, expectedData, criticalPaths) {
+    if (!db || !db.getUser) return false;
+
+    var savedData = db.getUser(userId);
+    if (!savedData) {
+        errorBanner({
+            module: 'SAVE',
+            message: 'User data NOT FOUND after save!',
+            trace: 'userId=' + userId,
+            impact: 'Save operation may have failed silently',
+        });
+        return false;
+    }
+
+    var allOk = true;
+
+    for (var i = 0; i < criticalPaths.length; i++) {
+        var path = criticalPaths[i];
+        var expected = walkPath(expectedData, path);
+        var actual = walkPath(savedData, path);
+
+        if (JSON.stringify(expected) !== JSON.stringify(actual)) {
+            warnCallout('SAVE INTEGRITY: ' + path + ' MISMATCH', {
+                reason: 'Expected: ' + JSON.stringify(expected) + ', Got: ' + JSON.stringify(actual),
+                module: 'SAVE',
+            });
+            allOk = false;
+        }
+    }
+
+    if (allOk) {
+        log('DEBUG', 'SAVE', '\u2705 saveVerify: ' + criticalPaths.length + '/' + criticalPaths.length + ' paths OK');
+    }
+
+    return allOk;
+}
+
+// ═══════════════════════════════════════════════════════════════
 // EXPORTS
 // ═══════════════════════════════════════════════════════════════
 
@@ -1119,6 +1468,7 @@ module.exports = {
     step, fieldMap,
     categoryBreakdown,
     criticalFields, summaryCard, fieldStatus, warningSection,
+    typeAssert, responseSnapshot, invariantCheck, mutationLog, deepTypeScan, saveVerify,
     STATUS,
     LEVELS, MODULES, DETAILS,
     chalk
