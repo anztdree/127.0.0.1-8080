@@ -271,6 +271,41 @@ async function handleSummonOneFree(request, ctx) {
     var heroObj = createNewHero(heroId, selectedDisplayId, heroConfig);
     var heroColor = QUALITY_TO_COLOR[selectedQuality] || 1;
 
+    // Deep type scan on hero object structure
+    var heroSpecs = {
+        '_heroId': 'string',
+        '_heroDisplayId': 'number',
+        '_heroStar': 'number',
+        '_heroBaseAttr': 'object',
+        '_superSkillLevel': 'number',
+        '_potentialLevel': 'object',
+        '_superSkillResetCount': 'number',
+        '_potentialResetCount': 'number',
+        '_qigong': 'object',
+        '_qigongTmp': 'object',
+        '_qigongTmpPower': 'number',
+        '_qigongStage': 'number',
+        '_breakInfo': 'object',
+        '_totalCost': 'object',
+        '_expeditionMaxLevel': 'number',
+        '_gemstoneSuitId': 'number',
+        '_linkTo': 'array',
+        '_fragment': 'number'
+    };
+
+    var heroScan = ctx.logger.deepTypeScan(heroObj, heroSpecs, 'heroObj');
+    if (heroScan.failed > 0) {
+        heroScan.errors.forEach(function(e) {
+            ctx.logger.warnCallout('HERO OBJECT TYPE: ' + e.path + ' wrong type', {
+                context: 'SUMMON-FREE',
+                expected: e.expected,
+                actual: e.actual + ' (value: ' + e.value + ')',
+                trace: 'createNewHero() must produce correct types',
+                impact: 'SetHeroDataToModel (L134052) may crash or ignore fields'
+            });
+        });
+    }
+
     ctx.logger.details('hero',
         ['heroInstanceId', heroId.substring(0, 12) + '...'],
         ['displayId', String(selectedDisplayId)],
@@ -382,19 +417,142 @@ async function handleSummonOneFree(request, ctx) {
     }
 
     // ─── Step 10: Save user data ───
+    // Mutation logging — track all state changes
+    ctx.logger.mutationLog({
+        field: 'summon._energy',
+        before: oldEnergy,
+        after: newEnergy,
+        unit: 'energy',
+        maxDelta: 100,
+        context: 'SUMMON-FREE'
+    });
+
+    if (!isGuide) {
+        ctx.logger.mutationLog({
+            field: 'summon.' + freeTimeField,
+            before: currentFreeTime,
+            after: newFreeTime,
+            unit: 'ms',
+            context: 'SUMMON-FREE'
+        });
+    }
+
+    ctx.logger.mutationLog({
+        field: 'heros._heros (total count)',
+        before: totalHeroes - 1,
+        after: totalHeroes,
+        unit: 'heroes',
+        context: 'SUMMON-FREE'
+    });
+
     ctx.db.saveUser(userId, user);
     ctx.logger.log('INFO', 'SUMMON-FREE', 'User data SAVED');
 
     // ─── Step 11: Build and return response ───
     ctx.logger.log('INFO', 'SUMMON-FREE', 'summonOneFree SUCCESS');
+
+    // Type assertions — catch silent type errors BEFORE response is sent
+    var assertOk = true;
+    assertOk = ctx.logger.typeAssert('responseData._addTotal', responseData._addTotal, 'array', {
+        context: 'SUMMON-FREE',
+        trace: 'L95438 → s = e._addTotal || e._addHeroes',
+        consumer: 'requestCallBackCheck — iterates hero array',
+        impact: 'If not array → client forEach crashes, no hero received'
+    }) && assertOk;
+
+    assertOk = ctx.logger.typeAssert('responseData._addTotal[0]._heroId', responseData._addTotal[0]._heroId, 'string', {
+        context: 'SUMMON-FREE',
+        trace: 'L134052 SetHeroDataToModel → u._heroId',
+        impact: 'If wrong type → hero not registered in client model'
+    }) && assertOk;
+
+    assertOk = ctx.logger.typeAssert('responseData._addTotal[0]._heroDisplayId', responseData._addTotal[0]._heroDisplayId, 'number', {
+        context: 'SUMMON-FREE',
+        trace: 'L134052 SetHeroDataToModel → reads displayId for hero config lookup',
+        impact: 'If wrong type → hero card display broken'
+    }) && assertOk;
+
+    assertOk = ctx.logger.typeAssert('responseData._addTotal[0]._heroQuality', responseData._addTotal[0]._heroQuality, 'number', {
+        context: 'SUMMON-FREE',
+        trace: 'L73608-73616 HERO_COLOR — client uses numeric color for UI rendering',
+        impact: 'If wrong type → hero quality border/rarity display broken'
+    }) && assertOk;
+
+    assertOk = ctx.logger.typeAssert('responseData._energy', responseData._energy, 'number', {
+        context: 'SUMMON-FREE',
+        trace: 'L95438 → SummonSingleton._energy = e._energy',
+        impact: 'If wrong type → energy display shows NaN or wrong count'
+    }) && assertOk;
+
+    // Invariant checks — business rule assertions
+    ctx.logger.invariantCheck(
+        'COMMON free timer = 6 hours (21600s)',
+        !isCommon || freeTimerSeconds === 21600,
+        {
+            context: 'SUMMON-FREE',
+            expect: 'freeTimerSeconds = 21600 for COMMON pool',
+            actual: 'freeTimerSeconds = ' + freeTimerSeconds + ' for pool ' + poolId,
+            trace: 'summon.json pool 3 (summonNormal).free = 21600',
+            impact: 'Player waits wrong duration for next free COMMON summon',
+            fix: 'Check summon.json pool 3 free value'
+        }
+    );
+
+    ctx.logger.invariantCheck(
+        'SUPER energy gain = 10 per free pull',
+        sType !== 3 || summonEnergyGain === 10,
+        {
+            context: 'SUMMON-FREE',
+            expect: 'summonEnergy = 10 for SUPER pool (pool 1)',
+            actual: 'summonEnergy = ' + summonEnergyGain + ' for pool ' + poolId,
+            trace: 'summon.json pool 1 (summonSuper).summonEnergy = 10',
+            impact: 'Player never accumulates energy for 10-pull summon',
+            fix: 'Check summon.json pool 1 summonEnergy value'
+        }
+    );
+
+    ctx.logger.invariantCheck(
+        'Tutorial does NOT send _canFreeTime',
+        !isGuide || responseData._canFreeTime === undefined,
+        {
+            context: 'SUMMON-FREE',
+            expect: 'responseData._canFreeTime = undefined when isGuide=true',
+            actual: 'responseData._canFreeTime = ' + String(responseData._canFreeTime),
+            trace: 'L95444 — if _canFreeTime exists → overwrites client timer',
+            impact: 'After tutorial, player must wait full timer for first real free summon',
+            fix: 'Check line 380-382: _canFreeTime should only be set when !isGuide'
+        }
+    );
+
+    ctx.logger.invariantCheck(
+        'Hero has valid displayId from hero.json',
+        !!heroJson[String(selectedDisplayId)],
+        {
+            context: 'SUMMON-FREE',
+            expect: 'heroJson[' + selectedDisplayId + '] exists',
+            actual: 'heroJson[' + selectedDisplayId + '] = ' + (heroJson[String(selectedDisplayId)] ? 'found' : 'MISSING'),
+            trace: 'hero.json must contain the summoned hero config',
+            impact: 'Hero created without name/type/config → broken hero card',
+            fix: 'Check selectedDisplayId matches a hero.json entry'
+        }
+    );
+
+    // Response snapshot — visual structure dump before sending
+    ctx.logger.responseSnapshot('SUMMON-FREE ret=0', responseData);
+
     ctx.logger.summaryCard({
         title: 'SUMMON FREE COMPLETE',
         userId: userId,
-        fields: 4,
-        result: isGuide ? 'TUTORIAL' : (sType === 1 ? 'COMMON' : 'SUPER'),
-        heroId: heroId.substring(0, 12) + '...',
-        displayId: String(selectedDisplayId),
-        quality: selectedQuality
+        mode: isGuide ? 'TUTORIAL' : (sType === 1 ? 'COMMON' : 'SUPER'),
+        poolId: poolId,
+        heroDisplayId: String(selectedDisplayId),
+        heroName: heroConfig.name || 'UNKNOWN',
+        heroQuality: selectedQuality + ' (' + heroColor + ')',
+        energyBefore: String(oldEnergy),
+        energyAfter: String(newEnergy),
+        totalHeroes: String(totalHeroes),
+        timerSet: isGuide ? 'NO (tutorial)' : new Date(newFreeTime).toISOString(),
+        assertOk: assertOk ? 'ALL PASS' : 'FAILURES DETECTED'
     });
 
     return ctx.buildDataResponse(0, responseData);
