@@ -1,3 +1,4 @@
+```
 [DB] Loaded 6 records from /var/www/html/server/main-server/data/main_server.json (67260 bytes)
 🟢 06:58:27.690 INFO  📋 CONFIG   ▸ serverOpenDate auto-initialized: 1778828307690
 
@@ -3050,3 +3051,2978 @@
   ├ 🔗 actions: 0
   ├ 🔗 verified: true
   └ 🔗 reason: ping timeout
+/var/www/html/server/main-server/logger.js:1493
+    var num = chalk.gray('[' + String(phaseNum).padStart(2, '0') + '/' + String(total).padStart(2, '0) + ']');
+                                                                                                   ^^^^^^^
+
+SyntaxError: missing ) after argument list
+    at wrapSafe (node:internal/modules/cjs/loader:1734:18)
+    at Module._compile (node:internal/modules/cjs/loader:1777:20)
+    at Object..js (node:internal/modules/cjs/loader:1934:10)
+    at Module.load (node:internal/modules/cjs/loader:1524:32)
+    at Module._load (node:internal/modules/cjs/loader:1326:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:245:24)
+    at Module.require (node:internal/modules/cjs/loader:1547:12)
+    at require (node:internal/modules/helpers:152:16)
+    at Object.<anonymous> (/var/www/html/server/main-server/index.js:31:16)
+
+Node.js v25.5.0
+[DB] Loaded 7 records from /var/www/html/server/main-server/data/main_server.json (78925 bytes)
+🟢 10:25:24.786 INFO  📋 CONFIG   ▸ serverOpenDate auto-initialized: 1778840724785
+
+  ┌─ LOADING RESOURCES ───────────────────────────────────┐
+
+🟢 10:25:24.796 INFO  📋 CONFIG   ▸ Resource loaded: constant.json
+🟢 10:25:24.848 INFO  📋 CONFIG   ▸ Resource loaded: hero.json
+🟢 10:25:24.852 INFO  📋 CONFIG   ▸ Resource loaded: summon.json
+🟢 10:25:24.857 INFO  📋 CONFIG   ▸ Resource loaded: heroLevelAttr.json
+🟢 10:25:24.861 INFO  📋 CONFIG   ▸ Resource loaded: heroTypeParam.json
+🟢 10:25:24.863 INFO  📋 CONFIG   ▸ Resource loaded: heroQualityParam.json
+🟢 10:25:24.868 INFO  📋 CONFIG   ▸ Resource loaded: heroPower.json
+🟢 10:25:24.870 INFO  📋 CONFIG   ▸ Resource loaded: zPowerQualityPara.json
+
+  ─  ─  ─  ─  ─  ─  ─  ─  ─  ─  ─  ─  ─  ─  ─  ─  ─  ─  ─  ─  ─  ─  ─  ─  ─  ─  ─  ─  ─  ─
+
+
+  ╔════════════════════════════════════════════════════════════╗
+  ║  SUPER WARRIOR Z — MAIN SERVER                             ║
+  ╚════════════════════════════════════════════════════════════╝
+
+
+
+  ─  ─  ─  ─  ─  ─  ─  ─  ─  ─  ─  ─  ─  ─  ─  ─  ─  ─  ─  ─  ─  ─  ─  ─  ─  ─  ─  ─  ─  ─
+
+🟢 10:25:24.970 INFO  📋 CONFIG   ▸ Resource JSON status:
+  ══════════════════════════════════════════════════════════
+
+🟢 10:25:24.971 INFO  ⚙️ HANDLER  ▸ Registered action handlers:
+
+  ├ >> user::enterGame  handlers/user/enterGame.js
+  ├ >> user::registChat  handlers/user/registChat.js
+  ├ >> user::getBulletinBrief  handlers/user/getBulletinBrief.js
+  ├ >> user::readBulletin  handlers/user/readBulletin.js
+  ├ >> friend::friendServerAction  handlers/friend/friendServerAction.js
+  ├ >> heroImage::getAll  handlers/heroImage/getAll.js
+  ├ >> hero::getAttrs  handlers/hero/getAttrs.js
+  ├ >> userMsg::getMsgList  handlers/userMsg/getMsgList.js
+  ├ >> userMsg::getMsg  handlers/userMsg/getMsg.js
+  ├ >> userMsg::sendMsg  handlers/userMsg/sendMsg.js
+  ├ >> userMsg::readMsg  handlers/userMsg/readMsg.js
+  ├ >> userMsg::delFriendMsg  handlers/userMsg/delFriendMsg.js
+  ├ >> guide::saveGuide  handlers/guide/saveGuide.js
+  ├ >> hangup::saveGuideTeam  handlers/hangup/saveGuideTeam.js
+  ├ >> hangup::checkBattleResult  handlers/hangup/checkBattleResult.js
+  ├ >> buryPoint::guideBattle  handlers/buryPoint/guideBattle.js
+  └ >> summon::summonOneFree  handlers/summon/summonOneFree.js
+
+
+  ─  ─  ─  ─  ─  ─  ─  ─  ─  ─  ─  ─  ─  ─  ─  ─  ─  ─  ─  ─  ─  ─  ─  ─  ─  ─  ─  ─  ─  ─
+
+
+🟢 10:25:24.974 INFO  🚀 SERVER   ▸ Ready — listening on http://127.0.0.1:8001
+🟢 10:25:24.974 INFO  🚀 SERVER   ▸ Waiting for Socket.IO connections...
+
+
+  ➕ NEW CONNECTION ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─
+🟢 10:25:51.316 INFO  🔐 TEA      ▸ Sending verify challenge
+🟢 10:25:51.362 INFO  🔐 TEA      ▸ TEA verification SUCCESS
+
+  📤 user::enterGame        ──────────────────────────────────
+
+  ══════════════════════════════════════════════════════════
+  🎮 HANDLER: enterGame  (user/enterGame)  userId=guest_2a33a56648
+  ══════════════════════════════════════════════════════════
+
+
+  ────────────────────────────────────────────────────────
+  [01/10] 🟢 ENTRY CHECK
+  ────────────────────────────────────────────────────────
+
+🟢 10:25:51.397 INFO  ⚔️ ENTER    ▸ enterGame REQUEST RECEIVED
+  [ 1/10] 🔄 Required fields validation  █░░░░░░░░░
+  [ 1/10] ✅ Required fields validation  █░░░░░░░░░  All 3 present
+
+  ────────────────────────────────────────────────────────
+  [02/10] 📦 DATA INJECTION CHECK
+  ────────────────────────────────────────────────────────
+
+  [ 2/10] 🔄 Token auth via SDK-Server  ██░░░░░░░░
+🟢 10:25:51.418 INFO  📡 SDKAPI   ▸ User verified via SDK-Server
+  [ 2/10] ✅ Token auth via SDK-Server  ██░░░░░░░░  23ms
+  [ 3/10] 🔄 ServerId validation  ███░░░░░░░
+  [ 3/10] ✅ ServerId validation  ███░░░░░░░  1 == 1
+
+  ────────────────────────────────────────────────────────
+  [03/10] 🔍 DEEP TYPE SCAN
+  ────────────────────────────────────────────────────────
+
+  [ 4/10] 🔄 Request type validation  ████░░░░░░
+
+  ┌──────────────────────────────────────────────────────────────┐
+  │  ❌ FATAL ERROR AT STEP Server selection                    │
+  │                                                              │
+  │  STEP:   ENTER-TYPESCAN                                      │
+  │  REASON: TYPE ASSERTION FAILED: request.serverId             │
+  │  DETAIL: Server selection                                    │
+  │  CLIENT: ctx.config.serverId                                 │
+  │                                                              │
+  │  IMPACT:  serverId must be string for parseInt comparison     │
+  │                                                              │
+  └──────────────────────────────────────────────────────────────┘
+
+  ├ ❌ field: request.serverId
+  ├ ❌ expected: string
+  ├ ❌ actual: number
+  └ ❌ value: 1
+  [ 4/10] ✅ Request type validation  ████░░░░░░  2/2 passed
+
+  ────────────────────────────────────────────────────────
+  [04/10] ⚡ PLAYER STATE SNAPSHOT
+  ────────────────────────────────────────────────────────
+
+  [ 5/10] 🔄 Database lookup  █████░░░░░
+  [ 5/10] 🌟 Database lookup  █████░░░░░  NEW USER — no existing data
+
+  ────────────────────────────────────────────────────────
+  [05/10] 🧮 INVARIANT CHECK
+  ────────────────────────────────────────────────────────
+
+  [ 6/10] 🔄 Config & resource invariants  ██████░░░░
+
+  ⚠️  INVARIANT VIOLATION: config.serverVersion loaded
+       SOURCE: ENTER-INVARIANT UserInfoSingleton.serverVersion → e.serverVersion
+       REASON: Expected: truthy (string), Got: MISSING — Client displays wrong version info
+
+  [ 6/10] ✅ Config & resource invariants  ██████░░░░  All server configs verified
+
+  ────────────────────────────────────────────────────────
+  [06/10] 🔮 MAIN PROCESS
+  ────────────────────────────────────────────────────────
+
+  [ 7/10] 🔄 Build/Load user data  ███████░░░
+  [ 7/10] ✅ Build/Load user data  ███████░░░  100 keys (4ms)
+  [ 8/10] 🔄 Circular reference safety  ████████░░
+  [ 8/10] ✅ Circular reference safety  ████████░░  0 circular refs
+
+  🔒 CRITICAL FIELDS AUDIT — game will crash/stuck if wrong
+  ──────────────────────────────────────────────
+  ├ 🔒 lastTeam[9]._team        = {0}  EMPTY — tutorial safe (guide 2106)
+  ├ 🔒 training._award          = null  present — FIX-001 safe
+  ├ 🔒 user._attribute._items[104] = present  Level=1
+  ├ 🔒 imprint._items           = Object{}  FIX-005: client L114925 uses for...in → needs Object
+  ├ 🔒 weapon._items            = Object{}  FIX-005: client L130938 uses for...in → needs Object
+  └ 🔒 genki._items             = Object{}  FIX-005: client L132158 uses for...in → needs Object
+  ✅ CRITICAL AUDIT: 6/6 PASSED
+
+  [ 9/10] 🔄 JSON serialization test  █████████░
+  [ 9/10] ✅ JSON serialization test  █████████░  10,057 bytes
+
+  ────────────────────────────────────────────────────────
+  [07/10] 📝 MUTATION LOG
+  ────────────────────────────────────────────────────────
+
+🟢 10:25:51.544 INFO  ⚔️ ENTER    ▸ MUTATION: New user data CREATED
+
+  ────────────────────────────────────────────────────────
+  [08/10] 💾 SAVE VERIFY
+  ────────────────────────────────────────────────────────
+
+  [10/10] 🔄 Database save  ██████████
+[DB] saveUser("guest_2a33a5..."): 100 keys, 10057 bytes
+  [10/10] ✅ Database save  ██████████  4ms
+🟢 10:25:51.549 INFO  ⚔️ ENTER    ▸ Post-save integrity verification...
+
+  ────────────────────────────────────────────────────────
+  [09/10] 📤 RESPONSE SNAPSHOT
+  ────────────────────────────────────────────────────────
+
+
+  ┌ 📸 ENTER GAME RESPONSE (ret=0) ───────────────────────────┐
+  ├   user                         Object{20}
+  ├   heros                        Object{4}
+  ├   hangup                       Object{16}
+  ├   totalProps                   Object{1}
+  ├   backpackLevel                1
+  ├   imprint                      Object{2}
+  ├   weapon                       Object{2}
+  ├   summon                       Object{7}
+  ├   dungeon                      Object{2}
+  ├   equip                        Object{2}
+  ├   scheduleInfo                 Object{53}
+  ├   timesInfo                    Object{12}
+  ├   serverVersion                ""
+  ├   serverId                     1
+  ├   serverOpenDate               1778840724785
+  ├   newUser                      true
+  ├   currency                     "USD"
+  ├   lastTeam                     Object{2}
+  ├   superSkill                   Object{2}
+  ├   giftInfo                     Object{11}
+  ├   guide                        Object{2}
+  ├   userGuild                    Object{3}
+  ├   userGuildPub                 Object{8}
+  ├   expedition                   Object{7}
+  ├   retrieve                     Object{7}
+  ├   battleMedal                  Object{11}
+  ├   training                     Object{9}
+  ├   heroSkin                     Object{3}
+  ├   userWar                      Object{9}
+  ├   userBallWar                  Object{6}
+  ├   headEffect                   Object{4}
+  ├   userTopBattle                Object{10}
+  ├   topBattleInfo                Object{4}
+  ├   checkin                      Object{5}
+  ├   curMainTask                  Object{0}
+  ├   summonLog                    Array[0] ⚠️ EMPTY
+  ├   vipLog                       Array[0] ⚠️ EMPTY
+  ├   cardLog                      Array[0] ⚠️ EMPTY
+  ├   onlineBulletin               Array[0] ⚠️ EMPTY
+  ├   broadcastRecord              Array[0] ⚠️ EMPTY
+  ├   blacklist                    Object{0}
+  ├   forbiddenChat                Object{2}
+  ├   guildLevel                   0
+  ├   guildTreasureMatchRet        0
+  ├   dragonEquiped                Object{0}
+  ├   warInfo                      null ⚠️ NULL
+  ├   ballWarState                 0
+  ├   enableShowQQ                 false
+  ├   showQQVip                    0
+  ├   showQQ                       0
+  ├   showQQImg1                   ""
+  ├   showQQImg2                   ""
+  ├   showQQUrl                    ""
+  ├   cellgameHaveSetHero          false
+  ├   globalWarBuffTag             ""
+  ├   globalWarLastRank            Object{0}
+  ├   globalWarBuff                0
+  ├   globalWarBuffEndTime         0
+  ├   guildName                    ""
+  ├   guildActivePoints            Object{0}
+  ├   ballBroadcast                null ⚠️ NULL
+  ├   ballWarInfo                  Object{4}
+  ├   teamTraining                 Object{4}
+  ├   teamServerHttpUrl            ""
+  ├   teamDungeonOpenTime          0
+  ├   teamDungeonTask              Object{3}
+  ├   teamDungeonSplBcst           null ⚠️ NULL
+  ├   teamDungeonNormBcst          null ⚠️ NULL
+  ├   teamDungeonHideInfo          null ⚠️ NULL
+  ├   teamDungeon                  Object{3}
+  ├   teamDungeonInvitedFriends    null ⚠️ NULL
+  ├   myTeamServerSocketUrl        "http://127.0.0.1:8003"
+  ├   shopNewHeroes                Object{0}
+  ├   channelSpecial               Object{15}
+  ├   hideHeroes                   Array[0] ⚠️ EMPTY
+  ├   templeLess                   0
+  ├   timeTrial                    Object{9}
+  ├   timeTrialNextOpenTime        0
+  ├   YouTuberRecruit              Object{7}
+  ├   userYouTuberRecruit          Object{2}
+  ├   heroImageVersion             0
+  ├   superImageVersion            0
+  ├   karinStartTime               0
+  ├   karinEndTime                 0
+  ├   timeBonusInfo                Object{2}
+  ├   monthCard                    Object{2}
+  ├   recharge                     Object{2}
+  ├   userDownloadReward           Object{4}
+  ├   clickSystem                  Object{2}
+  ├   questionnaires               null ⚠️ NULL
+  ├   littleGame                   Object{3}
+  ├   genki                        Object{4}
+  ├   gemstone                     Object{1}
+  ├   resonance                    Object{6}
+  ├   fastTeam                     Object{1}
+  ├   gravity                      Object{0}
+  ├   timeMachine                  Object{1}
+  ├   _arenaTeam                   null ⚠️ NULL
+  ├   _arenaSuper                  null ⚠️ NULL
+  └   mergedServers                Array[0] ⚠️ EMPTY
+  └──────────────────────────────────────────────────────────┘
+
+
+  ┌──────────────────────────────────────────────────────────────┐
+  │  ❌ FATAL ERROR AT STEP RESPONSE TYPE SCAN                  │
+  │                                                              │
+  │  STEP:   ENTER                                               │
+  │  REASON: userData.serverId expected string but got number    │
+  │  DETAIL: UserDataParser reads these fields on client         │
+  │  CLIENT: Multiple client parsers                             │
+  │                                                              │
+  │  IMPACT:  Client crash or silent data loss                    │
+  │  FIX:     Check buildNewUserData or updateExistingUser        │
+  │                                                              │
+  └──────────────────────────────────────────────────────────────┘
+
+  ├ ❌ field: userData.serverId
+  ├ ❌ expected: string
+  ├ ❌ actual: number
+  └ ❌ value: 1
+
+  ────────────────────────────────────────────────────────
+  [10/10] 🏁 EXECUTION SUMMARY
+  ────────────────────────────────────────────────────────
+
+
+  ═══════════════════════════════════════════
+
+  ❌ ENTER GAME COMPLETE
+
+  👤 USER:       guest_2a33a566488dfa9e (New User)
+  📦 FIELDS:     100
+  🦸 HEROES:     1 hero(es)
+  💎 DIAMOND:    0
+  🏆 LEVEL:      1
+
+  📏 JSON SIZE:  10,057 chars
+  📦 RESP SIZE:  2,382 chars
+  🔐 PROTOCOL:   LZ-STRING
+  ⏱️ TOTAL TIME: 186ms  ████████████████
+
+  🔒 CRITICAL:   6/6 PASSED
+  ⚠️ WARNINGS:   0
+  ❌ ERRORS:     1
+
+  ═══════════════════════════════════════════
+
+✅ user::enterGame        OK     ────────────────────────────
+  └ ret=0 2382 chars (LZ) 191ms
+
+  ✅ SUCCESS  📏 data= 2382 chars  📦 proto= LZ-STRING  ⏱️ time= 191ms
+
+  └ ⏱️ handler: 192ms █
+
+  📤 user::getBulletinBrief ──────────────────────────────────
+
+  ══════════════════════════════════════════════════════════
+  🎮 HANDLER: getBulletinBrief  (user/getBulletinBrief)  userId=guest_2a33a56648
+  ══════════════════════════════════════════════════════════
+
+
+  ────────────────────────────────────────────────────────
+  [01/10] 🟢 ENTRY CHECK
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 2] 🔄 Validate request fields  █░
+  [ 1/ 2] ✅ Validate request fields  █░  userId OK
+
+  ────────────────────────────────────────────────────────
+  [02/10] 📦 DATA INJECTION CHECK
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 1] 🔄 Load global bulletin data  █
+  [ 1/ 1] ✅ Load global bulletin data  █  0 entries loaded
+
+  ────────────────────────────────────────────────────────
+  [03/10] 🔍 DEEP TYPE SCAN
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 1] 🔄 Type assert request fields  █
+  [ 1/ 1] ✅ Type assert request fields  █  type verified
+
+  ────────────────────────────────────────────────────────
+  [04/10] ⚡ PLAYER STATE SNAPSHOT
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 1] 🔄 Snapshot bulletin state  █
+  [ 1/ 1] ✅ Snapshot bulletin state  █  0 bulletins in global store
+
+  ────────────────────────────────────────────────────────
+  [05/10] 🧮 INVARIANT CHECK
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 2] 🔄 Validate business rules  █░
+  [ 1/ 2] ✅ Validate business rules  █░  invariants checked
+
+  ────────────────────────────────────────────────────────
+  [06/10] 🔮 MAIN PROCESS
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 1] 🔄 Build _brief object (strip body field)  █
+  [ 1/ 1] ✅ Build _brief object (strip body field)  █  0 bulletins (body stripped)
+
+  ────────────────────────────────────────────────────────
+  [07/10] 💾 MUTATION LOG
+  ────────────────────────────────────────────────────────
+
+
+  ────────────────────────────────────────────────────────
+  [08/10] ✅ SAVE VERIFY
+  ────────────────────────────────────────────────────────
+
+
+  ────────────────────────────────────────────────────────
+  [09/10] 📤 RESPONSE SNAPSHOT
+  ────────────────────────────────────────────────────────
+
+
+  🔒 CRITICAL FIELDS AUDIT — game will crash/stuck if wrong
+  ──────────────────────────────────────────────
+  └ 🔒 _brief                   = Object{0}  L121094: for(var o in n._brief) iterates each bulletin
+  ✅ CRITICAL AUDIT: 1/1 PASSED
+
+
+  ┌ 📸 getBulletinBrief ret=0 ────────────────────────────────┐
+  └   _brief                       Object{0}
+  └──────────────────────────────────────────────────────────┘
+
+
+  ────────────────────────────────────────────────────────
+  [10/10] 🏁 EXECUTION SUMMARY
+  ────────────────────────────────────────────────────────
+
+
+  ═══════════════════════════════════════════
+
+  ✅ GET BULLETIN BRIEF COMPLETE
+
+  👤 USER:       guest_2a33a566488dfa9e
+
+
+  ⚠️ WARNINGS:   0
+  ❌ ERRORS:     0
+
+  ═══════════════════════════════════════════
+
+✅ user::getBulletinBrief OK     ────────────────────────────
+  └ ret=0 13 chars (raw) 4ms
+
+  ✅ SUCCESS  📏 data= 13 chars  📦 proto= RAW  ⏱️ time= 4ms
+
+  └ ⏱️ handler: 6ms 
+
+  📤 friend::friendServerAction ──────────────────────────────────
+
+  ══════════════════════════════════════════════════════════
+  🎮 HANDLER: friendServerAction  (friend/friendServerAction)  userId=guest_2a33a56648
+  ══════════════════════════════════════════════════════════
+
+
+  ────────────────────────────────────────────────────────
+  [01/10] 🟢 ENTRY CHECK
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 2] 🔄 Validate request fields  █░
+  [ 1/ 2] ✅ Validate request fields  █░  relayAction="${relayAction}"
+
+  ────────────────────────────────────────────────────────
+  [02/10] 📦 DATA INJECTION CHECK
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 1] 🔄 Load userData from DB  █
+  [ 1/ 1] ✅ Load userData from DB  █  userData loaded + teamwork fields ensured
+
+  ────────────────────────────────────────────────────────
+  [03/10] 🔍 DEEP TYPE SCAN
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 2] 🔄 Type assert request fields  █░
+  [ 1/ 2] ✅ Type assert request fields  █░  types verified
+
+  ────────────────────────────────────────────────────────
+  [04/10] ⚡ PLAYER STATE SNAPSHOT
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 1] 🔄 Snapshot teamwork storage state  █
+  [ 1/ 1] ✅ Snapshot teamwork storage state  █  0 friends
+
+  ────────────────────────────────────────────────────────
+  [05/10] 🧮 INVARIANT CHECK
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 1] 🔄 Validate relayAction is known  █
+  [ 1/ 1] ✅ Validate relayAction is known  █  known action
+
+  ────────────────────────────────────────────────────────
+  [06/10] 🔮 MAIN PROCESS
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 1] 🔄 Dispatch relayAction: queryFriends  █
+  [ 1/ 1] ✅ Dispatch relayAction: queryFriends  █  0 friends
+
+  ────────────────────────────────────────────────────────
+  [07/10] 💾 MUTATION LOG
+  ────────────────────────────────────────────────────────
+
+
+  ────────────────────────────────────────────────────────
+  [08/10] ✅ SAVE VERIFY
+  ────────────────────────────────────────────────────────
+
+
+  ────────────────────────────────────────────────────────
+  [09/10] 📤 RESPONSE SNAPSHOT
+  ────────────────────────────────────────────────────────
+
+
+  ┌ 📸 friendServerAction ret=0 [queryFriends] ───────────────┐
+  └   users                        Object{0}
+  └──────────────────────────────────────────────────────────┘
+
+
+  ────────────────────────────────────────────────────────
+  [10/10] 🏁 EXECUTION SUMMARY
+  ────────────────────────────────────────────────────────
+
+
+  ═══════════════════════════════════════════
+
+  ✅ FRIEND SERVER ACTION COMPLETE
+
+  👤 USER:       guest_2a33a566488dfa9e
+
+
+  ⚠️ WARNINGS:   0
+  ❌ ERRORS:     0
+
+  ═══════════════════════════════════════════
+
+✅ friend::friendServerAction OK     ────────────────────────────
+  └ ret=0 12 chars (raw) 6ms
+
+  ✅ SUCCESS  📏 data= 12 chars  📦 proto= RAW  ⏱️ time= 6ms
+
+  └ ⏱️ handler: 7ms 
+
+  📤 friend::friendServerAction ──────────────────────────────────
+
+  ══════════════════════════════════════════════════════════
+  🎮 HANDLER: friendServerAction  (friend/friendServerAction)  userId=guest_2a33a56648
+  ══════════════════════════════════════════════════════════
+
+
+  ────────────────────────────────────────────────────────
+  [01/10] 🟢 ENTRY CHECK
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 2] 🔄 Validate request fields  █░
+  [ 1/ 2] ✅ Validate request fields  █░  relayAction="${relayAction}"
+
+  ────────────────────────────────────────────────────────
+  [02/10] 📦 DATA INJECTION CHECK
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 1] 🔄 Load userData from DB  █
+  [ 1/ 1] ✅ Load userData from DB  █  userData loaded + teamwork fields ensured
+
+  ────────────────────────────────────────────────────────
+  [03/10] 🔍 DEEP TYPE SCAN
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 2] 🔄 Type assert request fields  █░
+  [ 1/ 2] ✅ Type assert request fields  █░  types verified
+
+  ────────────────────────────────────────────────────────
+  [04/10] ⚡ PLAYER STATE SNAPSHOT
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 1] 🔄 Snapshot teamwork storage state  █
+  [ 1/ 1] ✅ Snapshot teamwork storage state  █  0 friends
+
+  ────────────────────────────────────────────────────────
+  [05/10] 🧮 INVARIANT CHECK
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 1] 🔄 Validate relayAction is known  █
+  [ 1/ 1] ✅ Validate relayAction is known  █  known action
+
+  ────────────────────────────────────────────────────────
+  [06/10] 🔮 MAIN PROCESS
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 1] 🔄 Dispatch relayAction: queryBlackList  █
+  [ 1/ 1] ✅ Dispatch relayAction: queryBlackList  █  0 entries
+
+  ────────────────────────────────────────────────────────
+  [07/10] 💾 MUTATION LOG
+  ────────────────────────────────────────────────────────
+
+
+  ────────────────────────────────────────────────────────
+  [08/10] ✅ SAVE VERIFY
+  ────────────────────────────────────────────────────────
+
+
+  ────────────────────────────────────────────────────────
+  [09/10] 📤 RESPONSE SNAPSHOT
+  ────────────────────────────────────────────────────────
+
+
+  ┌ 📸 friendServerAction ret=0 [queryBlackList] ─────────────┐
+  └   users                        Object{0}
+  └──────────────────────────────────────────────────────────┘
+
+
+  ────────────────────────────────────────────────────────
+  [10/10] 🏁 EXECUTION SUMMARY
+  ────────────────────────────────────────────────────────
+
+
+  ═══════════════════════════════════════════
+
+  ✅ FRIEND SERVER ACTION COMPLETE
+
+  👤 USER:       guest_2a33a566488dfa9e
+
+
+  ⚠️ WARNINGS:   0
+  ❌ ERRORS:     0
+
+  ═══════════════════════════════════════════
+
+✅ friend::friendServerAction OK     ────────────────────────────
+  └ ret=0 12 chars (raw) 5ms
+
+  ✅ SUCCESS  📏 data= 12 chars  📦 proto= RAW  ⏱️ time= 5ms
+
+  └ ⏱️ handler: 5ms 
+
+  📤 heroImage::getAll      ──────────────────────────────────
+
+  ══════════════════════════════════════════════════════════
+  🎮 HANDLER: getAll  (heroImage/getAll)  userId=guest_2a33a56648
+  ══════════════════════════════════════════════════════════
+
+
+  ────────────────────────────────────────────────────────
+  [01/10] 🟢 ENTRY CHECK
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 2] 🔄 Validate request fields  █░
+  [ 1/ 2] ✅ Validate request fields  █░  userId OK
+
+  ────────────────────────────────────────────────────────
+  [02/10] 📦 DATA INJECTION CHECK
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 1] 🔄 Load userData from DB  █
+  [ 1/ 1] ✅ Load userData from DB  █  userData loaded
+
+  ────────────────────────────────────────────────────────
+  [03/10] 🔍 DEEP TYPE SCAN
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 1] 🔄 Type assert request fields  █
+  [ 1/ 1] ✅ Type assert request fields  █  type verified
+
+  ────────────────────────────────────────────────────────
+  [04/10] ⚡ PLAYER STATE SNAPSHOT
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 1] 🔄 Snapshot hero collection state  █
+  [ 1/ 1] ✅ Snapshot hero collection state  █  1 heroes in collection
+
+  ────────────────────────────────────────────────────────
+  [05/10] 🧮 INVARIANT CHECK
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 2] 🔄 Validate business rules  █░
+  [ 1/ 2] ✅ Validate business rules  █░  invariants checked
+
+  ────────────────────────────────────────────────────────
+  [06/10] 🔮 MAIN PROCESS
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 1] 🔄 Build hero image data  █
+  [ 1/ 1] ✅ Build hero image data  █  1 hero(es)
+
+  ────────────────────────────────────────────────────────
+  [07/10] 💾 MUTATION LOG
+  ────────────────────────────────────────────────────────
+
+
+  ────────────────────────────────────────────────────────
+  [08/10] ✅ SAVE VERIFY
+  ────────────────────────────────────────────────────────
+
+
+  ────────────────────────────────────────────────────────
+  [09/10] 📤 RESPONSE SNAPSHOT
+  ────────────────────────────────────────────────────────
+
+
+  🔒 CRITICAL FIELDS AUDIT — game will crash/stuck if wrong
+  ──────────────────────────────────────────────
+  └ 🔒 _heros                   = Object{1}  L134363: for(var n in e._heros) → Object, each has _id/_maxLevel/_selfComments
+  ✅ CRITICAL AUDIT: 1/1 PASSED
+
+
+  ┌ 📸 getAll ret=0 ──────────────────────────────────────────┐
+  └   _heros                       Object{1}
+  └──────────────────────────────────────────────────────────┘
+
+
+  ────────────────────────────────────────────────────────
+  [10/10] 🏁 EXECUTION SUMMARY
+  ────────────────────────────────────────────────────────
+
+
+  ═══════════════════════════════════════════
+
+  ✅ HERO IMAGE GET ALL COMPLETE
+
+  👤 USER:       guest_2a33a566488dfa9e
+  📦 FIELDS:     1
+
+
+  ⚠️ WARNINGS:   0
+  ❌ ERRORS:     0
+
+  ═══════════════════════════════════════════
+
+✅ heroImage::getAll      OK     ────────────────────────────
+  └ ret=0 97 chars (raw) 6ms
+
+  ✅ SUCCESS  📏 data= 97 chars  📦 proto= RAW  ⏱️ time= 6ms
+
+  └ ⏱️ handler: 6ms 
+
+  📤 hero::getAttrs         ──────────────────────────────────
+
+  ══════════════════════════════════════════════════════════
+  🎮 HANDLER: getAttrs  (hero/getAttrs)  userId=guest_2a33a56648
+  ══════════════════════════════════════════════════════════
+
+
+  ────────────────────────────────────────────────────────
+  [01/10] 🟢 ENTRY CHECK
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 2] 🔄 Validate request fields  █░
+  [ 1/ 2] ✅ Validate request fields  █░  1 hero(es) requested
+
+  ────────────────────────────────────────────────────────
+  [02/10] 📦 DATA INJECTION CHECK
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 1] 🔄 Load userData from DB  █
+  [ 1/ 1] ✅ Load userData from DB  █  userData loaded
+
+  ────────────────────────────────────────────────────────
+  [03/10] 🔍 DEEP TYPE SCAN
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 2] 🔄 Type assert request fields  █░
+  [ 1/ 2] ✅ Type assert request fields  █░  types verified
+
+  ────────────────────────────────────────────────────────
+  [04/10] ⚡ PLAYER STATE SNAPSHOT
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 1] 🔄 Snapshot hero request vs found  █
+  [ 1/ 1] ✅ Snapshot hero request vs found  █  1/1 heroes found
+
+  ────────────────────────────────────────────────────────
+  [05/10] 🧮 INVARIANT CHECK
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 1] 🔄 Validate hero availability  █
+  [ 1/ 1] ✅ Validate hero availability  █  all heroes found
+
+  ────────────────────────────────────────────────────────
+  [06/10] 🔮 MAIN PROCESS
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 1] 🔄 Calculate hero attributes  █
+  [ 1/ 1] ✅ Calculate hero attributes  █  1 heroes calculated
+
+  ────────────────────────────────────────────────────────
+  [07/10] 💾 MUTATION LOG
+  ────────────────────────────────────────────────────────
+
+
+  ────────────────────────────────────────────────────────
+  [08/10] ✅ SAVE VERIFY
+  ────────────────────────────────────────────────────────
+
+
+  ────────────────────────────────────────────────────────
+  [09/10] 📤 RESPONSE SNAPSHOT
+  ────────────────────────────────────────────────────────
+
+
+  🔒 CRITICAL FIELDS AUDIT — game will crash/stuck if wrong
+  ──────────────────────────────────────────────
+  ├ 🔒 _attrs                   = Object{1}  L133726: for(var o in t._attrs) — keyed by hero index, each has _items with calculated attrs
+  ├ 🔒 _baseAttrs               = Object{1}  L133731: t._baseAttrs[o] — keyed by hero index, each has _items with base attrs (before talent)
+  └ 🔒 POWER (attr 21)          = calculated per hero  L133821: 21==p._id → heroBaseAttr.power = floor(num)
+  ✅ CRITICAL AUDIT: 3/3 PASSED
+
+
+  ┌ 📸 getAttrs ret=0 ────────────────────────────────────────┐
+  ├   _attrs                       Object{1}
+  └   _baseAttrs                   Object{1}
+  └──────────────────────────────────────────────────────────┘
+
+
+  ────────────────────────────────────────────────────────
+  [10/10] 🏁 EXECUTION SUMMARY
+  ────────────────────────────────────────────────────────
+
+
+  ═══════════════════════════════════════════
+
+  ✅ HERO GET ATTRS COMPLETE
+
+  👤 USER:       guest_2a33a566488dfa9e
+  📦 FIELDS:     2
+
+
+  ⚠️ WARNINGS:   0
+  ❌ ERRORS:     0
+
+  ═══════════════════════════════════════════
+
+✅ hero::getAttrs         OK     ────────────────────────────
+  └ ret=0 394 chars (raw) 7ms
+
+  ✅ SUCCESS  📏 data= 394 chars  📦 proto= RAW  ⏱️ time= 7ms
+
+  └ ⏱️ handler: 7ms 
+
+  📤 userMsg::getMsgList    ──────────────────────────────────
+
+  ══════════════════════════════════════════════════════════
+  🎮 HANDLER: getMsgList  (userMsg/getMsgList)  userId=guest_2a33a56648
+  ══════════════════════════════════════════════════════════
+
+
+  ────────────────────────────────────────────────────────
+  [01/10] 🟢 ENTRY CHECK
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 2] 🔄 Validate request fields  █░
+  [ 1/ 2] ✅ Validate request fields  █░  userId OK
+
+  ────────────────────────────────────────────────────────
+  [02/10] 📦 DATA INJECTION CHECK
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 1] 🔄 Load userData from DB  █
+  [ 1/ 1] ✅ Load userData from DB  █  userData loaded
+
+  ────────────────────────────────────────────────────────
+  [03/10] 🔍 DEEP TYPE SCAN
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 1] 🔄 Type assert request fields  █
+  [ 1/ 1] ✅ Type assert request fields  █  type verified
+
+  ────────────────────────────────────────────────────────
+  [04/10] ⚡ PLAYER STATE SNAPSHOT
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 1] 🔄 Snapshot message brief state  █
+  [ 1/ 1] ✅ Snapshot message brief state  █  0 message entries
+
+  ────────────────────────────────────────────────────────
+  [05/10] 🧮 INVARIANT CHECK
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 1] 🔄 Validate data integrity  █
+  [ 1/ 1] ✅ Validate data integrity  █  valid object
+
+  ────────────────────────────────────────────────────────
+  [06/10] 🔮 MAIN PROCESS
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 1] 🔄 Return storedBrief directly  █
+  [ 1/ 1] ✅ Return storedBrief directly  █  0 entries returned as-is
+
+  ────────────────────────────────────────────────────────
+  [07/10] 💾 MUTATION LOG
+  ────────────────────────────────────────────────────────
+
+
+  ────────────────────────────────────────────────────────
+  [08/10] ✅ SAVE VERIFY
+  ────────────────────────────────────────────────────────
+
+
+  ────────────────────────────────────────────────────────
+  [09/10] 📤 RESPONSE SNAPSHOT
+  ────────────────────────────────────────────────────────
+
+
+  🔒 CRITICAL FIELDS AUDIT — game will crash/stuck if wrong
+  ──────────────────────────────────────────────
+  └ 🔒 _brief                   = Object{0}  L121134: setMessageFriendSimpleList iterates e[n].userInfo → UserSimpleInfo.deserialize
+  ✅ CRITICAL AUDIT: 1/1 PASSED
+
+
+  ┌ 📸 getMsgList ret=0 ──────────────────────────────────────┐
+  └   _brief                       Object{0}
+  └──────────────────────────────────────────────────────────┘
+
+
+  ────────────────────────────────────────────────────────
+  [10/10] 🏁 EXECUTION SUMMARY
+  ────────────────────────────────────────────────────────
+
+
+  ═══════════════════════════════════════════
+
+  ✅ GET MSG LIST COMPLETE
+
+  👤 USER:       guest_2a33a566488dfa9e
+  📦 FIELDS:     1
+
+
+  ⚠️ WARNINGS:   0
+  ❌ ERRORS:     0
+
+  ═══════════════════════════════════════════
+
+✅ userMsg::getMsgList    OK     ────────────────────────────
+  └ ret=0 13 chars (raw) 3ms
+
+  ✅ SUCCESS  📏 data= 13 chars  📦 proto= RAW  ⏱️ time= 3ms
+
+  └ ⏱️ handler: 3ms 
+
+  📤 guide::saveGuide       ──────────────────────────────────
+
+  ══════════════════════════════════════════════════════════
+  🎮 HANDLER: saveGuide  (guide/saveGuide)  userId=guest_2a33a56648
+  ══════════════════════════════════════════════════════════
+
+
+  ────────────────────────────────────────────────────────
+  [01/10] 🟢 ENTRY CHECK
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 3] 🔄 Validate request fields  █░░
+  [ 1/ 3] ✅ Validate request fields  █░░  type=2 step=2102
+
+  ────────────────────────────────────────────────────────
+  [02/10] 📦 DATA INJECTION CHECK
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 1] 🔄 Load userData from DB  █
+  [ 1/ 1] ✅ Load userData from DB  █  userData loaded
+
+  ────────────────────────────────────────────────────────
+  [03/10] 🔍 DEEP TYPE SCAN
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 2] 🔄 Type assert request fields  █░
+  [ 1/ 2] ✅ Type assert request fields  █░  all types verified
+
+  ────────────────────────────────────────────────────────
+  [04/10] ⚡ PLAYER STATE SNAPSHOT
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 1] 🔄 Snapshot guide._steps before modification  █
+  [ 1/ 1] ✅ Snapshot guide._steps before modification  █  guide._steps[2] was (none)
+
+  ────────────────────────────────────────────────────────
+  [05/10] 🧮 INVARIANT CHECK
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 2] 🔄 Validate business rules  █░
+  [ 1/ 2] ✅ Validate business rules  █░  invariants checked
+
+  ────────────────────────────────────────────────────────
+  [06/10] 🔮 MAIN PROCESS
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 1] 🔄 Update guide._steps  █
+  [ 1/ 1] ✅ Update guide._steps  █  guide._steps[2] = 2102
+
+  ────────────────────────────────────────────────────────
+  [07/10] 💾 MUTATION LOG
+  ────────────────────────────────────────────────────────
+
+
+  ────────────────────────────────────────────────────────
+  [08/10] ✅ SAVE VERIFY
+  ────────────────────────────────────────────────────────
+
+[DB] saveUser("guest_2a33a5..."): 100 keys, 10065 bytes
+
+  ────────────────────────────────────────────────────────
+  [09/10] 📤 RESPONSE SNAPSHOT
+  ────────────────────────────────────────────────────────
+
+
+  ┌ 📸 saveGuide ret=0 ───────────────────────────────────────┐
+  └──────────────────────────────────────────────────────────┘
+
+
+  ────────────────────────────────────────────────────────
+  [10/10] 🏁 EXECUTION SUMMARY
+  ────────────────────────────────────────────────────────
+
+
+  ═══════════════════════════════════════════
+
+  ✅ SAVE GUIDE COMPLETE
+
+  👤 USER:       guest_2a33a566488dfa9e
+
+
+  ⚠️ WARNINGS:   0
+  ❌ ERRORS:     0
+
+  ═══════════════════════════════════════════
+
+✅ guide::saveGuide       OK     ────────────────────────────
+  └ ret=0 2 chars (raw) 25ms
+
+  ✅ SUCCESS  📏 data= 2 chars  📦 proto= RAW  ⏱️ time= 25ms
+
+  └ ⏱️ handler: 26ms 
+
+  📤 user::registChat       ──────────────────────────────────
+
+  ══════════════════════════════════════════════════════════
+  🎮 HANDLER: registChat  (user/registChat)  userId=guest_2a33a56648
+  ══════════════════════════════════════════════════════════
+
+
+  ────────────────────────────────────────────────────────
+  [01/10] 🟢 ENTRY CHECK
+  ────────────────────────────────────────────────────────
+
+🟢 10:25:56.605 INFO  ⚪ REGIST_CHAT ▸ registChat REQUEST RECEIVED
+🟢 10:25:56.605 INFO  ⚪ REGIST_CHAT ▸ Entry check PASS — userId=guest_2a33a56648...
+
+  ────────────────────────────────────────────────────────
+  [02/10] 📦 DATA INJECTION CHECK
+  ────────────────────────────────────────────────────────
+
+🟢 10:25:56.605 INFO  ⚪ REGIST_CHAT ▸ Loading config for chat registration
+🟢 10:25:56.605 INFO  ⚪ REGIST_CHAT ▸ Config loaded — chatUrl and serverId resolved
+
+  ────────────────────────────────────────────────────────
+  [03/10] 🔍 DEEP TYPE SCAN
+  ────────────────────────────────────────────────────────
+
+
+  ────────────────────────────────────────────────────────
+  [04/10] ⚡ PLAYER STATE SNAPSHOT
+  ────────────────────────────────────────────────────────
+
+🟢 10:25:56.605 INFO  ⚪ REGIST_CHAT ▸ Loading player state for guild/room context
+
+  ────────────────────────────────────────────────────────
+  [05/10] 🧮 INVARIANT CHECK
+  ────────────────────────────────────────────────────────
+
+
+  ────────────────────────────────────────────────────────
+  [06/10] 🔮 MAIN PROCESS
+  ────────────────────────────────────────────────────────
+
+🟢 10:25:56.606 INFO  ⚪ REGIST_CHAT ▸ Building chat registration response (6 fields)
+🟢 10:25:56.606 INFO  ⚪ REGIST_CHAT ▸ Response fields built — 6 fields total
+
+  ────────────────────────────────────────────────────────
+  [07/10] 💾 MUTATION LOG
+  ────────────────────────────────────────────────────────
+
+🟢 10:25:56.606 INFO  ⚪ REGIST_CHAT ▸ No data mutations (configuration handler)
+
+  ────────────────────────────────────────────────────────
+  [08/10] ✅ SAVE VERIFY
+  ────────────────────────────────────────────────────────
+
+🟢 10:25:56.606 INFO  ⚪ REGIST_CHAT ▸ No DB save required (configuration handler)
+
+  ────────────────────────────────────────────────────────
+  [09/10] 📤 RESPONSE SNAPSHOT
+  ────────────────────────────────────────────────────────
+
+
+  🔒 CRITICAL FIELDS AUDIT — game will crash/stuck if wrong
+  ──────────────────────────────────────────────
+  ├ 🔒 _success                 = true  L114470: n._success ? connect chat : retry every 3s (max 15)
+  ├ 🔒 _chatServerUrl           = http://127.0.0.1:8002  L114480→L82537: io.connect(url) — MUST be full URL
+  ├ 🔒 _worldRoomId             = world_1  L114566: chatJoinRequest(worldRoomId) — ALWAYS joined after login
+  ├ 🔒 _guildRoomId             = (undefined)  L114568: if(guildRoomId) join — undefined = skip (no guild)
+  ├ 🔒 _teamDungeonChatRoom     = (undefined)  L114579: if(teamDungeonChatRoom) join — undefined = skip
+  └ 🔒 _teamChatRoom            = (undefined)  L114590: if(teamChatRoomId) join — undefined = skip (no team)
+  ✅ CRITICAL AUDIT: 6/6 PASSED
+
+
+  ┌ 📸 registChat ret=0 ──────────────────────────────────────┐
+  ├   _success                     true
+  ├   _chatServerUrl               "http://127.0.0.1:8002"
+  └   _worldRoomId                 "world_1"
+  └──────────────────────────────────────────────────────────┘
+
+
+  ────────────────────────────────────────────────────────
+  [10/10] 🏁 EXECUTION SUMMARY
+  ────────────────────────────────────────────────────────
+
+
+  ⚠️ WARNINGS DETECTED
+  ──────────────────────────────────────────────
+  ⚠️  [WARN-001] chat-server must be running on http://127.0.0.1:8002
+       Expected: (server operational)
+       Got:      may fail if chat-server down
+       Impact:   Chat will never connect. Client stops retrying registChat after 15 attempts (45s).
+       Fix:      Ensure chat-server is started before main-server
+
+  ⚠️  [WARN-002] chat-server MUST implement TEA handshake (verifyEnable=true)
+       Expected: (TEA verify event emitted by chat-server)
+       Got:      L113445: chatClient verifyEnable=TRUE → waits for verify event
+       Impact:   Client connection stalls — callback never fires, no chat, no error shown.
+       Fix:      chat-server must emit "verify" event with TEA challenge on connect
+
+  ⚠️  [WARN-003] guildRoomId, teamDungeonChatRoom, teamChatRoom = undefined (by design)
+       Expected: (undefined for new/no-guild/no-team users)
+       Got:      Returning undefined — client L114568/114579/114590 checks truthy before join
+       Impact:   None — client correctly skips joining these rooms when undefined.
+       Fix:      N/A — this is correct behavior. Guild handler (L114204) updates guildRoomId dynamically.
+  ⚠️ TOTAL WARNINGS: 3
+
+
+  ═══════════════════════════════════════════
+
+  ✅ REGIST CHAT COMPLETE
+
+  👤 USER:       guest_2a33a566488dfa9e
+  📦 FIELDS:     6
+
+  ⏱️ TOTAL TIME: 3ms  ░░░░░░░░░░░░░░░░
+
+
+  ═══════════════════════════════════════════
+
+✅ user::registChat       OK     ────────────────────────────
+  └ ret=0 83 chars (raw) 7ms
+
+  ✅ SUCCESS  📏 data= 83 chars  📦 proto= RAW  ⏱️ time= 7ms
+
+  └ ⏱️ handler: 7ms 
+
+  📤 guide::saveGuide       ──────────────────────────────────
+
+  ══════════════════════════════════════════════════════════
+  🎮 HANDLER: saveGuide  (guide/saveGuide)  userId=guest_2a33a56648
+  ══════════════════════════════════════════════════════════
+
+
+  ────────────────────────────────────────────────────────
+  [01/10] 🟢 ENTRY CHECK
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 3] 🔄 Validate request fields  █░░
+  [ 1/ 3] ✅ Validate request fields  █░░  type=2 step=2107
+
+  ────────────────────────────────────────────────────────
+  [02/10] 📦 DATA INJECTION CHECK
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 1] 🔄 Load userData from DB  █
+  [ 1/ 1] ✅ Load userData from DB  █  userData loaded
+
+  ────────────────────────────────────────────────────────
+  [03/10] 🔍 DEEP TYPE SCAN
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 2] 🔄 Type assert request fields  █░
+  [ 1/ 2] ✅ Type assert request fields  █░  all types verified
+
+  ────────────────────────────────────────────────────────
+  [04/10] ⚡ PLAYER STATE SNAPSHOT
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 1] 🔄 Snapshot guide._steps before modification  █
+  [ 1/ 1] ✅ Snapshot guide._steps before modification  █  guide._steps[2] was 2102
+
+  ────────────────────────────────────────────────────────
+  [05/10] 🧮 INVARIANT CHECK
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 2] 🔄 Validate business rules  █░
+  [ 1/ 2] ✅ Validate business rules  █░  invariants checked
+
+  ────────────────────────────────────────────────────────
+  [06/10] 🔮 MAIN PROCESS
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 1] 🔄 Update guide._steps  █
+  [ 1/ 1] ✅ Update guide._steps  █  guide._steps[2] = 2107
+
+  ────────────────────────────────────────────────────────
+  [07/10] 💾 MUTATION LOG
+  ────────────────────────────────────────────────────────
+
+
+  ────────────────────────────────────────────────────────
+  [08/10] ✅ SAVE VERIFY
+  ────────────────────────────────────────────────────────
+
+[DB] saveUser("guest_2a33a5..."): 100 keys, 10065 bytes
+
+  ────────────────────────────────────────────────────────
+  [09/10] 📤 RESPONSE SNAPSHOT
+  ────────────────────────────────────────────────────────
+
+
+  ┌ 📸 saveGuide ret=0 ───────────────────────────────────────┐
+  └──────────────────────────────────────────────────────────┘
+
+
+  ────────────────────────────────────────────────────────
+  [10/10] 🏁 EXECUTION SUMMARY
+  ────────────────────────────────────────────────────────
+
+
+  ═══════════════════════════════════════════
+
+  ✅ SAVE GUIDE COMPLETE
+
+  👤 USER:       guest_2a33a566488dfa9e
+
+
+  ⚠️ WARNINGS:   0
+  ❌ ERRORS:     0
+
+  ═══════════════════════════════════════════
+
+✅ guide::saveGuide       OK     ────────────────────────────
+  └ ret=0 2 chars (raw) 8ms
+
+  ✅ SUCCESS  📏 data= 2 chars  📦 proto= RAW  ⏱️ time= 8ms
+
+  └ ⏱️ handler: 8ms 
+
+  📤 hangup::saveGuideTeam  ──────────────────────────────────
+
+  ══════════════════════════════════════════════════════════
+  🎮 HANDLER: saveGuideTeam  (hangup/saveGuideTeam)  userId=guest_2a33a56648
+  ══════════════════════════════════════════════════════════
+
+
+  ────────────────────────────────────────────────────────
+  [01/10] 🟢 ENTRY CHECK
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 3] 🔄 Validate request fields  █░░
+  [ 1/ 3] ✅ Validate request fields  █░░  team=5 heroes
+
+  ────────────────────────────────────────────────────────
+  [02/10] 📦 DATA INJECTION CHECK
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 1] 🔄 Load userData from DB  █
+  [ 1/ 1] ✅ Load userData from DB  █  userData loaded
+
+  ────────────────────────────────────────────────────────
+  [03/10] 🔍 DEEP TYPE SCAN
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 2] 🔄 Type assert request fields  █░
+  [ 1/ 2] ✅ Type assert request fields  █░  all types verified
+
+  ────────────────────────────────────────────────────────
+  [04/10] ⚡ PLAYER STATE SNAPSHOT
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 1] 🔄 Snapshot hangupTeam data  █
+  [ 1/ 1] ✅ Snapshot hangupTeam data  █  team=0 supers=0
+
+  ────────────────────────────────────────────────────────
+  [05/10] 🧮 INVARIANT CHECK
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 2] 🔄 Validate business rules  █░
+  [ 1/ 2] ✅ Validate business rules  █░  invariants checked
+
+  ────────────────────────────────────────────────────────
+  [06/10] 🔮 MAIN PROCESS
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 1] 🔄 Update hangupTeam  █
+  [ 1/ 1] ✅ Update hangupTeam  █  team=5 heroes saved
+
+  ────────────────────────────────────────────────────────
+  [07/10] 💾 MUTATION LOG
+  ────────────────────────────────────────────────────────
+
+
+  ────────────────────────────────────────────────────────
+  [08/10] ✅ SAVE VERIFY
+  ────────────────────────────────────────────────────────
+
+[DB] saveUser("guest_2a33a5..."): 101 keys, 10180 bytes
+
+  ────────────────────────────────────────────────────────
+  [09/10] 📤 RESPONSE SNAPSHOT
+  ────────────────────────────────────────────────────────
+
+
+  ┌ 📸 saveGuideTeam ret=0 ───────────────────────────────────┐
+  └──────────────────────────────────────────────────────────┘
+
+
+  ────────────────────────────────────────────────────────
+  [10/10] 🏁 EXECUTION SUMMARY
+  ────────────────────────────────────────────────────────
+
+
+  ═══════════════════════════════════════════
+
+  ✅ SAVE GUIDE TEAM COMPLETE
+
+  👤 USER:       guest_2a33a566488dfa9e
+
+
+  ⚠️ WARNINGS:   0
+  ❌ ERRORS:     0
+
+  ═══════════════════════════════════════════
+
+✅ hangup::saveGuideTeam  OK     ────────────────────────────
+  └ ret=0 2 chars (raw) 8ms
+
+  ✅ SUCCESS  📏 data= 2 chars  📦 proto= RAW  ⏱️ time= 8ms
+
+  └ ⏱️ handler: 9ms 
+
+  📤 hangup::checkBattleResult ──────────────────────────────────
+
+  ══════════════════════════════════════════════════════════
+  🎮 HANDLER: checkBattleResult  (hangup/checkBattleResult)  userId=guest_2a33a56648
+  ══════════════════════════════════════════════════════════
+
+
+  ────────────────────────────────────────────────────────
+  [01/10] 🟢 ENTRY CHECK
+  ────────────────────────────────────────────────────────
+
+  [ 1/10] 🔄 Validate request  █░░░░░░░░░
+  [ 1/10] ✅ Validate request  █░░░░░░░░░
+
+  ────────────────────────────────────────────────────────
+  [02/10] 📦 DATA INJECTION CHECK
+  ────────────────────────────────────────────────────────
+
+  [ 2/10] 🔄 Load data  ██░░░░░░░░
+🟢 10:25:59.025 INFO  📋 CONFIG   ▸ Resource loaded: lesson.json
+  [ 2/10] ✅ Load data  ██░░░░░░░░  lesson.json=611 entries
+
+  ────────────────────────────────────────────────────────
+  [03/10] ⚡ PLAYER STATE SNAPSHOT
+  ────────────────────────────────────────────────────────
+
+  [ 3/10] 🔄 Read progress  ███░░░░░░░
+  [ 3/10] ✅ Read progress  ███░░░░░░░  lesson=10101
+
+  ────────────────────────────────────────────────────────
+  [04/10] 🧮 INVARIANT CHECK
+  ────────────────────────────────────────────────────────
+
+  [ 4/10] 🔄 Determine outcome  ████░░░░░░
+  [ 4/10] ✅ Determine outcome  ████░░░░░░  WIN (0)
+
+  ────────────────────────────────────────────────────────
+  [05/10] 🔮 MAIN PROCESS
+  ────────────────────────────────────────────────────────
+
+  [ 5/10] 🔄 Build response  █████░░░░░
+  [ 5/10] ✅ Build response  █████░░░░░  WIN rewards=5 lesson=10102
+
+  ────────────────────────────────────────────────────────
+  [06/10] 💾 MUTATION LOG
+  ────────────────────────────────────────────────────────
+
+
+  ────────────────────────────────────────────────────────
+  [07/10] ✅ SAVE VERIFY
+  ────────────────────────────────────────────────────────
+
+[DB] saveUser("guest_2a33a5..."): 101 keys, 10254 bytes
+
+  ────────────────────────────────────────────────────────
+  [08/10] 📤 RESPONSE SNAPSHOT
+  ────────────────────────────────────────────────────────
+
+
+  🔒 CRITICAL FIELDS AUDIT — game will crash/stuck if wrong
+  ──────────────────────────────────────────────
+  ├ 🔒 _battleResult            = 0  L104882: 0 == e._battleResult -> true (tutorial forced win)
+  ├ 🔒 _changeInfo._items       = 5 items  L97686: getBattleAwardItems iterates _changeInfo._items for {_id, _num}
+  ├ 🔒 _curLess                 = 10102  L104892/L97751: OnHookSingleton.lastSection = e._curLess
+  └ 🔒 _maxPassLesson           = 10101  L104893/L97751: OnHookSingleton.maxPassLesson = e._maxPassLesson
+  ✅ CRITICAL AUDIT: 4/4 PASSED
+
+
+  ────────────────────────────────────────────────────────
+  [09/10] 🔍 DEEP TYPE SCAN
+  ────────────────────────────────────────────────────────
+
+
+  ────────────────────────────────────────────────────────
+  [10/10] 🏁 EXECUTION SUMMARY
+  ────────────────────────────────────────────────────────
+
+
+  ═══════════════════════════════════════════
+
+  ✅ CHECK BATTLE RESULT
+
+  👤 USER:       guest_2a33a566488dfa9e
+  📦 FIELDS:     4
+
+
+
+  ═══════════════════════════════════════════
+
+
+  ┌ 📸 CHECK BATTLE RESULT ret=0 ─────────────────────────────┐
+  ├   _battleResult                0
+  ├   _curLess                     10102
+  ├   _maxPassLesson               10101
+  └   _changeInfo                  Object{1}
+  └──────────────────────────────────────────────────────────┘
+
+✅ hangup::checkBattleResult OK     ────────────────────────────
+  └ ret=0 218 chars (raw) 20ms
+
+  ✅ SUCCESS  📏 data= 218 chars  📦 proto= RAW  ⏱️ time= 20ms
+
+  └ ⏱️ handler: 21ms 
+
+  📤 buryPoint::guideBattle ──────────────────────────────────
+
+  ══════════════════════════════════════════════════════════
+  🎮 HANDLER: guideBattle  (buryPoint/guideBattle)  userId=guest_2a33a56648
+  ══════════════════════════════════════════════════════════
+
+
+  ────────────────────────────────────────────────────────
+  [01/10] 🟢 ENTRY CHECK
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 3] 🔄 Validate request fields  █░░
+  [ 1/ 3] ✅ Validate request fields  █░░  point=load
+
+  ────────────────────────────────────────────────────────
+  [02/10] 📦 DATA INJECTION CHECK
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 1] 🔄 Check data injection requirements  █
+  [ 1/ 1] ✅ Check data injection requirements  █  no DB load needed (analytics)
+
+  ────────────────────────────────────────────────────────
+  [03/10] 🔍 DEEP TYPE SCAN
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 3] 🔄 Type assert request fields  █░░
+  [ 1/ 3] ✅ Type assert request fields  █░░  all types verified
+
+  ────────────────────────────────────────────────────────
+  [04/10] ⚡ PLAYER STATE SNAPSHOT
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 1] 🔄 Check player state requirements  █
+  [ 1/ 1] ✅ Check player state requirements  █  analytics handler, no player state read
+
+  ────────────────────────────────────────────────────────
+  [05/10] 🧮 INVARIANT CHECK
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 1] 🔄 Validate point value  █
+  [ 1/ 1] ✅ Validate point value  █  point="load" is valid
+
+  ────────────────────────────────────────────────────────
+  [06/10] 🔮 MAIN PROCESS
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 1] 🔄 Process analytics event  █
+🟢 10:26:00.723 INFO  ⚪ BURYPOINT ▸ Guide battle analytics received: point=load passLesson=10101
+  [ 1/ 1] ✅ Process analytics event  █  analytics event logged
+
+  ────────────────────────────────────────────────────────
+  [07/10] 💾 MUTATION LOG
+  ────────────────────────────────────────────────────────
+
+
+  ────────────────────────────────────────────────────────
+  [08/10] ✅ SAVE VERIFY
+  ────────────────────────────────────────────────────────
+
+
+  ────────────────────────────────────────────────────────
+  [09/10] 📤 RESPONSE SNAPSHOT
+  ────────────────────────────────────────────────────────
+
+
+  ┌ 📸 guideBattle ret=0 ─────────────────────────────────────┐
+  └──────────────────────────────────────────────────────────┘
+
+
+  ────────────────────────────────────────────────────────
+  [10/10] 🏁 EXECUTION SUMMARY
+  ────────────────────────────────────────────────────────
+
+
+  ═══════════════════════════════════════════
+
+  ✅ GUIDE BATTLE ANALYTICS COMPLETE
+
+  👤 USER:       guest_2a33a566488dfa9e
+
+
+  ⚠️ WARNINGS:   0
+  ❌ ERRORS:     0
+
+  ═══════════════════════════════════════════
+
+✅ buryPoint::guideBattle OK     ────────────────────────────
+  └ ret=0 2 chars (raw) 4ms
+
+  ✅ SUCCESS  📏 data= 2 chars  📦 proto= RAW  ⏱️ time= 4ms
+
+  └ ⏱️ handler: 5ms 
+
+  📤 buryPoint::guideBattle ──────────────────────────────────
+
+  ══════════════════════════════════════════════════════════
+  🎮 HANDLER: guideBattle  (buryPoint/guideBattle)  userId=guest_2a33a56648
+  ══════════════════════════════════════════════════════════
+
+
+  ────────────────────────────────────────────────────────
+  [01/10] 🟢 ENTRY CHECK
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 3] 🔄 Validate request fields  █░░
+  [ 1/ 3] ✅ Validate request fields  █░░  point=battle
+
+  ────────────────────────────────────────────────────────
+  [02/10] 📦 DATA INJECTION CHECK
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 1] 🔄 Check data injection requirements  █
+  [ 1/ 1] ✅ Check data injection requirements  █  no DB load needed (analytics)
+
+  ────────────────────────────────────────────────────────
+  [03/10] 🔍 DEEP TYPE SCAN
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 3] 🔄 Type assert request fields  █░░
+  [ 1/ 3] ✅ Type assert request fields  █░░  all types verified
+
+  ────────────────────────────────────────────────────────
+  [04/10] ⚡ PLAYER STATE SNAPSHOT
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 1] 🔄 Check player state requirements  █
+  [ 1/ 1] ✅ Check player state requirements  █  analytics handler, no player state read
+
+  ────────────────────────────────────────────────────────
+  [05/10] 🧮 INVARIANT CHECK
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 1] 🔄 Validate point value  █
+  [ 1/ 1] ✅ Validate point value  █  point="battle" is valid
+
+  ────────────────────────────────────────────────────────
+  [06/10] 🔮 MAIN PROCESS
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 1] 🔄 Process analytics event  █
+🟢 10:26:11.596 INFO  ⚪ BURYPOINT ▸ Guide battle analytics received: point=battle passLesson=10101
+  [ 1/ 1] ✅ Process analytics event  █  analytics event logged
+
+  ────────────────────────────────────────────────────────
+  [07/10] 💾 MUTATION LOG
+  ────────────────────────────────────────────────────────
+
+
+  ────────────────────────────────────────────────────────
+  [08/10] ✅ SAVE VERIFY
+  ────────────────────────────────────────────────────────
+
+
+  ────────────────────────────────────────────────────────
+  [09/10] 📤 RESPONSE SNAPSHOT
+  ────────────────────────────────────────────────────────
+
+
+  ┌ 📸 guideBattle ret=0 ─────────────────────────────────────┐
+  └──────────────────────────────────────────────────────────┘
+
+
+  ────────────────────────────────────────────────────────
+  [10/10] 🏁 EXECUTION SUMMARY
+  ────────────────────────────────────────────────────────
+
+
+  ═══════════════════════════════════════════
+
+  ✅ GUIDE BATTLE ANALYTICS COMPLETE
+
+  👤 USER:       guest_2a33a566488dfa9e
+
+
+  ⚠️ WARNINGS:   0
+  ❌ ERRORS:     0
+
+  ═══════════════════════════════════════════
+
+✅ buryPoint::guideBattle OK     ────────────────────────────
+  └ ret=0 2 chars (raw) 5ms
+
+  ✅ SUCCESS  📏 data= 2 chars  📦 proto= RAW  ⏱️ time= 5ms
+
+  └ ⏱️ handler: 5ms 
+
+  📤 buryPoint::guideBattle ──────────────────────────────────
+
+  ══════════════════════════════════════════════════════════
+  🎮 HANDLER: guideBattle  (buryPoint/guideBattle)  userId=guest_2a33a56648
+  ══════════════════════════════════════════════════════════
+
+
+  ────────────────────────────────────────────────────────
+  [01/10] 🟢 ENTRY CHECK
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 3] 🔄 Validate request fields  █░░
+  [ 1/ 3] ✅ Validate request fields  █░░  point=home
+
+  ────────────────────────────────────────────────────────
+  [02/10] 📦 DATA INJECTION CHECK
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 1] 🔄 Check data injection requirements  █
+  [ 1/ 1] ✅ Check data injection requirements  █  no DB load needed (analytics)
+
+  ────────────────────────────────────────────────────────
+  [03/10] 🔍 DEEP TYPE SCAN
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 3] 🔄 Type assert request fields  █░░
+  [ 1/ 3] ✅ Type assert request fields  █░░  all types verified
+
+  ────────────────────────────────────────────────────────
+  [04/10] ⚡ PLAYER STATE SNAPSHOT
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 1] 🔄 Check player state requirements  █
+  [ 1/ 1] ✅ Check player state requirements  █  analytics handler, no player state read
+
+  ────────────────────────────────────────────────────────
+  [05/10] 🧮 INVARIANT CHECK
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 1] 🔄 Validate point value  █
+  [ 1/ 1] ✅ Validate point value  █  point="home" is valid
+
+  ────────────────────────────────────────────────────────
+  [06/10] 🔮 MAIN PROCESS
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 1] 🔄 Process analytics event  █
+🟢 10:26:13.233 INFO  ⚪ BURYPOINT ▸ Guide battle analytics received: point=home passLesson=10101
+  [ 1/ 1] ✅ Process analytics event  █  analytics event logged
+
+  ────────────────────────────────────────────────────────
+  [07/10] 💾 MUTATION LOG
+  ────────────────────────────────────────────────────────
+
+
+  ────────────────────────────────────────────────────────
+  [08/10] ✅ SAVE VERIFY
+  ────────────────────────────────────────────────────────
+
+
+  ────────────────────────────────────────────────────────
+  [09/10] 📤 RESPONSE SNAPSHOT
+  ────────────────────────────────────────────────────────
+
+
+  ┌ 📸 guideBattle ret=0 ─────────────────────────────────────┐
+  └──────────────────────────────────────────────────────────┘
+
+
+  ────────────────────────────────────────────────────────
+  [10/10] 🏁 EXECUTION SUMMARY
+  ────────────────────────────────────────────────────────
+
+
+  ═══════════════════════════════════════════
+
+  ✅ GUIDE BATTLE ANALYTICS COMPLETE
+
+  👤 USER:       guest_2a33a566488dfa9e
+
+
+  ⚠️ WARNINGS:   0
+  ❌ ERRORS:     0
+
+  ═══════════════════════════════════════════
+
+✅ buryPoint::guideBattle OK     ────────────────────────────
+  └ ret=0 2 chars (raw) 2ms
+
+  ✅ SUCCESS  📏 data= 2 chars  📦 proto= RAW  ⏱️ time= 2ms
+
+  └ ⏱️ handler: 2ms 
+
+  📤 activity::getActivityBrief ──────────────────────────────────
+🟡 10:26:13.432 WARN  ⚙️ HANDLER  ▸ Unknown type "activity" — no handlers registered for this type
+
+  📤 guide::saveGuide       ──────────────────────────────────
+
+  ══════════════════════════════════════════════════════════
+  🎮 HANDLER: saveGuide  (guide/saveGuide)  userId=guest_2a33a56648
+  ══════════════════════════════════════════════════════════
+
+
+  ────────────────────────────────────────────────────────
+  [01/10] 🟢 ENTRY CHECK
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 3] 🔄 Validate request fields  █░░
+  [ 1/ 3] ✅ Validate request fields  █░░  type=2 step=2206
+
+  ────────────────────────────────────────────────────────
+  [02/10] 📦 DATA INJECTION CHECK
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 1] 🔄 Load userData from DB  █
+  [ 1/ 1] ✅ Load userData from DB  █  userData loaded
+
+  ────────────────────────────────────────────────────────
+  [03/10] 🔍 DEEP TYPE SCAN
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 2] 🔄 Type assert request fields  █░
+  [ 1/ 2] ✅ Type assert request fields  █░  all types verified
+
+  ────────────────────────────────────────────────────────
+  [04/10] ⚡ PLAYER STATE SNAPSHOT
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 1] 🔄 Snapshot guide._steps before modification  █
+  [ 1/ 1] ✅ Snapshot guide._steps before modification  █  guide._steps[2] was 2107
+
+  ────────────────────────────────────────────────────────
+  [05/10] 🧮 INVARIANT CHECK
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 2] 🔄 Validate business rules  █░
+  [ 1/ 2] ✅ Validate business rules  █░  invariants checked
+
+  ────────────────────────────────────────────────────────
+  [06/10] 🔮 MAIN PROCESS
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 1] 🔄 Update guide._steps  █
+  [ 1/ 1] ✅ Update guide._steps  █  guide._steps[2] = 2206
+
+  ────────────────────────────────────────────────────────
+  [07/10] 💾 MUTATION LOG
+  ────────────────────────────────────────────────────────
+
+
+  ────────────────────────────────────────────────────────
+  [08/10] ✅ SAVE VERIFY
+  ────────────────────────────────────────────────────────
+
+[DB] saveUser("guest_2a33a5..."): 101 keys, 10254 bytes
+
+  ────────────────────────────────────────────────────────
+  [09/10] 📤 RESPONSE SNAPSHOT
+  ────────────────────────────────────────────────────────
+
+
+  ┌ 📸 saveGuide ret=0 ───────────────────────────────────────┐
+  └──────────────────────────────────────────────────────────┘
+
+
+  ────────────────────────────────────────────────────────
+  [10/10] 🏁 EXECUTION SUMMARY
+  ────────────────────────────────────────────────────────
+
+
+  ═══════════════════════════════════════════
+
+  ✅ SAVE GUIDE COMPLETE
+
+  👤 USER:       guest_2a33a566488dfa9e
+
+
+  ⚠️ WARNINGS:   0
+  ❌ ERRORS:     0
+
+  ═══════════════════════════════════════════
+
+✅ guide::saveGuide       OK     ────────────────────────────
+  └ ret=0 2 chars (raw) 6ms
+
+  ✅ SUCCESS  📏 data= 2 chars  📦 proto= RAW  ⏱️ time= 6ms
+
+  └ ⏱️ handler: 6ms 
+
+  📤 summon::summonOneFree  ──────────────────────────────────
+
+  ══════════════════════════════════════════════════════════
+  🎮 HANDLER: summonOneFree  (summon/summonOneFree)  userId=guest_2a33a56648
+  ══════════════════════════════════════════════════════════
+
+
+  ────────────────────────────────────────────────────────
+  [01/10] 🟢 ENTRY CHECK
+  ────────────────────────────────────────────────────────
+
+🟢 10:26:18.444 INFO  ⚪ SUMMON-FREE ▸ summonOneFree REQUEST RECEIVED
+
+  ────────────────────────────────────────────────────────
+  [02/10] 📦 DATA INJECTION CHECK
+  ────────────────────────────────────────────────────────
+
+🟢 10:26:18.445 INFO  ⚪ SUMMON-FREE ▸ userData loaded successfully (101 top-level keys)
+🟢 10:26:18.445 INFO  ⚪ SUMMON-FREE ▸ Deep clone SUCCESS — user object isolated from DB cache
+
+  ────────────────────────────────────────────────────────
+  [03/10] 🔍 DEEP TYPE SCAN
+  ────────────────────────────────────────────────────────
+
+🟢 10:26:18.448 INFO  📋 CONFIG   ▸ Resource loaded: summonPool.json
+🟢 10:26:18.449 INFO  📋 CONFIG   ▸ Resource loaded: summonRandom.json
+
+  ────────────────────────────────────────────────────────
+  [04/10] ⚡ PLAYER STATE SNAPSHOT
+  ────────────────────────────────────────────────────────
+
+🟢 10:26:18.449 INFO  ⚪ SUMMON-FREE ▸ Free timer OK — proceeding with summon
+
+  ────────────────────────────────────────────────────────
+  [05/10] 🧮 INVARIANT CHECK
+  ────────────────────────────────────────────────────────
+
+🟢 10:26:18.449 INFO  ⚪ SUMMON-FREE ▸ [GUIDE] Predetermined hero: displayId=1309 quality=purple
+
+  ────────────────────────────────────────────────────────
+  [06/10] 🔮 MAIN PROCESS
+  ────────────────────────────────────────────────────────
+
+
+  ⚠️  HERO OBJECT TYPE: heroObj._fragment wrong type
+
+
+  ────────────────────────────────────────────────────────
+  [07/10] 💾 MUTATION LOG
+  ────────────────────────────────────────────────────────
+
+
+  ────────────────────────────────────────────────────────
+  [08/10] ✅ SAVE VERIFY
+  ────────────────────────────────────────────────────────
+
+[DB] saveUser("guest_2a33a5..."): 101 keys, 10944 bytes
+🟢 10:26:18.454 INFO  ⚪ SUMMON-FREE ▸ User data SAVED
+
+  ────────────────────────────────────────────────────────
+  [09/10] 📤 RESPONSE SNAPSHOT
+  ────────────────────────────────────────────────────────
+
+🟢 10:26:18.454 INFO  ⚪ SUMMON-FREE ▸ summonOneFree SUCCESS
+
+  ┌ 📸 SUMMON-FREE ret=0 ─────────────────────────────────────┐
+  ├   _addTotal                    Array[1]
+  ├   _changeInfo                  Object{1}
+  └   _energy                      0
+  └──────────────────────────────────────────────────────────┘
+
+
+  ────────────────────────────────────────────────────────
+  [10/10] 🏁 EXECUTION SUMMARY
+  ────────────────────────────────────────────────────────
+
+
+  ═══════════════════════════════════════════
+
+  ✅ SUMMON FREE COMPLETE
+
+  👤 USER:       guest_2a33a566488dfa9e
+
+
+
+  ═══════════════════════════════════════════
+
+✅ summon::summonOneFree  OK     ────────────────────────────
+  └ ret=0 737 chars (raw) 13ms
+
+  ✅ SUCCESS  📏 data= 737 chars  📦 proto= RAW  ⏱️ time= 13ms
+
+  └ ⏱️ handler: 13ms 
+
+  📤 hero::getAttrs         ──────────────────────────────────
+
+  ══════════════════════════════════════════════════════════
+  🎮 HANDLER: getAttrs  (hero/getAttrs)  userId=guest_2a33a56648
+  ══════════════════════════════════════════════════════════
+
+
+  ────────────────────────────────────────────────────────
+  [01/10] 🟢 ENTRY CHECK
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 2] 🔄 Validate request fields  █░
+  [ 1/ 2] ✅ Validate request fields  █░  1 hero(es) requested
+
+  ────────────────────────────────────────────────────────
+  [02/10] 📦 DATA INJECTION CHECK
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 1] 🔄 Load userData from DB  █
+  [ 1/ 1] ✅ Load userData from DB  █  userData loaded
+
+  ────────────────────────────────────────────────────────
+  [03/10] 🔍 DEEP TYPE SCAN
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 2] 🔄 Type assert request fields  █░
+  [ 1/ 2] ✅ Type assert request fields  █░  types verified
+
+  ────────────────────────────────────────────────────────
+  [04/10] ⚡ PLAYER STATE SNAPSHOT
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 1] 🔄 Snapshot hero request vs found  █
+  [ 1/ 1] ✅ Snapshot hero request vs found  █  1/1 heroes found
+
+  ────────────────────────────────────────────────────────
+  [05/10] 🧮 INVARIANT CHECK
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 1] 🔄 Validate hero availability  █
+  [ 1/ 1] ✅ Validate hero availability  █  all heroes found
+
+  ────────────────────────────────────────────────────────
+  [06/10] 🔮 MAIN PROCESS
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 1] 🔄 Calculate hero attributes  █
+  [ 1/ 1] ✅ Calculate hero attributes  █  1 heroes calculated
+
+  ────────────────────────────────────────────────────────
+  [07/10] 💾 MUTATION LOG
+  ────────────────────────────────────────────────────────
+
+
+  ────────────────────────────────────────────────────────
+  [08/10] ✅ SAVE VERIFY
+  ────────────────────────────────────────────────────────
+
+
+  ────────────────────────────────────────────────────────
+  [09/10] 📤 RESPONSE SNAPSHOT
+  ────────────────────────────────────────────────────────
+
+
+  🔒 CRITICAL FIELDS AUDIT — game will crash/stuck if wrong
+  ──────────────────────────────────────────────
+  ├ 🔒 _attrs                   = Object{1}  L133726: for(var o in t._attrs) — keyed by hero index, each has _items with calculated attrs
+  ├ 🔒 _baseAttrs               = Object{1}  L133731: t._baseAttrs[o] — keyed by hero index, each has _items with base attrs (before talent)
+  └ 🔒 POWER (attr 21)          = calculated per hero  L133821: 21==p._id → heroBaseAttr.power = floor(num)
+  ✅ CRITICAL AUDIT: 3/3 PASSED
+
+
+  ┌ 📸 getAttrs ret=0 ────────────────────────────────────────┐
+  ├   _attrs                       Object{1}
+  └   _baseAttrs                   Object{1}
+  └──────────────────────────────────────────────────────────┘
+
+
+  ────────────────────────────────────────────────────────
+  [10/10] 🏁 EXECUTION SUMMARY
+  ────────────────────────────────────────────────────────
+
+
+  ═══════════════════════════════════════════
+
+  ✅ HERO GET ATTRS COMPLETE
+
+  👤 USER:       guest_2a33a566488dfa9e
+  📦 FIELDS:     2
+
+
+  ⚠️ WARNINGS:   0
+  ❌ ERRORS:     0
+
+  ═══════════════════════════════════════════
+
+✅ hero::getAttrs         OK     ────────────────────────────
+  └ ret=0 392 chars (raw) 3ms
+
+  ✅ SUCCESS  📏 data= 392 chars  📦 proto= RAW  ⏱️ time= 3ms
+
+  └ ⏱️ handler: 3ms 
+
+  📤 guide::saveGuide       ──────────────────────────────────
+
+  ══════════════════════════════════════════════════════════
+  🎮 HANDLER: saveGuide  (guide/saveGuide)  userId=guest_2a33a56648
+  ══════════════════════════════════════════════════════════
+
+
+  ────────────────────────────────────────────────────────
+  [01/10] 🟢 ENTRY CHECK
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 3] 🔄 Validate request fields  █░░
+  [ 1/ 3] ✅ Validate request fields  █░░  type=2 step=2210
+
+  ────────────────────────────────────────────────────────
+  [02/10] 📦 DATA INJECTION CHECK
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 1] 🔄 Load userData from DB  █
+  [ 1/ 1] ✅ Load userData from DB  █  userData loaded
+
+  ────────────────────────────────────────────────────────
+  [03/10] 🔍 DEEP TYPE SCAN
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 2] 🔄 Type assert request fields  █░
+  [ 1/ 2] ✅ Type assert request fields  █░  all types verified
+
+  ────────────────────────────────────────────────────────
+  [04/10] ⚡ PLAYER STATE SNAPSHOT
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 1] 🔄 Snapshot guide._steps before modification  █
+  [ 1/ 1] ✅ Snapshot guide._steps before modification  █  guide._steps[2] was 2206
+
+  ────────────────────────────────────────────────────────
+  [05/10] 🧮 INVARIANT CHECK
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 2] 🔄 Validate business rules  █░
+  [ 1/ 2] ✅ Validate business rules  █░  invariants checked
+
+  ────────────────────────────────────────────────────────
+  [06/10] 🔮 MAIN PROCESS
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 1] 🔄 Update guide._steps  █
+  [ 1/ 1] ✅ Update guide._steps  █  guide._steps[2] = 2210
+
+  ────────────────────────────────────────────────────────
+  [07/10] 💾 MUTATION LOG
+  ────────────────────────────────────────────────────────
+
+
+  ────────────────────────────────────────────────────────
+  [08/10] ✅ SAVE VERIFY
+  ────────────────────────────────────────────────────────
+
+[DB] saveUser("guest_2a33a5..."): 101 keys, 10944 bytes
+
+  ────────────────────────────────────────────────────────
+  [09/10] 📤 RESPONSE SNAPSHOT
+  ────────────────────────────────────────────────────────
+
+
+  ┌ 📸 saveGuide ret=0 ───────────────────────────────────────┐
+  └──────────────────────────────────────────────────────────┘
+
+
+  ────────────────────────────────────────────────────────
+  [10/10] 🏁 EXECUTION SUMMARY
+  ────────────────────────────────────────────────────────
+
+
+  ═══════════════════════════════════════════
+
+  ✅ SAVE GUIDE COMPLETE
+
+  👤 USER:       guest_2a33a566488dfa9e
+
+
+  ⚠️ WARNINGS:   0
+  ❌ ERRORS:     0
+
+  ═══════════════════════════════════════════
+
+✅ guide::saveGuide       OK     ────────────────────────────
+  └ ret=0 2 chars (raw) 7ms
+
+  ✅ SUCCESS  📏 data= 2 chars  📦 proto= RAW  ⏱️ time= 7ms
+
+  └ ⏱️ handler: 7ms 
+
+  📤 summon::summonOneFree  ──────────────────────────────────
+
+  ══════════════════════════════════════════════════════════
+  🎮 HANDLER: summonOneFree  (summon/summonOneFree)  userId=guest_2a33a56648
+  ══════════════════════════════════════════════════════════
+
+
+  ────────────────────────────────────────────────────────
+  [01/10] 🟢 ENTRY CHECK
+  ────────────────────────────────────────────────────────
+
+🟢 10:26:22.653 INFO  ⚪ SUMMON-FREE ▸ summonOneFree REQUEST RECEIVED
+
+  ────────────────────────────────────────────────────────
+  [02/10] 📦 DATA INJECTION CHECK
+  ────────────────────────────────────────────────────────
+
+🟢 10:26:22.654 INFO  ⚪ SUMMON-FREE ▸ userData loaded successfully (101 top-level keys)
+🟢 10:26:22.655 INFO  ⚪ SUMMON-FREE ▸ Deep clone SUCCESS — user object isolated from DB cache
+
+  ────────────────────────────────────────────────────────
+  [03/10] 🔍 DEEP TYPE SCAN
+  ────────────────────────────────────────────────────────
+
+
+  ────────────────────────────────────────────────────────
+  [04/10] ⚡ PLAYER STATE SNAPSHOT
+  ────────────────────────────────────────────────────────
+
+🟢 10:26:22.656 INFO  ⚪ SUMMON-FREE ▸ Free timer OK — proceeding with summon
+
+  ────────────────────────────────────────────────────────
+  [05/10] 🧮 INVARIANT CHECK
+  ────────────────────────────────────────────────────────
+
+🟢 10:26:22.656 INFO  ⚪ SUMMON-FREE ▸ [GUIDE] Predetermined hero: displayId=1206 quality=blue
+
+  ────────────────────────────────────────────────────────
+  [06/10] 🔮 MAIN PROCESS
+  ────────────────────────────────────────────────────────
+
+
+  ⚠️  HERO OBJECT TYPE: heroObj._fragment wrong type
+
+
+  ────────────────────────────────────────────────────────
+  [07/10] 💾 MUTATION LOG
+  ────────────────────────────────────────────────────────
+
+
+  ────────────────────────────────────────────────────────
+  [08/10] ✅ SAVE VERIFY
+  ────────────────────────────────────────────────────────
+
+[DB] saveUser("guest_2a33a5..."): 101 keys, 11634 bytes
+🟢 10:26:22.660 INFO  ⚪ SUMMON-FREE ▸ User data SAVED
+
+  ────────────────────────────────────────────────────────
+  [09/10] 📤 RESPONSE SNAPSHOT
+  ────────────────────────────────────────────────────────
+
+🟢 10:26:22.660 INFO  ⚪ SUMMON-FREE ▸ summonOneFree SUCCESS
+
+  ┌ 📸 SUMMON-FREE ret=0 ─────────────────────────────────────┐
+  ├   _addTotal                    Array[1]
+  ├   _changeInfo                  Object{1}
+  └   _energy                      0
+  └──────────────────────────────────────────────────────────┘
+
+
+  ────────────────────────────────────────────────────────
+  [10/10] 🏁 EXECUTION SUMMARY
+  ────────────────────────────────────────────────────────
+
+
+  ═══════════════════════════════════════════
+
+  ✅ SUMMON FREE COMPLETE
+
+  👤 USER:       guest_2a33a566488dfa9e
+
+
+
+  ═══════════════════════════════════════════
+
+✅ summon::summonOneFree  OK     ────────────────────────────
+  └ ret=0 737 chars (raw) 8ms
+
+  ✅ SUCCESS  📏 data= 737 chars  📦 proto= RAW  ⏱️ time= 8ms
+
+  └ ⏱️ handler: 8ms 
+
+  📤 hero::getAttrs         ──────────────────────────────────
+
+  ══════════════════════════════════════════════════════════
+  🎮 HANDLER: getAttrs  (hero/getAttrs)  userId=guest_2a33a56648
+  ══════════════════════════════════════════════════════════
+
+
+  ────────────────────────────────────────────────────────
+  [01/10] 🟢 ENTRY CHECK
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 2] 🔄 Validate request fields  █░
+  [ 1/ 2] ✅ Validate request fields  █░  1 hero(es) requested
+
+  ────────────────────────────────────────────────────────
+  [02/10] 📦 DATA INJECTION CHECK
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 1] 🔄 Load userData from DB  █
+  [ 1/ 1] ✅ Load userData from DB  █  userData loaded
+
+  ────────────────────────────────────────────────────────
+  [03/10] 🔍 DEEP TYPE SCAN
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 2] 🔄 Type assert request fields  █░
+  [ 1/ 2] ✅ Type assert request fields  █░  types verified
+
+  ────────────────────────────────────────────────────────
+  [04/10] ⚡ PLAYER STATE SNAPSHOT
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 1] 🔄 Snapshot hero request vs found  █
+  [ 1/ 1] ✅ Snapshot hero request vs found  █  1/1 heroes found
+
+  ────────────────────────────────────────────────────────
+  [05/10] 🧮 INVARIANT CHECK
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 1] 🔄 Validate hero availability  █
+  [ 1/ 1] ✅ Validate hero availability  █  all heroes found
+
+  ────────────────────────────────────────────────────────
+  [06/10] 🔮 MAIN PROCESS
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 1] 🔄 Calculate hero attributes  █
+  [ 1/ 1] ✅ Calculate hero attributes  █  1 heroes calculated
+
+  ────────────────────────────────────────────────────────
+  [07/10] 💾 MUTATION LOG
+  ────────────────────────────────────────────────────────
+
+
+  ────────────────────────────────────────────────────────
+  [08/10] ✅ SAVE VERIFY
+  ────────────────────────────────────────────────────────
+
+
+  ────────────────────────────────────────────────────────
+  [09/10] 📤 RESPONSE SNAPSHOT
+  ────────────────────────────────────────────────────────
+
+
+  🔒 CRITICAL FIELDS AUDIT — game will crash/stuck if wrong
+  ──────────────────────────────────────────────
+  ├ 🔒 _attrs                   = Object{1}  L133726: for(var o in t._attrs) — keyed by hero index, each has _items with calculated attrs
+  ├ 🔒 _baseAttrs               = Object{1}  L133731: t._baseAttrs[o] — keyed by hero index, each has _items with base attrs (before talent)
+  └ 🔒 POWER (attr 21)          = calculated per hero  L133821: 21==p._id → heroBaseAttr.power = floor(num)
+  ✅ CRITICAL AUDIT: 3/3 PASSED
+
+
+  ┌ 📸 getAttrs ret=0 ────────────────────────────────────────┐
+  ├   _attrs                       Object{1}
+  └   _baseAttrs                   Object{1}
+  └──────────────────────────────────────────────────────────┘
+
+
+  ────────────────────────────────────────────────────────
+  [10/10] 🏁 EXECUTION SUMMARY
+  ────────────────────────────────────────────────────────
+
+
+  ═══════════════════════════════════════════
+
+  ✅ HERO GET ATTRS COMPLETE
+
+  👤 USER:       guest_2a33a566488dfa9e
+  📦 FIELDS:     2
+
+
+  ⚠️ WARNINGS:   0
+  ❌ ERRORS:     0
+
+  ═══════════════════════════════════════════
+
+✅ hero::getAttrs         OK     ────────────────────────────
+  └ ret=0 396 chars (raw) 5ms
+
+  ✅ SUCCESS  📏 data= 396 chars  📦 proto= RAW  ⏱️ time= 5ms
+
+  └ ⏱️ handler: 5ms 
+
+  📤 activity::getActivityBrief ──────────────────────────────────
+🟡 10:26:26.346 WARN  ⚙️ HANDLER  ▸ Unknown type "activity" — no handlers registered for this type
+
+  📤 guide::saveGuide       ──────────────────────────────────
+
+  ══════════════════════════════════════════════════════════
+  🎮 HANDLER: saveGuide  (guide/saveGuide)  userId=guest_2a33a56648
+  ══════════════════════════════════════════════════════════
+
+
+  ────────────────────────────────────────────────────────
+  [01/10] 🟢 ENTRY CHECK
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 3] 🔄 Validate request fields  █░░
+  [ 1/ 3] ✅ Validate request fields  █░░  type=2 step=2304
+
+  ────────────────────────────────────────────────────────
+  [02/10] 📦 DATA INJECTION CHECK
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 1] 🔄 Load userData from DB  █
+  [ 1/ 1] ✅ Load userData from DB  █  userData loaded
+
+  ────────────────────────────────────────────────────────
+  [03/10] 🔍 DEEP TYPE SCAN
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 2] 🔄 Type assert request fields  █░
+  [ 1/ 2] ✅ Type assert request fields  █░  all types verified
+
+  ────────────────────────────────────────────────────────
+  [04/10] ⚡ PLAYER STATE SNAPSHOT
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 1] 🔄 Snapshot guide._steps before modification  █
+  [ 1/ 1] ✅ Snapshot guide._steps before modification  █  guide._steps[2] was 2210
+
+  ────────────────────────────────────────────────────────
+  [05/10] 🧮 INVARIANT CHECK
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 2] 🔄 Validate business rules  █░
+  [ 1/ 2] ✅ Validate business rules  █░  invariants checked
+
+  ────────────────────────────────────────────────────────
+  [06/10] 🔮 MAIN PROCESS
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 1] 🔄 Update guide._steps  █
+  [ 1/ 1] ✅ Update guide._steps  █  guide._steps[2] = 2304
+
+  ────────────────────────────────────────────────────────
+  [07/10] 💾 MUTATION LOG
+  ────────────────────────────────────────────────────────
+
+
+  ────────────────────────────────────────────────────────
+  [08/10] ✅ SAVE VERIFY
+  ────────────────────────────────────────────────────────
+
+[DB] saveUser("guest_2a33a5..."): 101 keys, 11634 bytes
+
+  ────────────────────────────────────────────────────────
+  [09/10] 📤 RESPONSE SNAPSHOT
+  ────────────────────────────────────────────────────────
+
+
+  ┌ 📸 saveGuide ret=0 ───────────────────────────────────────┐
+  └──────────────────────────────────────────────────────────┘
+
+
+  ────────────────────────────────────────────────────────
+  [10/10] 🏁 EXECUTION SUMMARY
+  ────────────────────────────────────────────────────────
+
+
+  ═══════════════════════════════════════════
+
+  ✅ SAVE GUIDE COMPLETE
+
+  👤 USER:       guest_2a33a566488dfa9e
+
+
+  ⚠️ WARNINGS:   0
+  ❌ ERRORS:     0
+
+  ═══════════════════════════════════════════
+
+✅ guide::saveGuide       OK     ────────────────────────────
+  └ ret=0 2 chars (raw) 7ms
+
+  ✅ SUCCESS  📏 data= 2 chars  📦 proto= RAW  ⏱️ time= 7ms
+
+  └ ⏱️ handler: 7ms 
+
+  ➖ DISCONNECT ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─
+  └ 🔗 reason: reason=ping timeout  sid= 5yF9JIzr...
+
+  ➕ NEW CONNECTION ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─
+🟢 10:27:14.623 INFO  🔐 TEA      ▸ Sending verify challenge
+🟢 10:27:14.666 INFO  🔐 TEA      ▸ TEA verification SUCCESS
+
+  ➖ DISCONNECT ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─
+  └ 🔗 reason: reason=ping timeout  sid= dsMT93J2...
+
+  ➕ NEW CONNECTION ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─
+🟢 10:27:59.709 INFO  🔐 TEA      ▸ Sending verify challenge
+🟢 10:27:59.750 INFO  🔐 TEA      ▸ TEA verification SUCCESS
+
+  ➖ DISCONNECT ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─
+  └ 🔗 reason: reason=ping timeout  sid= m60-3zTF...
+
+  ➕ NEW CONNECTION ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─
+🟢 10:29:32.345 INFO  🔐 TEA      ▸ Sending verify challenge
+🟢 10:29:32.438 INFO  🔐 TEA      ▸ TEA verification SUCCESS
+
+  📤 user::enterGame        ──────────────────────────────────
+
+  ══════════════════════════════════════════════════════════
+  🎮 HANDLER: enterGame  (user/enterGame)  userId=guest_2a33a56648
+  ══════════════════════════════════════════════════════════
+
+
+  ────────────────────────────────────────────────────────
+  [01/10] 🟢 ENTRY CHECK
+  ────────────────────────────────────────────────────────
+
+🟢 10:29:32.486 INFO  ⚔️ ENTER    ▸ enterGame REQUEST RECEIVED
+  [ 1/10] 🔄 Required fields validation  █░░░░░░░░░
+  [ 1/10] ✅ Required fields validation  █░░░░░░░░░  All 3 present
+
+  ────────────────────────────────────────────────────────
+  [02/10] 📦 DATA INJECTION CHECK
+  ────────────────────────────────────────────────────────
+
+  [ 2/10] 🔄 Token auth via SDK-Server  ██░░░░░░░░
+🟢 10:29:32.500 INFO  📡 SDKAPI   ▸ User verified via SDK-Server
+  [ 2/10] ✅ Token auth via SDK-Server  ██░░░░░░░░  14ms
+  [ 3/10] 🔄 ServerId validation  ███░░░░░░░
+  [ 3/10] ✅ ServerId validation  ███░░░░░░░  1 == 1
+
+  ────────────────────────────────────────────────────────
+  [03/10] 🔍 DEEP TYPE SCAN
+  ────────────────────────────────────────────────────────
+
+  [ 4/10] 🔄 Request type validation  ████░░░░░░
+
+  ┌──────────────────────────────────────────────────────────────┐
+  │  ❌ FATAL ERROR AT STEP Server selection                    │
+  │                                                              │
+  │  STEP:   ENTER-TYPESCAN                                      │
+  │  REASON: TYPE ASSERTION FAILED: request.serverId             │
+  │  DETAIL: Server selection                                    │
+  │  CLIENT: ctx.config.serverId                                 │
+  │                                                              │
+  │  IMPACT:  serverId must be string for parseInt comparison     │
+  │                                                              │
+  └──────────────────────────────────────────────────────────────┘
+
+  ├ ❌ field: request.serverId
+  ├ ❌ expected: string
+  ├ ❌ actual: number
+  └ ❌ value: 1
+  [ 4/10] ✅ Request type validation  ████░░░░░░  2/2 passed
+
+  ────────────────────────────────────────────────────────
+  [04/10] ⚡ PLAYER STATE SNAPSHOT
+  ────────────────────────────────────────────────────────
+
+  [ 5/10] 🔄 Database lookup  █████░░░░░
+  [ 5/10] ✅ Database lookup  █████░░░░░  EXISTING USER (101 keys, 11,634 bytes)
+
+  ────────────────────────────────────────────────────────
+  [05/10] 🧮 INVARIANT CHECK
+  ────────────────────────────────────────────────────────
+
+  [ 6/10] 🔄 Config & resource invariants  ██████░░░░
+
+  ⚠️  INVARIANT VIOLATION: config.serverVersion loaded
+       SOURCE: ENTER-INVARIANT UserInfoSingleton.serverVersion → e.serverVersion
+       REASON: Expected: truthy (string), Got: MISSING — Client displays wrong version info
+
+  [ 6/10] ✅ Config & resource invariants  ██████░░░░  All server configs verified
+
+  ────────────────────────────────────────────────────────
+  [06/10] 🔮 MAIN PROCESS
+  ────────────────────────────────────────────────────────
+
+  [ 7/10] 🔄 Build/Load user data  ███████░░░
+  [ 7/10] ✅ Build/Load user data  ███████░░░  101 keys (1ms)
+  [ 8/10] 🔄 Circular reference safety  ████████░░
+  [ 8/10] ✅ Circular reference safety  ████████░░  0 circular refs
+
+  🔒 CRITICAL FIELDS AUDIT — game will crash/stuck if wrong
+  ──────────────────────────────────────────────
+  ├ 🔒 training._award          = null  present — FIX-001 safe
+  ├ 🔒 user._attribute._items[104] = present  Level=1
+  ├ 🔒 imprint._items           = Object{}  FIX-005: client L114925 uses for...in → needs Object
+  ├ 🔒 weapon._items            = Object{}  FIX-005: client L130938 uses for...in → needs Object
+  └ 🔒 genki._items             = Object{}  FIX-005: client L132158 uses for...in → needs Object
+  ✅ CRITICAL AUDIT: 5/5 PASSED
+
+  [ 9/10] 🔄 JSON serialization test  █████████░
+  [ 9/10] ✅ JSON serialization test  █████████░  11,647 bytes
+
+  ⚠️ WARNINGS DETECTED
+  ──────────────────────────────────────────────
+  ⚠️  [W001] training._award EXISTS in stored data — potential circular ref
+       Expected: null or undefined
+       Got:      type=object (possibly self-referencing)
+       Impact:   Client bug L121387 may create nesting loop on re-login
+       Fix:      stripCircularReferences will sanitize before response
+  ⚠️ TOTAL WARNINGS: 1
+
+
+  ────────────────────────────────────────────────────────
+  [07/10] 📝 MUTATION LOG
+  ────────────────────────────────────────────────────────
+
+🟢 10:29:32.506 INFO  ⚔️ ENTER    ▸ MUTATION: Existing user data UPDATED
+
+  ────────────────────────────────────────────────────────
+  [08/10] 💾 SAVE VERIFY
+  ────────────────────────────────────────────────────────
+
+  [10/10] 🔄 Database save  ██████████
+[DB] saveUser("guest_2a33a5..."): 101 keys, 11647 bytes
+  [10/10] ✅ Database save  ██████████  2ms
+🟢 10:29:32.509 INFO  ⚔️ ENTER    ▸ Post-save integrity verification...
+
+  ────────────────────────────────────────────────────────
+  [09/10] 📤 RESPONSE SNAPSHOT
+  ────────────────────────────────────────────────────────
+
+
+  ┌ 📸 ENTER GAME RESPONSE (ret=0) ───────────────────────────┐
+  ├   user                         Object{20}
+  ├   heros                        Object{4}
+  ├   hangup                       Object{16}
+  ├   totalProps                   Object{1}
+  ├   backpackLevel                1
+  ├   imprint                      Object{2}
+  ├   weapon                       Object{2}
+  ├   summon                       Object{7}
+  ├   dungeon                      Object{2}
+  ├   equip                        Object{2}
+  ├   scheduleInfo                 Object{53}
+  ├   timesInfo                    Object{12}
+  ├   serverVersion                ""
+  ├   serverId                     1
+  ├   serverOpenDate               1778840724785
+  ├   newUser                      false
+  ├   currency                     "USD"
+  ├   lastTeam                     Object{2}
+  ├   superSkill                   Object{2}
+  ├   giftInfo                     Object{11}
+  ├   guide                        Object{2}
+  ├   userGuild                    Object{3}
+  ├   userGuildPub                 Object{8}
+  ├   expedition                   Object{7}
+  ├   retrieve                     Object{7}
+  ├   battleMedal                  Object{11}
+  ├   training                     Object{9}
+  ├   heroSkin                     Object{3}
+  ├   userWar                      Object{9}
+  ├   userBallWar                  Object{6}
+  ├   headEffect                   Object{4}
+  ├   userTopBattle                Object{10}
+  ├   topBattleInfo                Object{4}
+  ├   checkin                      Object{5}
+  ├   curMainTask                  Object{0}
+  ├   summonLog                    Array[0] ⚠️ EMPTY
+  ├   vipLog                       Array[0] ⚠️ EMPTY
+  ├   cardLog                      Array[0] ⚠️ EMPTY
+  ├   onlineBulletin               Array[0] ⚠️ EMPTY
+  ├   broadcastRecord              Array[0] ⚠️ EMPTY
+  ├   blacklist                    Object{0}
+  ├   forbiddenChat                Object{2}
+  ├   guildLevel                   0
+  ├   guildTreasureMatchRet        0
+  ├   dragonEquiped                Object{0}
+  ├   warInfo                      null ⚠️ NULL
+  ├   ballWarState                 0
+  ├   enableShowQQ                 false
+  ├   showQQVip                    0
+  ├   showQQ                       0
+  ├   showQQImg1                   ""
+  ├   showQQImg2                   ""
+  ├   showQQUrl                    ""
+  ├   cellgameHaveSetHero          false
+  ├   globalWarBuffTag             ""
+  ├   globalWarLastRank            Object{0}
+  ├   globalWarBuff                0
+  ├   globalWarBuffEndTime         0
+  ├   guildName                    ""
+  ├   guildActivePoints            Object{0}
+  ├   ballBroadcast                null ⚠️ NULL
+  ├   ballWarInfo                  Object{4}
+  ├   teamTraining                 Object{4}
+  ├   teamServerHttpUrl            ""
+  ├   teamDungeonOpenTime          0
+  ├   teamDungeonTask              Object{3}
+  ├   teamDungeonSplBcst           null ⚠️ NULL
+  ├   teamDungeonNormBcst          null ⚠️ NULL
+  ├   teamDungeonHideInfo          null ⚠️ NULL
+  ├   teamDungeon                  Object{3}
+  ├   teamDungeonInvitedFriends    null ⚠️ NULL
+  ├   myTeamServerSocketUrl        "http://127.0.0.1:8003"
+  ├   shopNewHeroes                Object{0}
+  ├   channelSpecial               Object{15}
+  ├   hideHeroes                   Array[0] ⚠️ EMPTY
+  ├   templeLess                   0
+  ├   timeTrial                    Object{9}
+  ├   timeTrialNextOpenTime        0
+  ├   YouTuberRecruit              Object{7}
+  ├   userYouTuberRecruit          Object{2}
+  ├   heroImageVersion             0
+  ├   superImageVersion            0
+  ├   karinStartTime               0
+  ├   karinEndTime                 0
+  ├   timeBonusInfo                Object{2}
+  ├   monthCard                    Object{2}
+  ├   recharge                     Object{2}
+  ├   userDownloadReward           Object{4}
+  ├   clickSystem                  Object{2}
+  ├   questionnaires               null ⚠️ NULL
+  ├   littleGame                   Object{3}
+  ├   genki                        Object{4}
+  ├   gemstone                     Object{1}
+  ├   resonance                    Object{6}
+  ├   fastTeam                     Object{1}
+  ├   gravity                      Object{0}
+  ├   timeMachine                  Object{1}
+  ├   _arenaTeam                   null ⚠️ NULL
+  ├   _arenaSuper                  null ⚠️ NULL
+  ├   mergedServers                Array[0] ⚠️ EMPTY
+  └   hangupTeam                   Object{2}
+  └──────────────────────────────────────────────────────────┘
+
+
+  ┌──────────────────────────────────────────────────────────────┐
+  │  ❌ FATAL ERROR AT STEP RESPONSE TYPE SCAN                  │
+  │                                                              │
+  │  STEP:   ENTER                                               │
+  │  REASON: userData.serverId expected string but got number    │
+  │  DETAIL: UserDataParser reads these fields on client         │
+  │  CLIENT: Multiple client parsers                             │
+  │                                                              │
+  │  IMPACT:  Client crash or silent data loss                    │
+  │  FIX:     Check buildNewUserData or updateExistingUser        │
+  │                                                              │
+  └──────────────────────────────────────────────────────────────┘
+
+  ├ ❌ field: userData.serverId
+  ├ ❌ expected: string
+  ├ ❌ actual: number
+  └ ❌ value: 1
+
+  ────────────────────────────────────────────────────────
+  [10/10] 🏁 EXECUTION SUMMARY
+  ────────────────────────────────────────────────────────
+
+
+  ═══════════════════════════════════════════
+
+  ❌ ENTER GAME COMPLETE — WITH WARNINGS
+
+  👤 USER:       guest_2a33a566488dfa9e (Returning User)
+  📦 FIELDS:     101
+  🦸 HEROES:     3 hero(es)
+  💎 DIAMOND:    20
+  🏆 LEVEL:      1
+
+  📏 JSON SIZE:  11,647 chars
+  📦 RESP SIZE:  2,734 chars
+  🔐 PROTOCOL:   LZ-STRING
+  ⏱️ TOTAL TIME: 63ms  █████████░░░░░░░
+
+  🔒 CRITICAL:   5/5 PASSED
+  ⚠️ WARNINGS:   1
+  ❌ ERRORS:     1
+
+  ═══════════════════════════════════════════
+
+✅ user::enterGame        OK     ────────────────────────────
+  └ ret=0 2734 chars (LZ) 64ms
+
+  ✅ SUCCESS  📏 data= 2734 chars  📦 proto= LZ-STRING  ⏱️ time= 64ms
+
+  └ ⏱️ handler: 64ms 
+
+  📤 user::getBulletinBrief ──────────────────────────────────
+
+  ══════════════════════════════════════════════════════════
+  🎮 HANDLER: getBulletinBrief  (user/getBulletinBrief)  userId=guest_2a33a56648
+  ══════════════════════════════════════════════════════════
+
+
+  ────────────────────────────────────────────────────────
+  [01/10] 🟢 ENTRY CHECK
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 2] 🔄 Validate request fields  █░
+  [ 1/ 2] ✅ Validate request fields  █░  userId OK
+
+  ────────────────────────────────────────────────────────
+  [02/10] 📦 DATA INJECTION CHECK
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 1] 🔄 Load global bulletin data  █
+  [ 1/ 1] ✅ Load global bulletin data  █  0 entries loaded
+
+  ────────────────────────────────────────────────────────
+  [03/10] 🔍 DEEP TYPE SCAN
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 1] 🔄 Type assert request fields  █
+  [ 1/ 1] ✅ Type assert request fields  █  type verified
+
+  ────────────────────────────────────────────────────────
+  [04/10] ⚡ PLAYER STATE SNAPSHOT
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 1] 🔄 Snapshot bulletin state  █
+  [ 1/ 1] ✅ Snapshot bulletin state  █  0 bulletins in global store
+
+  ────────────────────────────────────────────────────────
+  [05/10] 🧮 INVARIANT CHECK
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 2] 🔄 Validate business rules  █░
+  [ 1/ 2] ✅ Validate business rules  █░  invariants checked
+
+  ────────────────────────────────────────────────────────
+  [06/10] 🔮 MAIN PROCESS
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 1] 🔄 Build _brief object (strip body field)  █
+  [ 1/ 1] ✅ Build _brief object (strip body field)  █  0 bulletins (body stripped)
+
+  ────────────────────────────────────────────────────────
+  [07/10] 💾 MUTATION LOG
+  ────────────────────────────────────────────────────────
+
+
+  ────────────────────────────────────────────────────────
+  [08/10] ✅ SAVE VERIFY
+  ────────────────────────────────────────────────────────
+
+
+  ────────────────────────────────────────────────────────
+  [09/10] 📤 RESPONSE SNAPSHOT
+  ────────────────────────────────────────────────────────
+
+
+  🔒 CRITICAL FIELDS AUDIT — game will crash/stuck if wrong
+  ──────────────────────────────────────────────
+  └ 🔒 _brief                   = Object{0}  L121094: for(var o in n._brief) iterates each bulletin
+  ✅ CRITICAL AUDIT: 1/1 PASSED
+
+
+  ┌ 📸 getBulletinBrief ret=0 ────────────────────────────────┐
+  └   _brief                       Object{0}
+  └──────────────────────────────────────────────────────────┘
+
+
+  ────────────────────────────────────────────────────────
+  [10/10] 🏁 EXECUTION SUMMARY
+  ────────────────────────────────────────────────────────
+
+
+  ═══════════════════════════════════════════
+
+  ✅ GET BULLETIN BRIEF COMPLETE
+
+  👤 USER:       guest_2a33a566488dfa9e
+
+
+  ⚠️ WARNINGS:   0
+  ❌ ERRORS:     0
+
+  ═══════════════════════════════════════════
+
+✅ user::getBulletinBrief OK     ────────────────────────────
+  └ ret=0 13 chars (raw) 7ms
+
+  ✅ SUCCESS  📏 data= 13 chars  📦 proto= RAW  ⏱️ time= 7ms
+
+  └ ⏱️ handler: 8ms 
+
+  📤 friend::friendServerAction ──────────────────────────────────
+
+  ══════════════════════════════════════════════════════════
+  🎮 HANDLER: friendServerAction  (friend/friendServerAction)  userId=guest_2a33a56648
+  ══════════════════════════════════════════════════════════
+
+
+  ────────────────────────────────────────────────────────
+  [01/10] 🟢 ENTRY CHECK
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 2] 🔄 Validate request fields  █░
+  [ 1/ 2] ✅ Validate request fields  █░  relayAction="${relayAction}"
+
+  ────────────────────────────────────────────────────────
+  [02/10] 📦 DATA INJECTION CHECK
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 1] 🔄 Load userData from DB  █
+  [ 1/ 1] ✅ Load userData from DB  █  userData loaded + teamwork fields ensured
+
+  ────────────────────────────────────────────────────────
+  [03/10] 🔍 DEEP TYPE SCAN
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 2] 🔄 Type assert request fields  █░
+  [ 1/ 2] ✅ Type assert request fields  █░  types verified
+
+  ────────────────────────────────────────────────────────
+  [04/10] ⚡ PLAYER STATE SNAPSHOT
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 1] 🔄 Snapshot teamwork storage state  █
+  [ 1/ 1] ✅ Snapshot teamwork storage state  █  0 friends
+
+  ────────────────────────────────────────────────────────
+  [05/10] 🧮 INVARIANT CHECK
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 1] 🔄 Validate relayAction is known  █
+  [ 1/ 1] ✅ Validate relayAction is known  █  known action
+
+  ────────────────────────────────────────────────────────
+  [06/10] 🔮 MAIN PROCESS
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 1] 🔄 Dispatch relayAction: queryFriends  █
+  [ 1/ 1] ✅ Dispatch relayAction: queryFriends  █  0 friends
+
+  ────────────────────────────────────────────────────────
+  [07/10] 💾 MUTATION LOG
+  ────────────────────────────────────────────────────────
+
+
+  ────────────────────────────────────────────────────────
+  [08/10] ✅ SAVE VERIFY
+  ────────────────────────────────────────────────────────
+
+
+  ────────────────────────────────────────────────────────
+  [09/10] 📤 RESPONSE SNAPSHOT
+  ────────────────────────────────────────────────────────
+
+
+  ┌ 📸 friendServerAction ret=0 [queryFriends] ───────────────┐
+  └   users                        Object{0}
+  └──────────────────────────────────────────────────────────┘
+
+
+  ────────────────────────────────────────────────────────
+  [10/10] 🏁 EXECUTION SUMMARY
+  ────────────────────────────────────────────────────────
+
+
+  ═══════════════════════════════════════════
+
+  ✅ FRIEND SERVER ACTION COMPLETE
+
+  👤 USER:       guest_2a33a566488dfa9e
+
+
+  ⚠️ WARNINGS:   0
+  ❌ ERRORS:     0
+
+  ═══════════════════════════════════════════
+
+✅ friend::friendServerAction OK     ────────────────────────────
+  └ ret=0 12 chars (raw) 5ms
+
+  ✅ SUCCESS  📏 data= 12 chars  📦 proto= RAW  ⏱️ time= 5ms
+
+  └ ⏱️ handler: 6ms 
+
+  📤 friend::friendServerAction ──────────────────────────────────
+
+  ══════════════════════════════════════════════════════════
+  🎮 HANDLER: friendServerAction  (friend/friendServerAction)  userId=guest_2a33a56648
+  ══════════════════════════════════════════════════════════
+
+
+  ────────────────────────────────────────────────────────
+  [01/10] 🟢 ENTRY CHECK
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 2] 🔄 Validate request fields  █░
+  [ 1/ 2] ✅ Validate request fields  █░  relayAction="${relayAction}"
+
+  ────────────────────────────────────────────────────────
+  [02/10] 📦 DATA INJECTION CHECK
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 1] 🔄 Load userData from DB  █
+  [ 1/ 1] ✅ Load userData from DB  █  userData loaded + teamwork fields ensured
+
+  ────────────────────────────────────────────────────────
+  [03/10] 🔍 DEEP TYPE SCAN
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 2] 🔄 Type assert request fields  █░
+  [ 1/ 2] ✅ Type assert request fields  █░  types verified
+
+  ────────────────────────────────────────────────────────
+  [04/10] ⚡ PLAYER STATE SNAPSHOT
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 1] 🔄 Snapshot teamwork storage state  █
+  [ 1/ 1] ✅ Snapshot teamwork storage state  █  0 friends
+
+  ────────────────────────────────────────────────────────
+  [05/10] 🧮 INVARIANT CHECK
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 1] 🔄 Validate relayAction is known  █
+  [ 1/ 1] ✅ Validate relayAction is known  █  known action
+
+  ────────────────────────────────────────────────────────
+  [06/10] 🔮 MAIN PROCESS
+  ────────────────────────────────────────────────────────
+
+  [ 1/ 1] 🔄 Dispatch relayAction: queryBlackList  █
+  [ 1/ 1] ✅ Dispatch relayAction: queryBlackList  █  0 entries
+
+  ────────────────────────────────────────────────────────
+  [07/10] 💾 MUTATION LOG
+  ────────────────────────────────────────────────────────
+
+
+  ────────────────────────────────────────────────────────
+  [08/10] ✅ SAVE VERIFY
+  ────────────────────────────────────────────────────────
+
+
+  ────────────────────────────────────────────────────────
+  [09/10] 📤 RESPONSE SNAPSHOT
+  ────────────────────────────────────────────────────────
+
+
+  ┌ 📸 friendServerAction ret=0 [queryBlackList] ─────────────┐
+  └   users                        Object{0}
+  └──────────────────────────────────────────────────────────┘
+
+
+  ────────────────────────────────────────────────────────
+  [10/10] 🏁 EXECUTION SUMMARY
+  ────────────────────────────────────────────────────────
+
+
+  ═══════════════════════════════════════════
+
+  ✅ FRIEND SERVER ACTION COMPLETE
+
+  👤 USER:       guest_2a33a566488dfa9e
+
+
+  ⚠️ WARNINGS:   0
+  ❌ ERRORS:     0
+
+  ═══════════════════════════════════════════
+
+✅ friend::friendServerAction OK     ────────────────────────────
+  └ ret=0 12 chars (raw) 8ms
+
+  ✅ SUCCESS  📏 data= 12 chars  📦 proto= RAW  ⏱️ time= 8ms
+
+  └ ⏱️ handler: 8ms 
+```
