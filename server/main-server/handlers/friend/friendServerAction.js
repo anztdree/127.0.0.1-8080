@@ -221,6 +221,27 @@ function handleFriendServerAction(request, ctx) {
         // ─────────────────────────────────────────────
         case 'sendMsg': {
             const { friendId, msg } = request;
+
+            // ── Validation: friendId and msg required ──
+            if (!friendId || msg === undefined || msg === null) {
+                ctx.logger.step(2, 2, 'Handle ' + relayAction, 'fail', 'friendId or msg MISSING');
+                return ctx.buildErrorResponse(8);
+            }
+            // ── Validation: message length limit ──
+            var maxTeamMsgLen = 500;
+            if (typeof msg !== 'string') {
+                ctx.logger.step(2, 2, 'Handle ' + relayAction, 'fail', 'msg is not string');
+                return ctx.buildErrorResponse(8);
+            }
+            if (msg.length === 0) {
+                ctx.logger.step(2, 2, 'Handle ' + relayAction, 'fail', 'msg is empty');
+                return ctx.buildErrorResponse(8);
+            }
+            if (msg.length > maxTeamMsgLen) {
+                ctx.logger.log('WARN', 'FRIEND', 'relay sendMsg: msg truncated (' + msg.length + '/' + maxTeamMsgLen + ')');
+                request.msg = msg.substring(0, maxTeamMsgLen);
+            }
+
             const senderData = userData;
             const recipientData = ctx.db.getUser(friendId);
 
@@ -578,9 +599,9 @@ function handleFriendServerAction(request, ctx) {
         // Default — unknown relay action
         // ─────────────────────────────────────────────
         default: {
-            ctx.logger.log('WARN', 'FRIEND', 'Unknown relayAction: "' + relayAction + '"');
-            ctx.logger.step(2, 2, 'Handle ' + relayAction, 'warn', 'unknown action');
-            return ctx.buildDataResponse(0, {});
+            ctx.logger.log('WARN', 'FRIEND', 'Unknown relayAction: "' + relayAction + '" — returning error');
+            ctx.logger.step(2, 2, 'Handle ' + relayAction, 'fail', 'unknown action');
+            return ctx.buildErrorResponse(4);
         }
     }
 }
