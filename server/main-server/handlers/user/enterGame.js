@@ -701,6 +701,38 @@ function buildNewUserData(userId, request, ctx) {
         totalPropsItems[id] = { _id: item._id, _num: item._num };
     }
 
+    // ─── [FIX-009] Add starting items from thingsID.json startNum ───
+    // CAUSE: thingsID.json defines startNum for items new users should receive
+    //   (e.g. item 131 Exp Capsule = 1000, item 134 God Water = 50)
+    //   but enterGame only built totalPropsItems from attributeItems (currencies 101-114).
+    //   Items 131, 134 were NEVER added → new user gets 0 → tutorial crashes at
+    //   "Insufficient materials — Exp Capsule" because getItemNum(131) returns 0.
+    // TRACE: thingsID.json entries with startNum > 0:
+    //   102 (Gold)       startNum:10000 — already in attributeItems (constant.json takes priority)
+    //   131 (Exp Capsule) startNum:1000  — MISSING → causes tutorial failure
+    //   134 (God Water)   startNum:50    — MISSING
+    // FIX: Load thingsID.json, iterate entries with startNum > 0, add to totalPropsItems
+    //   Skip items already in totalPropsItems (currencies from constant.json take priority)
+    const thingsIdRes = ctx.loadResource('thingsID');
+    if (thingsIdRes) {
+        let startItemsAdded = 0;
+        for (const [id, thingData] of Object.entries(thingsIdRes)) {
+            const startNum = parseInt(thingData.startNum);
+            if (startNum > 0 && !totalPropsItems[id]) {
+                totalPropsItems[id] = { _id: parseInt(id), _num: startNum };
+                startItemsAdded++;
+                ctx.logger.log('DEBUG', 'ENTER',
+                    `[BUILD] startNum item added: id=${id} num=${startNum} name=${thingData.keyName || thingData.nameGM || 'unknown'}`);
+            }
+        }
+        ctx.logger.log('DEBUG', 'ENTER', `[BUILD] Starting items from thingsID.json: ${startItemsAdded} items added`);
+        if (startItemsAdded === 0) {
+            ctx.logger.log('WARN', 'ENTER', '[BUILD] thingsID.json loaded but NO new startNum items added (all already in attributeItems or startNum=0)');
+        }
+    } else {
+        ctx.logger.log('WARN', 'ENTER', '[BUILD] thingsID.json NOT FOUND — new user will NOT receive starting items (Exp Capsule, God Water, etc.)');
+    }
+
     // ─── Build hero object ───
     // Traced: HerosManager.readByData → SetHeroDataToModel
     const heroObj = buildStarterHero(heroId, startHero, startHeroLevel, heroConfig, now, constant);
