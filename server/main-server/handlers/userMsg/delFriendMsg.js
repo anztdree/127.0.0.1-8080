@@ -59,6 +59,24 @@ function handleDelFriendMsg(request, ctx) {
     }
     ctx.db.saveUser(userId, userData);
 
+    // ── Also delete from recipient's side (bidirectional consistency) ──
+    // Match friendServerAction.delMsg behavior — delete from BOTH users
+    const recipientData = ctx.db.getUser(friendId);
+    if (recipientData) {
+        if (recipientData.userMsgMessages) {
+            delete recipientData.userMsgMessages[userId];
+        }
+        if (recipientData.userMsgBrief) {
+            delete recipientData.userMsgBrief[userId];
+        }
+        if (recipientData.userMsgReadTime) {
+            delete recipientData.userMsgReadTime[userId];
+        }
+        ctx.db.saveUser(friendId, recipientData);
+    } else {
+        ctx.logger.log('DEBUG', 'USERMSG', 'delFriendMsg: recipient ' + friendId + ' not found — sender-side only delete');
+    }
+
     ctx.logger.step(1, 2, 'Delete friend messages', 'pass',
         'deleted all msgs with ' + friendId.substring(0, 16));
 

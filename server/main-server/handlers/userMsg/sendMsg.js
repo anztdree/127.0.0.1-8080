@@ -73,7 +73,22 @@ function handleSendMsg(request, ctx) {
         return ctx.buildErrorResponse(8);
     }
 
-    const now = Date.now();
+    // ── Validation: message length limit (prevent DB bloat) ──
+    var maxMsgLen = 500;
+    if (typeof msg !== 'string') {
+        ctx.logger.step(1, 3, 'Send userMsg', 'fail', 'msg is not string (type=' + typeof msg + ')');
+        return ctx.buildErrorResponse(8);
+    }
+    if (msg.length === 0) {
+        ctx.logger.step(1, 3, 'Send userMsg', 'fail', 'msg is empty string');
+        return ctx.buildErrorResponse(8);
+    }
+    if (msg.length > maxMsgLen) {
+        ctx.logger.log('WARN', 'USERMSG', 'sendMsg: msg too long (' + msg.length + '/' + maxMsgLen + '), truncating');
+        request.msg = msg.substring(0, maxMsgLen);
+    }
+
+    var now = Date.now();
     const senderData = ctx.db.getUser(userId);
     const recipientData = ctx.db.getUser(friendId);
 
@@ -86,6 +101,25 @@ function handleSendMsg(request, ctx) {
     if (!senderData.userMsgMessages) senderData.userMsgMessages = {};
     if (!senderData.userMsgBrief) senderData.userMsgBrief = {};
     if (!senderData.userMsgReadTime) senderData.userMsgReadTime = {};
+
+    // ── Validation: rate limit (10 msgs per 10s per conversation) ──
+    var rateLimitKey = friendId;
+    var rateLimitMax = 10;
+    var rateLimitWindow = 10000; // 10 seconds
+    // var now already declared above
+    if (!senderData._msgRateLimit) senderData._msgRateLimit = {};
+    var rl = senderData._msgRateLimit[rateLimitKey];
+    if (rl) {
+        var recent = rl.filter(function(t) { return now - t < rateLimitWindow; });
+        if (recent.length >= rateLimitMax) {
+            ctx.logger.log('WARN', 'USERMSG', 'sendMsg: rate limit hit (' + recent.length + '/' + rateLimitMax + ' in 10s)');
+            return ctx.buildErrorResponse(8);
+        }
+        recent.push(now);
+        senderData._msgRateLimit[rateLimitKey] = recent;
+    } else {
+        senderData._msgRateLimit[rateLimitKey] = [now];
+    }
 
     // Build self message (sender's perspective: _isSelf = true)
     const selfMsg = { _time: now, _isSelf: true, _context: msg };
