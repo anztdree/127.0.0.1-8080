@@ -69,6 +69,29 @@ function handleBuryPointGuideBattle(request, ctx) {
         ['version', String(version || '(none)')]
     );
 
+    // ── Persist analytics to DB (was fire-and-forget, now stored) ──
+    if (userId) {
+        var userData = ctx.db.getUser(userId);
+        if (userData) {
+            if (!userData._analytics) userData._analytics = {};
+            if (!userData._analytics.guideBattle) userData._analytics.guideBattle = [];
+            userData._analytics.guideBattle.push({
+                _point: point || 'unknown',
+                _passLesson: passLesson || 0,
+                _time: Date.now(),
+                _version: version || ''
+            });
+            // Keep max 100 entries per user
+            if (userData._analytics.guideBattle.length > 100) {
+                userData._analytics.guideBattle = userData._analytics.guideBattle.slice(-100);
+            }
+            ctx.db.saveUser(userId, userData);
+            ctx.logger.log('DEBUG', 'BURYPOINT', 'Analytics saved for user ' + userId.substring(0, 12));
+        } else {
+            ctx.logger.log('DEBUG', 'BURYPOINT', 'User ' + userId + ' not found — analytics not saved');
+        }
+    }
+
     // Fire-and-forget analytics — client ignores response data.
     // Must return ret=0 to prevent ErrorHandler.ShowErrorTips popup.
     return ctx.buildDataResponse(0, {});
