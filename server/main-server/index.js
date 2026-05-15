@@ -70,7 +70,12 @@ if (!config.serverOpenDate) {
 
 // ─── v4.0: Install global error capture (Layer 1) ───
 // Catches uncaughtException + unhandledRejection that would be silent
-logger.fatalCapture();
+process.on('uncaughtException', function(err, origin) {
+    logger.fatalCapture(err, origin);
+});
+process.on('unhandledRejection', function(reason, promise) {
+    logger.rejectionCapture(reason, promise);
+});
 
 // ─── Resource JSON Loader ───
 const resourceCache = {};
