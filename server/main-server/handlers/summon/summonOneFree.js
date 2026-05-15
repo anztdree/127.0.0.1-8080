@@ -692,7 +692,7 @@ function createNewHero(heroId, displayId, heroConfig) {
         _expeditionMaxLevel: 0,
         _gemstoneSuitId: 0,
         _linkTo: [],
-        _linkFrom: ''
+        _linkFrom: []
     };
 }
 
