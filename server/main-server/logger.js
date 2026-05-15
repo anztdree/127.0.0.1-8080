@@ -1451,6 +1451,75 @@ function saveVerify(userId, db, expectedData, criticalPaths) {
 }
 
 // ═══════════════════════════════════════════════════════════════
+// v3.2 — HANDLER DIVIDER — ═══ pemisah antar handler
+// Double-line separator untuk memisahkan log antar handler.
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * Handler divider — thick ═══ line between different handler logs.
+ * Makes it easy to find where one handler's log ends and another begins.
+ *
+ * @param {string} handlerName - Name of the handler (e.g. 'summonOneFree')
+ * @param {string} action      - Full action path (e.g. 'summon/summonOneFree')
+ * @param {string} [userId]    - Optional userId for context
+ */
+function handlerDivider(handlerName, action, userId) {
+    var W = BOX_WIDTH;
+    console.log('');
+    console.log(chalk.cyan.bold('  ══' + '═'.repeat(W - 4) + '══'));
+    var label = '  🎮 HANDLER: ' + chalk.white.bold(handlerName);
+    if (action) label += chalk.gray('  (' + action + ')');
+    if (userId) label += chalk.gray('  userId=' + chalk.white(userId.substring(0, 16)));
+    console.log(label);
+    console.log(chalk.cyan.bold('  ══' + '═'.repeat(W - 4) + '══'));
+    console.log('');
+}
+
+// ═══════════════════════════════════════════════════════════════
+// v3.2 — PHASE HEADER — Emoji header per phase
+// Judul phase dengan emoji dan nomor, memudahkan pencarian.
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * Phase header — prints a numbered phase title with emoji.
+ * Used at the start of each of the 10 phases.
+ *
+ * @param {number} phaseNum  - Phase number (1-10)
+ * @param {number} total     - Total phases (usually 10)
+ * @param {string} emoji     - Emoji for this phase
+ * @param {string} title     - Phase title (e.g. 'ENTRY CHECK')
+ */
+function phaseHeader(phaseNum, total, emoji, title) {
+    var num = chalk.gray('[' + String(phaseNum).padStart(2, '0') + '/' + String(total).padStart(2, '0') + ']');
+    console.log('');
+    console.log(chalk.cyan('  ──' + '─'.repeat(BOX_WIDTH - 6) + '──'));
+    console.log('  ' + num + ' ' + emoji + ' ' + chalk.white.bold(title));
+    console.log(chalk.cyan('  ──' + '─'.repeat(BOX_WIDTH - 6) + '──'));
+    console.log('');
+}
+
+// ═══════════════════════════════════════════════════════════════
+// v3.2 — PHASE DIVIDER — ─── pemisah antar phase
+// Thin separator between phases within the same handler.
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * Phase divider — thin ─── line between phases within a handler.
+ * Lighter than handlerDivider, just separates logical sections.
+ *
+ * @param {string} [label] - Optional label to show on the divider
+ */
+function phaseDivider(label) {
+    if (label) {
+        var padded = '  ' + label + ' ';
+        var sideLen = Math.max(1, Math.floor((BOX_WIDTH - padded.length) / 2));
+        console.log(chalk.gray('  ' + '─'.repeat(sideLen) + chalk.dim(padded) + '─'.repeat(sideLen)));
+    } else {
+        console.log(chalk.gray('  ──' + '─'.repeat(BOX_WIDTH - 6) + '──'));
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
 // EXPORTS
 // ═══════════════════════════════════════════════════════════════
 
@@ -1469,6 +1538,7 @@ module.exports = {
     categoryBreakdown,
     criticalFields, summaryCard, fieldStatus, warningSection,
     typeAssert, responseSnapshot, invariantCheck, mutationLog, deepTypeScan, saveVerify,
+    handlerDivider, phaseHeader, phaseDivider,
     STATUS,
     LEVELS, MODULES, DETAILS,
     chalk
