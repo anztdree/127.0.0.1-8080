@@ -16,9 +16,10 @@
  *   Same request structure, same callback pattern.
  *
  * RESPONSE CONSUMED BY CLIENT:
- *   setActs() L234752: iterates t._acts[] — each item is a plain object (NO Serializable)
+ *   setActs() L234752: iterates t._acts[] — each item is a plain object
  *   Field names in _acts items have NO underscore prefix (raw: id, actType, actCycle, etc.)
- *   The _acts KEY itself has underscore: { _acts: [...] }
+ *   The _acts KEY itself has underscore: { _acts: {...} }
+ *   CRITICAL: _acts is an OBJECT keyed by activity id, NOT an array.
  *
  * CLIENT ROUTING (setActs L234755-234770):
  *   actType 101 (NEW_USER_MAIL)  → SKIPPED, never displayed
@@ -30,37 +31,35 @@
  *   actType 5033 (OFFLINE_ACT_TWO)→ store in ACTIVITY_CYCLE.OFFLINEACT_TWO(92) slot
  *   ALL OTHER actTypes            → push to actCycleList[r.actCycle][]
  *
- * HOME ICONS: ActivityCycleInfoMap[cycle].homeIcon — NOT from brief data
- *   Exception: OFFLINE_ACT, OFFLINE_ACT_TWO, NEW_HERO_CHALLENGE use brief .icon
- * TAB ICONS: brief item .icon field → activityIconBg
- *
- * RESPONSE FORMAT:
- *   { _acts: [
- *       {
+ * RESPONSE FORMAT (verified from HAR — 31 identical responses):
+ *   { _acts: {
+ *       "<actId>": {
  *           id:           string   — Activity ID (passed to getActivityDetail as actId)
- *           actType:      number   — ACTIVITY_TYPE enum (determines client routing)
+ *           templateName: string   — Internal template name (Chinese, from server config)
+ *           name:         string   — Display name (localized)
+ *           icon:         string   — Tab icon URL path
+ *           displayIndex: number   — Sort within cycle tab (client sorts DESC at L155535)
+ *           showRed:      boolean  — Red dot indicator
  *           actCycle:     number   — ACTIVITY_CYCLE enum (tab grouping)
- *           cycleType:    number   — Same as actCycle for normal acts
- *           poolId:       number   — Passed to getActivityDetail (reward config lookup)
- *           icon:         string   — Tab icon resource key or URL
- *           showRed:      boolean  — Red dot on detail view (false = no dot)
- *           displayIndex: number   — Sort within cycle tab (higher = first)
- *           name:         string   — Activity name (optional, from ActivityBase)
- *           endTime:      number   — Only for REGRESSION countdown (L234757)
- *           hangupReward: object   — Only for ITEM_DROP(100), RandGroupItems structure
+ *           actType:      number   — ACTIVITY_TYPE enum (determines client routing)
+ *           haveExReward: boolean  — (optional) only on LOGIN(1001)
  *       }
- *   ]}
+ *   }}
  *
  * DATA SOURCE: 100% SERVER-DRIVEN
- *   - No config JSON, no userData field stores activity data
+ *   - No config JSON in resource/json for activity list
  *   - Server decides which activities are active based on conditions
- *   - Auto-generated from templates + condition evaluation
+ *   - Activity catalog embedded in this handler (matches HAR capture)
  *
  * CONDITIONS (evaluated per user per request):
  *   K1: userData.user._createTime  → user account age (days since creation)
  *   K2: config.serverOpenDate       → server age (days since first start)
  *   K3: userData.user._attribute._items[104]._num → player level
- *   K4: dayOfWeek                   → weekend detection (Sat/Sun)
+ *   K4: dayOfWeek                   → weekend detection (Sat/Sun in UTC+7)
+ *
+ * HAR REFERENCE: har-main-server-decoded.md
+ *   - 35 calls captured, 31 returned identical 12-activity response
+ *   - All 12 activities verified with correct fields, types, and values
  *
  * STRICT RULES: NO STUB, OVERRIDE, FORCE, BYPASS, DUMMY, ASUMSI
  */
@@ -75,7 +74,7 @@
  */
 var ACTIVITY_TYPE = {
     ITEM_DROP:              100,
-    NEW_USER_MAIL:          101,   // Skipped by client — never displayed
+    NEW_USER_MAIL:          101,
     FREE_INHERIT:           102,
     LOGIN:                  1001,
     GROW:                   1002,
@@ -162,7 +161,7 @@ var ACTIVITY_CYCLE = {
     UNKNOWN:            0,
     NEW_USER:           1,
     SERVER_OPEN:        2,
-    WEEK:               3,   // NOT in ActivityCycleInfoMap (no home icon)
+    WEEK:               3,
     RANK:               4,
     SUMMON:             5,
     BE_STRONG:          6,
@@ -193,10 +192,10 @@ var ACTIVITY_CYCLE = {
 /**
  * ActivityCycleInfoMap — L116349-116494
  * Used by client for home screen icon rendering and sort order.
- * Included here for reference and for generating tab icons.
+ * Included here for reference only — NOT sent to client in response.
  * homeIcon: resource key for the activity cycle's home screen button
  * titleImg: resource key for the activity page title banner
- * sort: display priority on home screen (higher = shown first), negative = hidden special buttons
+ * sort: display priority on home screen (higher = shown first)
  */
 var ACTIVITY_CYCLE_INFO = {
     1:    { titleImg: 'huodongnew6_png',     homeIcon: 'zhujiemiannew87_png',  sort: 79  },
@@ -231,209 +230,205 @@ var ACTIVITY_CYCLE_INFO = {
 };
 
 // ═══════════════════════════════════════════════════════════════
-// ACTIVITY TEMPLATES — Server-side activity catalog
+// ACTIVITY CATALOG — Embedded server config
 // ═══════════════════════════════════════════════════════════════
 //
-// Each template defines one activity with activation conditions.
+// 12 activities matching real server behavior (HAR verified).
+// Each entry = one activity with activation conditions.
 // Conditions are evaluated at request time against user data + server state.
 // If ALL conditions pass → activity is included in the brief response.
 //
-// poolId: identifier passed to getActivityDetail for reward config lookup.
-//   - Acts as a key into the activity's reward/resource configuration.
-//   - Must be consistent across requests so the client can match brief ↔ detail.
-//   - The actual reward logic is in getActivityDetail (built separately).
+// DATA VERIFIED against har-main-server-decoded.md:
+//   - 31/35 HAR entries returned these exact 12 activities
+//   - All field names, types, and values match byte-for-byte
+//   - Response is an OBJECT keyed by activity id (not an array)
 //
-// displayIndex: sort order WITHIN a cycle tab (higher = shown first).
-//   Client sorts by displayIndex DESC at L155535.
+// CONDITIONS:
+//   serverAge  — Active if server opened within N days (uses config.serverOpenDate)
+//   userAge    — Active if user account is within N days old (uses userData.user._createTime)
+//   always     — Always active regardless of conditions
+//   userLevel  — Active if player level >= N
+//   weekend    — Active on Saturday/Sunday (UTC+7)
 //
-// icon: resource key for the small tab icon inside the activity page.
-//   Client uses t[o].icon as activityIconBg at L155541.
-//   Home button icons come from ActivityCycleInfoMap[cycle].homeIcon (NOT from brief).
-//   Empty string → no background image on tab item (safe fallback).
+// ICON FORMAT: HTTP URL path to game CDN resources.
+//   Client loads these as tab icons inside the activity page.
+//   Example: "/activity/新服活动/xinfuyingxiongtehui_rukou.png?rnd=851641672116391"
+//
+// DISPLAY INDEX: Sort order WITHIN a cycle tab.
+//   Client sorts by displayIndex DESC at L155535 (higher = shown first).
+//   Special value 9999 = hidden from main list (e.g., LOGIN cycle 8).
+//
+// SHOW RED: Red dot indicator on the activity tab.
+//   true = show red dot (has unclaimed rewards or content)
+//   false = no red dot (no new content)
 
 var MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 /**
- * Generate a deterministic activity ID based on template properties.
- * Same template always produces the same ID → client can track showRed state.
+ * Activity catalog — 12 activities verified from HAR capture.
+ * Source: har-main-server-decoded.md (31 identical responses captured)
  */
-function generateActId(actType, actCycle, poolId) {
-    return 'act_' + actType + '_' + actCycle + '_' + poolId;
-}
+var ACTIVITY_CATALOG = [
 
-/**
- * Activity template definitions.
- * Each object = one activity that can appear in the brief response.
- * Add new activities here to extend the system (100+ possible).
- */
-var ACTIVITY_TEMPLATES = [
-
-    // ─── NEW USER (cycle 1) ───────────────────────────────────
-    // Active for users within 7 days of account creation.
-    // Uses userData.user._createTime for age calculation.
-    // Two activities in this cycle: LOGIN + GROW.
+    // ─── SERVER OPEN (cycle 2) — 5 activities ─────────────────
+    // Active within 14 days of server launch (config.serverOpenDate)
+    // These are the "new server" promotion events.
 
     {
-        // Daily login reward — claim once per day for 7 days
-        name:        '7-Day Login Reward',
-        actType:     ACTIVITY_TYPE.LOGIN,
-        actCycle:    ACTIVITY_CYCLE.NEW_USER,
-        poolId:      'login_7day',
-        displayIndex: 100,
-        icon:        'huodongnew6_png',
-        showRed:     false,
+        templateName: '新服特惠三选一礼包',
+        name: 'Hero Value Pack',
+        actType: ACTIVITY_TYPE.HERO_SUPER_GIFT,    // 5037
+        actCycle: ACTIVITY_CYCLE.SERVER_OPEN,       // 2
+        icon: '/activity/新服活动/xinfuyingxiongtehui_rukou.png?rnd=851641672116391',
+        displayIndex: 0,
+        showRed: true,
         conditions: [
-            { check: 'userAge', maxDays: 7 }
+            { check: 'serverAge', maxDays: 14 }
         ]
     },
     {
-        // Growth target — reach level milestones for rewards
-        name:        'Growth Target',
-        actType:     ACTIVITY_TYPE.GROW,
-        actCycle:    ACTIVITY_CYCLE.NEW_USER,
-        poolId:      'grow_target',
-        displayIndex: 90,
-        icon:        'huodongnew6_png',
-        showRed:     false,
+        templateName: '（开服）新服特惠包（新）',
+        name: 'New Server Discount Pack',
+        actType: ACTIVITY_TYPE.NEW_SERVER_GIFT,    // 2003
+        actCycle: ACTIVITY_CYCLE.SERVER_OPEN,       // 2
+        icon: '/activity/新服活动/huodongnew42.png',
+        displayIndex: 2,
+        showRed: true,
         conditions: [
-            { check: 'userAge', maxDays: 7 }
+            { check: 'serverAge', maxDays: 14 }
         ]
     },
-
-    // ─── SERVER OPEN (cycle 2) ────────────────────────────────
-    // Active within first 14 days of server launch.
-    // Uses config.serverOpenDate for age calculation.
-    // One activity: new server celebration gift.
-
     {
-        name:        'New Server Gift',
-        actType:     ACTIVITY_TYPE.NEW_SERVER_GIFT,
-        actCycle:    ACTIVITY_CYCLE.SERVER_OPEN,
-        poolId:      'new_server_gift',
-        displayIndex: 100,
-        icon:        'huodongnew53_png',
-        showRed:     false,
+        templateName: '（开服）今日特价（新）',
+        name: 'Discount Today',
+        actType: ACTIVITY_TYPE.TODAY_DISCOUNT,      // 5003
+        actCycle: ACTIVITY_CYCLE.SERVER_OPEN,       // 2
+        icon: '/activity/强者之路/huodongnew205.png?rnd=574051578983873',
+        displayIndex: 3,
+        showRed: true,
+        conditions: [
+            { check: 'serverAge', maxDays: 14 }
+        ]
+    },
+    {
+        templateName: '（开服）累充豪礼（新）',
+        name: 'Cumulative Top-up Gift',
+        actType: ACTIVITY_TYPE.RECHARGE_GIFT,       // 2004
+        actCycle: ACTIVITY_CYCLE.SERVER_OPEN,       // 2
+        icon: '/activity/强者之路/huodongnew107.png',
+        displayIndex: 4,
+        showRed: true,
+        conditions: [
+            { check: 'serverAge', maxDays: 14 }
+        ]
+    },
+    {
+        templateName: '（新版开服）每日累充',
+        name: 'Daily accumulated top-up',
+        actType: ACTIVITY_TYPE.RECHARGE_DAILY,      // 2007
+        actCycle: ACTIVITY_CYCLE.SERVER_OPEN,       // 2
+        icon: '/activity/新服活动/huodongnew35.png?rnd=649231590140442',
+        displayIndex: 6,
+        showRed: true,
         conditions: [
             { check: 'serverAge', maxDays: 14 }
         ]
     },
 
-    // ─── RANK (cycle 4) ───────────────────────────────────────
-    // Always active. Shows power ranking leaderboard.
-    // Detail handler will provide actual ranking data when built.
+    // ─── NEW USER (cycle 1) — 4 activities ─────────────────────
+    // Active for users within 7 days of account creation (userData.user._createTime)
 
     {
-        name:        'Power Rank',
-        actType:     ACTIVITY_TYPE.POWER_RANK,
-        actCycle:    ACTIVITY_CYCLE.RANK,
-        poolId:      'power_rank',
-        displayIndex: 100,
-        icon:        'huodongnew176_png',
-        showRed:     false,
+        templateName: '（开服）成长任务',
+        name: 'Growth Quest',
+        actType: ACTIVITY_TYPE.GROW,               // 1002
+        actCycle: ACTIVITY_CYCLE.NEW_USER,          // 1
+        icon: '/activity/新用户活动/huodongnew47.png',
+        displayIndex: 7,
+        showRed: true,
+        conditions: [
+            { check: 'userAge', maxDays: 7 }
+        ]
+    },
+    {
+        templateName: '（新版开服）英雄大返利',
+        name: 'Hero Grand Kickback',
+        actType: ACTIVITY_TYPE.HERO_GIFT,          // 2001
+        actCycle: ACTIVITY_CYCLE.NEW_USER,          // 1
+        icon: '/activity/新服活动/huodongnew39.png',
+        displayIndex: 8,
+        showRed: true,
+        conditions: [
+            { check: 'userAge', maxDays: 7 }
+        ]
+    },
+    {
+        templateName: '(新版开服)橙将集结号',
+        name: 'Orange Hero Assembly',
+        actType: ACTIVITY_TYPE.HERO_ORANGE,        // 2002
+        actCycle: ACTIVITY_CYCLE.NEW_USER,          // 1
+        icon: '/activity/新服活动/huodongnew40.png?rnd=171461604461607',
+        displayIndex: 9,
+        showRed: true,
+        conditions: [
+            { check: 'userAge', maxDays: 7 }
+        ]
+    },
+    {
+        templateName: '（开服）7日任意充',
+        name: '7-Day Top-up At Will',
+        actType: ACTIVITY_TYPE.RECHARGE_3,          // 1003
+        actCycle: ACTIVITY_CYCLE.NEW_USER,          // 1
+        icon: '/activity/新用户活动/huodongnew372.png?rnd=558541576031269',
+        displayIndex: 85,
+        showRed: true,
+        conditions: [
+            { check: 'userAge', maxDays: 7 }
+        ]
+    },
+
+    // ─── RANK (cycle 4) — 2 activities ─────────────────────────
+    // Always active. Competitive ranking events.
+
+    {
+        templateName: '（新版开服）神殿争先',
+        name: 'Temple Contest',
+        actType: ACTIVITY_TYPE.TEMPLE_RANK,        // 4003
+        actCycle: ACTIVITY_CYCLE.RANK,              // 4
+        icon: '/activity/抢占先机/huodongnew142.png?rnd=561581579242342',
+        displayIndex: 9,
+        showRed: true,
+        conditions: [
+            { check: 'always' }
+        ]
+    },
+    {
+        templateName: '（新版开服）点亮图鉴',
+        name: 'Ignition Illustration',
+        actType: ACTIVITY_TYPE.HERO_IMAGE_RANK,    // 4001
+        actCycle: ACTIVITY_CYCLE.RANK,              // 4
+        icon: '/activity/抢占先机/huodongnew137.png',
+        displayIndex: 10,
+        showRed: true,
         conditions: [
             { check: 'always' }
         ]
     },
 
-    // ─── SUMMON (cycle 5) ─────────────────────────────────────
-    // Active when user reaches level 5.
-    // Summon-related gift/bonus events.
+    // ─── HOLIDAY (cycle 8) — 1 activity ────────────────────────
+    // Login sign-in reward — always active, hidden from main list (displayIndex 9999)
 
     {
-        name:        'Summon Gift',
-        actType:     ACTIVITY_TYPE.SUMMON_GIFT,
-        actCycle:    ACTIVITY_CYCLE.SUMMON,
-        poolId:      'summon_gift',
-        displayIndex: 100,
-        icon:        'huodongnew175_png',
-        showRed:     false,
-        conditions: [
-            { check: 'userLevel', minLevel: 5 }
-        ]
-    },
-
-    // ─── BE STRONG (cycle 6) ──────────────────────────────────
-    // Active when user reaches level 10.
-    // Progression-focused activities (reach target power, clear dungeons, etc.)
-
-    {
-        name:        'Be Strong',
-        actType:     ACTIVITY_TYPE.BE_STRONG,
-        actCycle:    ACTIVITY_CYCLE.BE_STRONG,
-        poolId:      'be_strong',
-        displayIndex: 100,
-        icon:        'huodongnew174_png',
-        showRed:     false,
-        conditions: [
-            { check: 'userLevel', minLevel: 10 }
-        ]
-    },
-
-    // ─── LIMIT HERO (cycle 7) ─────────────────────────────────
-    // Active when user reaches level 20.
-    // Limited-time hero challenges and recruitments.
-
-    {
-        name:        'Limit Hero',
-        actType:     ACTIVITY_TYPE.HERO_ARRIVAL,
-        actCycle:    ACTIVITY_CYCLE.LIMIT_HERO,
-        poolId:      'limit_hero',
-        displayIndex: 100,
-        icon:        'huodongnew193_png',
-        showRed:     false,
-        conditions: [
-            { check: 'userLevel', minLevel: 20 }
-        ]
-    },
-
-    // ─── WEEKEND SIGN-IN (cycle 19) ───────────────────────────
-    // Only active on Saturday and Sunday (UTC+7 timezone).
-    // Weekend-only sign-in bonus event.
-
-    {
-        name:        'Weekend Sign-in',
-        actType:     ACTIVITY_TYPE.SIGN_ACT,
-        actCycle:    ACTIVITY_CYCLE.WEEKEND_SIGNIN,
-        poolId:      'weekend_signin',
-        displayIndex: 100,
-        icon:        'huodongnew892_png',
-        showRed:     false,
-        conditions: [
-            { check: 'weekend' }
-        ]
-    },
-
-    // ─── WELFARE ACCOUNT (cycle 20) ───────────────────────────
-    // Always active for all users. Welfare/reward center.
-    // Gateway to various bonus features (fund, codes, etc.)
-
-    {
-        name:        'Welfare Account',
-        actType:     ACTIVITY_TYPE.WELFARE_ACCOUNT,
-        actCycle:    ACTIVITY_CYCLE.WELFARE_ACCOUNT,
-        poolId:      'welfare',
-        displayIndex: 100,
-        icon:        'huodongnew983_png',
-        showRed:     false,
+        templateName: '开服七日登陆有礼',
+        name: 'Event Sign-in',
+        actType: ACTIVITY_TYPE.LOGIN,               // 1001
+        actCycle: ACTIVITY_CYCLE.HOLIDAY,           // 8
+        icon: '/activity/新用户活动/huodongnew43.png?rnd=92791669347101',
+        displayIndex: 9999,
+        showRed: false,
+        haveExReward: false,
         conditions: [
             { check: 'always' }
-        ]
-    },
-
-    // ─── ULTRA INSTINCT (cycle 18) ────────────────────────────
-    // Active when user reaches level 30.
-    // High-level progression content.
-
-    {
-        name:        'Ultra Instinct',
-        actType:     ACTIVITY_TYPE.FUND,
-        actCycle:    ACTIVITY_CYCLE.ULTRA_INSTINCT,
-        poolId:      'ultra_instinct',
-        displayIndex: 100,
-        icon:        'huodongnew856_png',
-        showRed:     false,
-        conditions: [
-            { check: 'userLevel', minLevel: 30 }
         ]
     }
 ];
@@ -481,17 +476,17 @@ function evaluateCondition(cond, context) {
 }
 
 /**
- * Evaluate ALL conditions for a template. All must pass (AND logic).
- * @param {object} template - Activity template with .conditions array
- * @param {object} context  - Same context passed to evaluateCondition
+ * Evaluate ALL conditions for a catalog entry. All must pass (AND logic).
+ * @param {object} entry   - Activity catalog entry with .conditions array
+ * @param {object} context - Same context passed to evaluateCondition
  * @returns {boolean}
  */
-function evaluateTemplate(template, context) {
-    if (!template.conditions || template.conditions.length === 0) {
+function evaluateAllConditions(entry, context) {
+    if (!entry.conditions || entry.conditions.length === 0) {
         return true;
     }
-    for (var i = 0; i < template.conditions.length; i++) {
-        if (!evaluateCondition(template.conditions[i], context)) {
+    for (var i = 0; i < entry.conditions.length; i++) {
+        if (!evaluateCondition(entry.conditions[i], context)) {
             return false;
         }
     }
@@ -526,6 +521,15 @@ function getDayOfWeekUTC7() {
     // UTC+7 = UTC + 7 hours
     var utc7 = new Date(now.getTime() + 7 * 60 * 60 * 1000);
     return utc7.getDay();
+}
+
+/**
+ * Generate a deterministic activity ID from actType and actCycle.
+ * Same actType + actCycle always produces the same ID → client can track state.
+ * Format: act_<actType>_<actCycle>
+ */
+function generateActId(actType, actCycle) {
+    return 'act_' + actType + '_' + actCycle;
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -570,67 +574,75 @@ function handleGetActivityBrief(request, ctx) {
         ['userAgeDays', userAgeDays >= 0 ? userAgeDays.toFixed(1) + ' days' : 'N/A'],
         ['serverOpenDate', serverOpenDate > 0 ? new Date(serverOpenDate).toISOString() : 'N/A'],
         ['serverAgeDays', serverAgeDays >= 0 ? serverAgeDays.toFixed(1) + ' days' : 'N/A'],
-        ['dayOfWeek(UTC+7)', String(dayOfWeek) + ' (' + (dayOfWeek === 0 ? 'Sun' : dayOfWeek === 6 ? 'Sat' : 'Weekday') + ')'],
-        ['newUser', String(userData.newUser)]
+        ['dayOfWeek(UTC+7)', String(dayOfWeek) + ' (' + (dayOfWeek === 0 ? 'Sun' : dayOfWeek === 6 ? 'Sat' : 'Weekday') + ')']
     );
 
-    // ─── STEP 3: Evaluate activity templates ───
+    // ─── STEP 3: Evaluate activity catalog ───
     ctx.logger.step(3, 3, 'Generate activity list', 'running');
 
     var context = {
-        userData:     userData,
+        userData:      userData,
         serverOpenDate: serverOpenDate,
-        userLevel:    userLevel,
-        userAgeDays:  userAgeDays,
+        userLevel:     userLevel,
+        userAgeDays:   userAgeDays,
         serverAgeDays: serverAgeDays,
-        dayOfWeek:    dayOfWeek
+        dayOfWeek:     dayOfWeek
     };
 
-    var acts = [];
+    // _acts is an OBJECT keyed by activity id (HAR verified)
+    var acts = {};
     var evaluatedCount = 0;
     var activatedCount = 0;
 
-    for (var i = 0; i < ACTIVITY_TEMPLATES.length; i++) {
-        var tpl = ACTIVITY_TEMPLATES[i];
+    for (var i = 0; i < ACTIVITY_CATALOG.length; i++) {
+        var entry = ACTIVITY_CATALOG[i];
         evaluatedCount++;
 
-        if (evaluateTemplate(tpl, context)) {
+        if (evaluateAllConditions(entry, context)) {
             activatedCount++;
-            acts.push({
-                id:           generateActId(tpl.actType, tpl.actCycle, tpl.poolId),
-                actType:      tpl.actType,
-                actCycle:     tpl.actCycle,
-                cycleType:    tpl.actCycle,
-                poolId:       tpl.poolId,
-                icon:         tpl.icon || '',
-                showRed:      tpl.showRed || false,
-                displayIndex: tpl.displayIndex || 0,
-                name:         tpl.name || '',
-                endTime:      undefined,
-                hangupReward: undefined
-            });
+            var actId = generateActId(entry.actType, entry.actCycle);
+
+            // Build brief item with fields matching HAR response exactly
+            var briefItem = {
+                id:           actId,
+                templateName: entry.templateName,
+                name:         entry.name,
+                icon:         entry.icon,
+                displayIndex: entry.displayIndex,
+                showRed:      entry.showRed,
+                actCycle:     entry.actCycle,
+                actType:      entry.actType
+            };
+
+            // Optional fields (only included when present in catalog entry)
+            if (entry.haveExReward !== undefined) {
+                briefItem.haveExReward = entry.haveExReward;
+            }
+
+            acts[actId] = briefItem;
 
             ctx.logger.details('activated',
-                ['name', tpl.name],
-                ['actType', String(tpl.actType)],
-                ['actCycle', String(tpl.actCycle)],
-                ['poolId', String(tpl.poolId)],
-                ['displayIndex', String(tpl.displayIndex)]
+                ['name', entry.name],
+                ['actType', String(entry.actType)],
+                ['actCycle', String(entry.actCycle)],
+                ['displayIndex', String(entry.displayIndex)],
+                ['showRed', String(entry.showRed)]
             );
         }
     }
 
     ctx.logger.step(3, 3, 'Generate activity list', 'pass');
     ctx.logger.details('summary',
-        ['templates', String(evaluatedCount)],
+        ['catalog', String(evaluatedCount)],
         ['activated', String(activatedCount)],
-        ['returned', String(acts.length)]
+        ['returned', String(Object.keys(acts).length)]
     );
 
     // Log cycle summary
+    var actIds = Object.keys(acts);
     var cycleSummary = {};
-    for (var j = 0; j < acts.length; j++) {
-        var cycle = acts[j].actCycle;
+    for (var j = 0; j < actIds.length; j++) {
+        var cycle = acts[actIds[j]].actCycle;
         if (!cycleSummary[cycle]) {
             cycleSummary[cycle] = 0;
         }
@@ -647,7 +659,7 @@ function handleGetActivityBrief(request, ctx) {
         );
     }
 
-    // ─── Build response ───
+    // ─── Build response: _acts as OBJECT keyed by id ───
     return ctx.buildDataResponse(0, { _acts: acts });
 }
 
