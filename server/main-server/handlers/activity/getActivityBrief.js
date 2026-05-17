@@ -536,7 +536,6 @@ function handleGetActivityBrief(request, ctx) {
     var userId = request.userId;
 
     // ─── STEP 1: Validate request ───
-    ctx.logger.phase('ACTIVITY_GETBRIEF');
     ctx.logger.step(1, 3, 'Validate request', 'running');
     ctx.logger.details('request',
         ['userId', userId ? userId.substring(0, 20) + '...' : 'MISSING']
@@ -647,8 +646,6 @@ function handleGetActivityBrief(request, ctx) {
             ['sort', info ? String(info.sort) : 'N/A']
         );
     }
-
-    ctx.logger.phaseEnd('ACTIVITY_GETBRIEF');
 
     // ─── Build response ───
     return ctx.buildDataResponse(0, { _acts: acts });
