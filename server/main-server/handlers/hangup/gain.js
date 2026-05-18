@@ -92,6 +92,34 @@
  *   106 = VIP LEVEL, 131 = EXP CAPSULE, 132 = EVOLVE CAPSULE
  *
  * ═══════════════════════════════════════════════════════════════
+ * BUG FIX LOG
+ * ═══════════════════════════════════════════════════════════════
+ *
+ * [FIX-010] Removed early return at exCount <= 0
+ *   CAUSE: Deterministic rewards are based on elapsedSeconds, NOT exCount.
+ *     With 80s elapsed (enterGame → gain), exCount=0 (80 < 300 threshold).
+ *     Early return blocked ALL rewards: deterministic, random, AND first-time bonus.
+ *   EVIDENCE: HAR Entry 94 — elapsed 73.9s, exCount=0, real server returned
+ *     rewards {102, 103, 131, 132}. Our server returned empty _items {}.
+ *   FIX: Remove early return. Code flow continues to reward calculation.
+ *     Deterministic rewards use elapsedSeconds → non-zero for any time > 0.
+ *     Random drops loop naturally skips when exCount=0.
+ *     First-time bonus applies regardless of elapsed time.
+ *
+ * [FIX-011] _lastGainTime in response must be OLD value, not new (now)
+ *   CAUSE: Client L235034 calculates Math.floor((serverTime - _lastGainTime) / 1000)
+ *     to display idle time. Response had _lastGainTime = now → diff ≈ 0 → "timing = 0".
+ *   EVIDENCE: HAR Entry 94 — _lastGainTime=1775293261683 (old), serverTime=1775293335595,
+ *     diff=73.9s. Real server sends old value; DB stores new value.
+ *   FIX: responseData._lastGainTime = lastGainTime (old), not now (new).
+ *     DB update at step 7 still uses: user.hangup._lastGainTime = now.
+ *
+ * [FIX-012] Echo request fields in response data
+ *   CAUSE: HAR shows real server response includes type, action, userId, version.
+ *     Our response was missing these 4 fields.
+ *   FIX: Add request.type, request.action, request.userId, request.version to responseData.
+ *
+ * ═══════════════════════════════════════════════════════════════
  * STRICT RULES: NO STUB, OVERRIDE, FORCE, BYPASS, DUMMY, ASUMSI
  * All reward values from lesson.json config + calculated formulas.
  * _changeInfo._items uses NEW TOTALS (current + reward), not deltas.
@@ -225,29 +253,19 @@ function handleHangupGain(request, ctx) {
         elapsedSeconds + 's, ' + exCount + ' ticks');
 
     // ═══════════════════════════════════════════════════════════════
-    // EARLY RETURN: zero ticks — no rewards, just update timestamp
+    // NO EARLY RETURN — always proceed to calculate rewards
     // ═══════════════════════════════════════════════════════════════
-    if (exCount <= 0) {
-        if (!user.hangup) user.hangup = {};
-        user.hangup._lastGainTime = now;
-        ctx.db.saveUser(userId, user);
-
-        ctx.logger.step(4, 8, 'Lesson config', 'skip', 'no ticks');
-        ctx.logger.step(5, 8, 'Calculate rewards', 'skip', 'no ticks');
-        ctx.logger.step(6, 8, 'Level-up cascade', 'skip', 'no ticks');
-        ctx.logger.step(7, 8, 'Save & respond', 'running');
-
-        // NOTE: Real server does NOT send _exCount (verified from 3 HAR captures)
-        const zeroResponse = {
-            _changeInfo: { _items: {} },
-            _lastGainTime: now,
-            _clickGlobalWarBuffTag: hangup._clickGlobalWarBuffTag || ''
-        };
-
-        ctx.logger.step(7, 8, 'Save & respond', 'pass', 'zero rewards');
-        ctx.logger.responseSnapshot('HANGUP GAIN ret=0 (zero ticks)', zeroResponse);
-        return ctx.buildDataResponse(0, zeroResponse);
-    }
+    // [FIX-010] Removed early return at exCount <= 0
+    //   CAUSE: Deterministic rewards (lesson.json idleReward1-4) are based on
+    //     elapsedSeconds, NOT exCount. With 80s elapsed and 300s tick interval,
+//     exCount=0 but player still earned gold/exp for those 80 seconds.
+    //     Early return blocked ALL rewards including first-time bonus.
+    //   EVIDENCE: HAR Entry 94 — elapsed 73.9s, exCount=0, real server
+    //     returned rewards (102, 103, 131, 132). Our server returned nothing.
+    //   FIX: Remove early return. Let code flow naturally:
+    //     - 5a: Deterministic rewards use elapsedSeconds → non-zero for any time > 0
+    //     - 5b: Random drops use exCount → naturally 0 when exCount=0 (loop skips)
+    //     - 5c: First-time bonus → applies regardless of elapsed time
 
     // ═══════════════════════════════════════════════════════════════
     // STEP 4: Get lesson config & bonus multiplier
@@ -584,9 +602,27 @@ function handleHangupGain(request, ctx) {
     // NOTE: _exCount is NOT included in response.
     // Verified from 3 HAR captures — real server never sends _exCount.
     // Client reads t._exCount at L234004 but handles undefined gracefully.
+    //
+    // [FIX-011] _lastGainTime must be OLD value (before update), not new (now).
+    //   CAUSE: Client L235034 calculates Math.floor((serverTime - _lastGainTime) / 1000)
+    //     to display idle time in HomeGainTips popup. If _lastGainTime = now,
+    //     serverTime - _lastGainTime ≈ 0 → shows “timing waktu hanya 0”.  
+    //   EVIDENCE: HAR Entry 94 — _lastGainTime=1775293261683 (old), serverTime=1775293335595,
+    //     diff=73.9s → client correctly shows 73.9s idle time. Our server sent now → diff≈0.
+    //   TRACE: Real server sends _lastGainTime = value BEFORE this gain's update.
+    //     DB gets _lastGainTime = now (for next gain calculation),
+    //     but response gets _lastGainTime = old value (for client display).
+    //
+    // [FIX-012] Echo request fields in response (type, action, userId, version).
+    //   EVIDENCE: HAR — real server response always includes these 4 fields.
+    //   They are not consumed by the gain callback, but maintained for protocol consistency.
     var responseData = {
+        type: request.type,
+        action: request.action,
+        userId: request.userId,
+        version: request.version || '1.0',
         _changeInfo: { _items: responseItems },
-        _lastGainTime: now,
+        _lastGainTime: lastGainTime || now,
         _clickGlobalWarBuffTag: hangup._clickGlobalWarBuffTag || ''
     };
 
@@ -622,8 +658,8 @@ function handleHangupGain(request, ctx) {
 
     ctx.logger.typeAssert('responseData._lastGainTime', responseData._lastGainTime, 'number', {
         context: 'HANGUP-GAIN',
-        trace: 'L235034: GetTimeLeft2BySecond()',
-        impact: 'Wrong type -> countdown display broken'
+        trace: 'L235034: GetTimeLeft2BySecond() — must be OLD value, not now',
+        impact: 'Wrong type or value -> countdown display shows 0'
     });
 
     ctx.logger.typeAssert('responseData._changeInfo._items', responseData._changeInfo._items, 'object', {
@@ -633,13 +669,13 @@ function handleHangupGain(request, ctx) {
     });
 
     ctx.logger.invariantCheck(
-        'Positive exCount produces reward items',
-        exCount > 0 ? Object.keys(changeItems).length > 0 : true,
+        'Positive elapsedSeconds produces reward items',
+        elapsedSeconds > 0 ? Object.keys(changeItems).length > 0 : true,
         {
             context: 'HANGUP-GAIN',
-            expect: 'changeItems has entries when exCount > 0',
-            actual: 'changeItems count = ' + Object.keys(changeItems).length + ', exCount = ' + exCount,
-            trace: 'lesson.json idleReward1-4 + rewardNum1-4',
+            expect: 'changeItems has entries when elapsedSeconds > 0',
+            actual: 'changeItems count = ' + Object.keys(changeItems).length + ', elapsedSeconds = ' + elapsedSeconds,
+            trace: 'lesson.json idleReward1-4 + rewardNum1-4 (FIX-010: no early return)',
             impact: 'Player waited for idle rewards but gets NOTHING'
         }
     );
@@ -650,7 +686,7 @@ function handleHangupGain(request, ctx) {
         {
             context: 'HANGUP-GAIN',
             expect: 'Keys are item ID strings like "102", "103"',
-            actual: 'Keys: ' + Object.keys(responseItems).join(', '),
+            actual: 'Keys: ' + (Object.keys(responseItems).length > 0 ? Object.keys(responseItems).join(', ') : '(empty)'),
             trace: 'HAR verified: real server uses item ID keys',
             impact: 'Sequential keys -> client misreads reward items'
         }
