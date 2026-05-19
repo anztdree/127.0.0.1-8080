@@ -91,6 +91,21 @@
  *   use the actual curLess to read correct rewards and nextID from lesson.json.
  *   Regular: respect checkResult, use actual curLess from user data
  *
+ * [FIX-007] curMainTask progression on lesson-type task completion
+ *   CAUSE: curMainTask was ONLY set once in enterGame.js for new users, and
+ *   NEVER updated by any handler afterward. When player clears a stage that
+ *   matches a task's targetCount (taskType=lesson), the task should advance
+ *   to nextTaskID from task.json. Without this update, task UI stays stuck
+ *   showing old target (e.g. "Clear 1-2" while player is already at 1-3).
+ *   EVIDENCE: HAR enterGame response shows curMainTask: { "6002": { _id:6002,
+ *     _curCount:10102, _targetCount:10103, _state:1 } } — official server DOES
+ *     advance tasks. Our server was not.
+ *   TRACE: task.json chains tasks via nextTaskID (6001→6002→6003...).
+ *     taskType=lesson tasks use taskPara1 as target lesson ID.
+ *     _curCount = last completed lesson (for lesson-type), 0 for other types.
+ *   FIX: After WIN, load task.json, iterate user.curMainTask, check if
+ *     completedLessonId matches _targetCount, advance to nextTaskID.
+ *
  * STRICT RULES: NO STUB, OVERRIDE, FORCE, BYPASS, DUMMY, ASUMSI
  */
 
@@ -362,16 +377,126 @@ function handleCheckBattleResult(request, ctx) {
     user.hangup._maxPassLesson = maxPassLesson;
     user.hangup._maxPassChapter = maxPassChapter;
 
+    // ═══════════════════════════════════════════════════════════════
+    // FIX-007: Update curMainTask — advance lesson-type tasks on WIN
+    // ═══════════════════════════════════════════════════════════════
+    // curMainTask tracks main story task progression.
+    // enterGame sets it once for new users, but it was NEVER updated after.
+    // Official server advances curMainTask when a lesson-type task target
+    // is met. Without this, task UI stays stuck on old target forever.
+    //
+    // Flow:
+    //   1. On WIN, check if completedLessonId matches any active task's _targetCount
+    //   2. Only for taskType=lesson (other types: upGradeHeroLevel, composeHero, etc.
+    //      have different triggers and are handled elsewhere by the client)
+    //   3. Remove completed task from curMainTask
+    //   4. Load next task via nextTaskID from task.json
+    //   5. Add new task with _curCount = completedLessonId (for lesson type)
+    //      or _curCount = 0 (for non-lesson types like upGradeHeroLevel)
+    //
+    // HAR EVIDENCE: Official server sends after clearing lesson 10102:
+    //   curMainTask: { "6002": { "_id": 6002, "_curCount": 10102,
+    //     "_targetCount": 10103, "_state": 1 } }
+    //   Task 6001 (target=10102) removed, task 6002 (target=10103) added.
+    // ═══════════════════════════════════════════════════════════════
+    if (isWin) {
+        ctx.logger.step(6, 7, 'Update curMainTask', 'running');
+
+        const taskData = ctx.loadResource('task');
+        if (!taskData) {
+            ctx.logger.log('WARN', 'BATTLE-RESULT', '[FIX-007] task.json not loaded — curMainTask not updated');
+        } else if (!user.curMainTask || Object.keys(user.curMainTask).length === 0) {
+            ctx.logger.log('DEBUG', 'BATTLE-RESULT', '[FIX-007] user.curMainTask is empty — nothing to advance');
+        } else {
+            // Ensure curMainTask exists on user object
+            if (!user.curMainTask) user.curMainTask = {};
+
+            const completedId = parseInt(lessonId);
+            const activeTaskIds = Object.keys(user.curMainTask);
+            let taskAdvanced = false;
+
+            for (var t = 0; t < activeTaskIds.length; t++) {
+                var taskKey = activeTaskIds[t];
+                var taskEntry = user.curMainTask[taskKey];
+                if (!taskEntry) continue;
+
+                // Look up task config from task.json
+                var taskConfig = taskData[taskKey];
+                if (!taskConfig) {
+                    ctx.logger.log('WARN', 'BATTLE-RESULT', '[FIX-007] task ' + taskKey + ' not found in task.json — skipping');
+                    continue;
+                }
+
+                // Only process main-type tasks with lesson taskType
+                if (taskConfig.type !== 'main') continue;
+                if (taskConfig.taskType !== 'lesson') continue;
+
+                // Check if this lesson task's target matches the just-completed lesson
+                if (taskEntry._targetCount === completedId) {
+                    ctx.logger.details('taskProgress',
+                        ['matchedTask', taskKey],
+                        ['taskType', 'lesson'],
+                        ['targetWas', String(completedId)]
+                    );
+
+                    // Remove completed task from curMainTask
+                    delete user.curMainTask[taskKey];
+
+                    // Look up next task via nextTaskID chain
+                    var nextTaskId = String(taskConfig.nextTaskID);
+                    if (nextTaskId && nextTaskId !== 'undefined' && nextTaskId !== 'null' && taskData[nextTaskId]) {
+                        var nextConfig = taskData[nextTaskId];
+
+                        // For lesson-type next task: _curCount = last completed lesson
+                        // For non-lesson next task (e.g. upGradeHeroLevel): _curCount = 0
+                        var newCurCount = 0;
+                        if (nextConfig.taskType === 'lesson') {
+                            newCurCount = completedId;
+                        }
+
+                        user.curMainTask[nextTaskId] = {
+                            _id: nextConfig.id,
+                            _curCount: newCurCount,
+                            _targetCount: nextConfig.taskPara1,
+                            _state: 1
+                        };
+
+                        taskAdvanced = true;
+
+                        ctx.logger.details('taskProgress',
+                            ['nextTask', nextTaskId],
+                            ['nextTaskType', nextConfig.taskType],
+                            ['curCount', String(newCurCount)],
+                            ['targetCount', String(nextConfig.taskPara1)],
+                            ['levelNeeded', String(nextConfig.levelNeeded || 0)]
+                        );
+                    } else {
+                        ctx.logger.details('taskProgress',
+                            ['nextTask', '(none — last task or nextTaskID missing)']
+                        );
+                    }
+                }
+            }
+
+            if (taskAdvanced) {
+                ctx.logger.step(6, 7, 'Update curMainTask', 'pass', 'Task advanced — curMainTask updated');
+            } else {
+                ctx.logger.step(6, 7, 'Update curMainTask', 'pass', 'No lesson task matched completed lesson ' + completedId + ' — no change');
+            }
+        }
+    }
+
     // Save to DB
     ctx.db.saveUser(userId, user);
     ctx.logger.saveVerify(userId, ctx.db, user, [
         'hangup._curLess',
         'hangup._maxPassLesson',
         'hangup._maxPassChapter',
-        'totalProps._items'
+        'totalProps._items',
+        'curMainTask'
     ]);
 
-    ctx.logger.step(5, 5, 'Build response', 'pass', `${isWin ? 'WIN' : 'LOSE'} rewards=${rewardCount} lesson=${curLess}`);
+    ctx.logger.step(5, 7, 'Build response', 'pass', `${isWin ? 'WIN' : 'LOSE'} rewards=${rewardCount} lesson=${curLess}`);
 
     // ═══════════════════════════════════════════════════════════════
     // BUILD FINAL RESPONSE
