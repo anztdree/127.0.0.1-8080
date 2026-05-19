@@ -11,8 +11,7 @@
  * Handlers: user/enterGame, user/registChat, user/getBulletinBrief+readBulletin,
  *           friend/friendServerAction, heroImage/getAll, hero/getAttrs,
  *           userMsg/getMsgList, guide/saveGuide,
- *           hangup/saveGuideTeam, hangup/checkBattleResult, hangup/gain,
- *           activity/getActivityDetail
+ *           hangup/saveGuideTeam, hangup/checkBattleResult
  *
  * ═══════════════════════════════════════════════════════════════
  * BUG FIX LOG
@@ -51,8 +50,8 @@ const hangupCheckBattleResult = require('./handlers/hangup/checkBattleResult');
 const buryPointGuideBattle = require('./handlers/buryPoint/guideBattle');
 const summonOneFree = require('./handlers/summon/summonOneFree');
 const activityGetActivityBrief = require('./handlers/activity/getActivityBrief');
-const activityGetActivityDetail = require('./handlers/activity/getActivityDetail');
 const hangupGain = require('./handlers/hangup/gain');
+const giftGetOnlineGift = require('./handlers/gift/getOnlineGift');
 
 // ─── Socket.IO 2.5.1 Setup ───
 const io = require('socket.io')(config.port, {
@@ -66,6 +65,83 @@ const io = require('socket.io')(config.port, {
 // ─── Session Tracking ───
 const sessions = new Map();
 const actionCounters = new Map();
+
+// ─── v5.0: Per-socket stats + idle timer ───
+const socketStatsMap = new Map();  // socketId → { actionCount, successCount, errorCount, errorDetails[], totalTime, totalData, lastActivityAt, userId, registeredHandlers, missingHandlers }
+const idleTimersMap = new Map();   // socketId → setTimeout id
+
+function initSocketStats(socketId) {
+    socketStatsMap.set(socketId, {
+        actionCount: 0,
+        successCount: 0,
+        errorCount: 0,
+        errorDetails: [],
+        totalTime: 0,
+        totalData: 0,
+        lastActivityAt: Date.now(),
+        userId: null,
+        registeredHandlers: 0,
+        missingHandlers: 0
+    });
+}
+
+function resetIdleTimer(socketId) {
+    if (idleTimersMap.has(socketId)) {
+        clearTimeout(idleTimersMap.get(socketId));
+    }
+    var stats = socketStatsMap.get(socketId);
+    if (stats) stats.lastActivityAt = Date.now();
+    idleTimersMap.set(socketId, setTimeout(function() {
+        var s = socketStatsMap.get(socketId);
+        if (s && s.actionCount > 0) {
+            logger.summaryIdle(socketId, formatStats(s, socketId));
+        }
+        idleTimersMap.delete(socketId);
+    }, 10000));
+}
+
+function clearIdleTimer(socketId) {
+    if (idleTimersMap.has(socketId)) {
+        clearTimeout(idleTimersMap.get(socketId));
+        idleTimersMap.delete(socketId);
+    }
+}
+
+function formatStats(stats, socketId) {
+    var avgTime = stats.actionCount > 0 ? (stats.totalTime / stats.actionCount).toFixed(1) : '0';
+    var aliveMs = 0;
+    var s = sessions.get(socketId);
+    if (s) aliveMs = Date.now() - s.connectedAt;
+    var aliveStr = formatAlive(aliveMs);
+
+    // Count registered handlers
+    var totalH = 0;
+    var types = Object.keys(ACTION_HANDLERS);
+    for (var t = 0; t < types.length; t++) {
+        totalH += Object.keys(ACTION_HANDLERS[types[t]]).length;
+    }
+
+    return {
+        actionCount: stats.actionCount,
+        successCount: stats.successCount,
+        errorCount: stats.errorCount,
+        errorDetails: stats.errorDetails,
+        avgTime: avgTime,
+        totalData: stats.totalData,
+        userId: stats.userId ? (stats.userId.substring(0, 20) + (stats.userId.length > 20 ? '...' + stats.userId.substring(stats.userId.length - 12) : '')) : null,
+        alive: aliveStr,
+        registeredHandlers: totalH,
+        missingHandlers: stats.missingHandlers
+    };
+}
+
+function formatAlive(ms) {
+    var seconds = Math.floor(ms / 1000);
+    var m = Math.floor(seconds / 60);
+    var s = seconds % 60;
+    if (m > 0) return m + 'm ' + s + 's';
+    return s + 's';
+}
 
 // ─── Initialize serverOpenDate ───
 if (!config.serverOpenDate) {
@@ -423,14 +499,16 @@ const ACTION_HANDLERS = {
         gain: hangupGain
     },
     activity: {
-        getActivityBrief: activityGetActivityBrief,
-        getActivityDetail: activityGetActivityDetail
+        getActivityBrief: activityGetActivityBrief
     },
     buryPoint: {
         guideBattle: buryPointGuideBattle
     },
     summon: {
         summonOneFree: summonOneFree
+    },
+    gift: {
+        getOnlineGift: giftGetOnlineGift
     }
 };
 
@@ -453,15 +531,9 @@ io.on('connection', (socket) => {
         transport: transport
     });
     actionCounters.set(socketId, 0);
+    initSocketStats(socketId);
 
     logger.socketEvent('connect', socketId, clientIp, transport);
-    logger.details('session',
-        ['socketId', socketId],
-        ['ip', clientIp],
-        ['transport', transport],
-        ['totalSessions', String(sessions.size)],
-        ['activeUsers', String([...sessions.values()].filter(s => s.userId).length)]
-    );
 
     // ─── TEA HANDSHAKE ───
     const challenge = uuidv4();
@@ -539,58 +611,167 @@ io.on('connection', (socket) => {
         const action = request.action || 'UNKNOWN';
         const actionType = request.type || '';
         const fullAction = actionType ? `${actionType}::${action}` : action;
+        const socketStats = socketStatsMap.get(socketId);
 
-        // ─── REQUEST LOG ───
-        logger.actionLog('req', fullAction, 'OK');
+        // Silent error: callback not a function
+        if (typeof callback !== 'function') {
+            logger.actionHeader(actionCounter, actionType || '?', action || '?', 1, 0, 0);
+            console.log(chalk.red.bold('     \u274C SILENT ERROR: callback is not a function') + chalk.gray(' \u2500'.repeat(30)));
+            logger.details('impact',
+                ['type', actionType || '(missing)'],
+                ['action', action || '(missing)'],
+                ['fix', 'Client must provide callback function in handler.process event']
+            );
+            logger.actionFooter();
+            if (socketStats) {
+                socketStats.actionCount++;
+                socketStats.errorCount++;
+                socketStats.errorDetails.push({ type: actionType || '?', action: action || '?' });
+                socketStats.missingHandlers++;
+            }
+            resetIdleTimer(socketId);
+            return;
+        }
+
+        // Silent error: type missing
+        if (!actionType) {
+            logger.actionHeader(actionCounter, '?', action, 4, 0, 0);
+            console.log(chalk.red.bold('     \u274C SILENT ERROR: request.type is missing') + chalk.gray(' \u2500'.repeat(26)));
+            logger.details('impact',
+                ['fix', 'Client must include { type: "user", action: "enterGame" } in payload'],
+                ['registeredTypes', Object.keys(ACTION_HANDLERS).join(', ')]
+            );
+            logger.actionFooter();
+            callback(buildErrorResponse(4));
+            if (socketStats) {
+                socketStats.actionCount++;
+                socketStats.errorCount++;
+                socketStats.errorDetails.push({ type: '?', action: action });
+                socketStats.missingHandlers++;
+            }
+            resetIdleTimer(socketId);
+            return;
+        }
+
+        // ─── ACTION HEADER (v5.0 Table Flow) ───
+        logger.actionHeader(actionCounter, actionType, action);
+
+        // ─── 📥 REQUEST ───
+        console.log('');
+        console.log('     \u{1F4D5} REQUEST');
         logger.details('request',
-            ['action', action],
-            ['type', actionType],
-            ['userId', (request.userId || '?').substring(0, 20)],
-            ['counter', String(actionCounter)],
-            ['serverId', String(request.serverId || '?')]
+            ['type ..............', actionType],
+            ['action ............', action],
+            ['userId ............', (request.userId || '(missing)').substring(0, 36)],
+            ['serverId ..........', String(request.serverId || '(missing)')]
         );
-        logger.requestDump(request);
 
         // Validate: socket must be TEA-verified
         const currentSession = sessions.get(socketId);
         if (!currentSession || !currentSession.verified) {
-            logger.log('WARN', 'HANDLER', chalk.red('Socket not TEA-verified') + ' → ret=38');
-            if (typeof callback === 'function') {
-                callback(buildErrorResponse(38));
-            }
-            return;
-        }
-
-        // Find handler by type + action
-        const typeHandlers = ACTION_HANDLERS[actionType];
-        if (!typeHandlers) {
-            logger.log('WARN', 'HANDLER', chalk.yellow(`Unknown type`) + ` "${actionType}" — no handlers registered for this type`);
-            logger.details('registered',
-                ['types', Object.keys(ACTION_HANDLERS).join(', ')],
-                ['action', action]
+            const dur = Date.now() - handlerStart;
+            console.log(chalk.red.bold('     \u274C ERROR: Socket not TEA-verified') + chalk.gray(' \u2500'.repeat(22)));
+            logger.details('impact',
+                ['fix', 'Client must complete TEA verify handshake before sending actions'],
+                ['ret', '38']
             );
-            if (typeof callback === 'function') {
-                callback(buildErrorResponse(4));
-            }
-            return;
-        }
-
-        const handler = typeHandlers[action];
-        if (!handler) {
-            logger.log('WARN', 'HANDLER', chalk.yellow(`Unknown action`) + ` "${actionType}::${action}"`);
-            logger.details('available',
-                ['actions', Object.keys(typeHandlers).join(', ')],
-                ['requested', action]
+            // ─── 📤 RESPONSE ───
+            console.log('');
+            console.log('     \u{1F4E4} RESPONSE');
+            logger.details('response',
+                ['ret ...............', chalk.red('38 (not verified)')],
+                ['size ..............', '0 chars']
             );
-            if (typeof callback === 'function') {
-                callback(buildErrorResponse(4));
+            console.log('');
+            console.log('     \u23F1\uFE0F  TIMING');
+            logger.details('timing',
+                ['Total .............', dur + 'ms']
+            );
+            logger.actionFooter();
+            callback(buildErrorResponse(38));
+            if (socketStats) {
+                socketStats.actionCount++;
+                socketStats.errorCount++;
+                socketStats.errorDetails.push({ type: actionType, action: action });
+                socketStats.totalTime += dur;
             }
+            resetIdleTimer(socketId);
             return;
         }
 
         // Track userId in session
         if (request.userId) {
             currentSession.userId = request.userId;
+            if (socketStats) socketStats.userId = request.userId;
+        }
+
+        // Find handler by type + action
+        const typeHandlers = ACTION_HANDLERS[actionType];
+        if (!typeHandlers) {
+            const dur = Date.now() - handlerStart;
+            console.log(chalk.red.bold('     \u274C NOT_FOUND: Unknown type') + ' ' + chalk.yellow('"' + actionType + '"') + chalk.gray(' \u2500'.repeat(Math.max(1, 28 - actionType.length))));
+            logger.details('impact',
+                ['registeredTypes', Object.keys(ACTION_HANDLERS).join(', ')],
+                ['requestedType', actionType],
+                ['fix', 'Client is sending unknown type \u2014 check protocol version']
+            );
+            // ─── 📤 RESPONSE ───
+            console.log('');
+            console.log('     \u{1F4E4} RESPONSE');
+            logger.details('response',
+                ['ret ...............', chalk.red('4 (NOT_FOUND)')],
+                ['size ..............', '0 chars']
+            );
+            console.log('');
+            console.log('     \u23F1\uFE0F  TIMING');
+            logger.details('timing',
+                ['Total .............', dur + 'ms']
+            );
+            logger.actionFooter();
+            callback(buildErrorResponse(4));
+            if (socketStats) {
+                socketStats.actionCount++;
+                socketStats.errorCount++;
+                socketStats.errorDetails.push({ type: actionType, action: action });
+                socketStats.totalTime += dur;
+                socketStats.missingHandlers++;
+            }
+            resetIdleTimer(socketId);
+            return;
+        }
+
+        const handler = typeHandlers[action];
+        if (!handler) {
+            const dur = Date.now() - handlerStart;
+            console.log(chalk.red.bold('     \u274C NOT_FOUND: Unknown action') + ' ' + chalk.yellow('"' + actionType + '::' + action + '"') + chalk.gray(' \u2500'.repeat(Math.max(1, 16 - fullAction.length))));
+            logger.details('impact',
+                ['availableActions', Object.keys(typeHandlers).join(', ')],
+                ['requestedAction', action],
+                ['fix', 'Client is requesting unregistered action \u2014 check handler registration']
+            );
+            // ─── 📤 RESPONSE ───
+            console.log('');
+            console.log('     \u{1F4E4} RESPONSE');
+            logger.details('response',
+                ['ret ...............', chalk.red('4 (NOT_FOUND)')],
+                ['size ..............', '0 chars']
+            );
+            console.log('');
+            console.log('     \u23F1\uFE0F  TIMING');
+            logger.details('timing',
+                ['Total .............', dur + 'ms']
+            );
+            logger.actionFooter();
+            callback(buildErrorResponse(4));
+            if (socketStats) {
+                socketStats.actionCount++;
+                socketStats.errorCount++;
+                socketStats.errorDetails.push({ type: actionType, action: action });
+                socketStats.totalTime += dur;
+                socketStats.missingHandlers++;
+            }
+            resetIdleTimer(socketId);
+            return;
         }
 
         try {
@@ -613,52 +794,103 @@ io.on('connection', (socket) => {
 
             const response = await handler(request, ctx);
             const handlerDuration = Date.now() - handlerStart;
-
-            // ─── RESPONSE LOG ───
             const dataLen = typeof response.data === 'string' ? response.data.length : 0;
             const isCompressed = response.compress || false;
-            logger.actionLog('res', fullAction, response.ret === 0 ? 'OK' : 'ERR', null,
-                `ret=${response.ret} ${dataLen} chars ${isCompressed ? '(LZ)' : '(raw)'} ${handlerDuration}ms`);
-            logger.responseSummary(response.ret, dataLen, isCompressed, handlerDuration);
-            logger.timing('handler', handlerStart);
 
-            if (typeof callback === 'function') {
-                callback(response);
+            // ─── 📤 RESPONSE ───
+            console.log('');
+            console.log('     \u{1F4E4} RESPONSE');
+            var retColor = response.ret === 0 ? chalk.green : chalk.red;
+            logger.details('response',
+                ['ret ...............', retColor(String(response.ret))],
+                ['fields ............', typeof response.data === 'object' ? String(Object.keys(response.data).length) + ' top-level' : '(raw string)'],
+                ['size ..............', dataLen.toLocaleString() + ' chars (' + (isCompressed ? 'LZ)' : 'RAW)')]
+            );
+
+            // ─── ⏱️ TIMING ───
+            console.log('');
+            console.log('     \u23F1\uFE0F  TIMING');
+            var barLen = Math.min(Math.floor(handlerDuration / 10), 20);
+            var barColor = handlerDuration > 2000 ? chalk.red : handlerDuration > 1000 ? chalk.yellow : chalk.green;
+            var bar = barLen > 0 ? barColor('\u2588'.repeat(barLen)) : '';
+            logger.details('timing',
+                ['Total .............', (handlerDuration + 'ms  ' + bar)]
+            );
+
+            logger.actionFooter();
+
+            // ─── Update socket stats ───
+            if (socketStats) {
+                socketStats.actionCount++;
+                socketStats.totalTime += handlerDuration;
+                socketStats.totalData += dataLen;
+                if (response.ret === 0) {
+                    socketStats.successCount++;
+                } else {
+                    socketStats.errorCount++;
+                    socketStats.errorDetails.push({ type: actionType, action: action });
+                }
             }
+            resetIdleTimer(socketId);
+
+            callback(response);
         } catch (err) {
             const handlerDuration = Date.now() - handlerStart;
+
+            console.log('');
+            console.log(chalk.red.bold('     \u274C UNHANDLED ERROR') + chalk.gray(' \u2500'.repeat(30)));
             logger.errorWithStack('HANDLER', `Action "${fullAction}" threw UNHANDLED error`, err);
             logger.details('error',
                 ['name', err.name],
                 ['message', err.message],
                 ['duration', handlerDuration + 'ms']
             );
-            if (typeof callback === 'function') {
-                callback(buildErrorResponse(1));
+
+            // ─── 📤 RESPONSE ───
+            console.log('');
+            console.log('     \u{1F4E4} RESPONSE');
+            logger.details('response',
+                ['ret ...............', chalk.red('1 (server error)')],
+                ['size ..............', '0 chars']
+            );
+            console.log('');
+            console.log('     \u23F1\uFE0F  TIMING');
+            logger.details('timing',
+                ['Total .............', handlerDuration + 'ms']
+            );
+            logger.actionFooter();
+
+            // ─── Update socket stats ───
+            if (socketStats) {
+                socketStats.actionCount++;
+                socketStats.errorCount++;
+                socketStats.errorDetails.push({ type: actionType, action: action });
+                socketStats.totalTime += handlerDuration;
             }
+            resetIdleTimer(socketId);
+
+            callback(buildErrorResponse(1));
         }
     });
 
     // ─── Socket Disconnect ───
     socket.on('disconnect', (reason) => {
+        clearIdleTimer(socketId);
+
         const s = sessions.get(socketId);
-        const userId = (s && s.userId) ? s.userId : 'unknown';
-        const aliveMs = s ? Date.now() - s.connectedAt : 0;
-        const verified = s ? s.verified : false;
-        const actionCount = actionCounters.get(socketId) || 0;
+        const socketStats = socketStatsMap.get(socketId);
 
         logger.socketEvent('disconnect', socketId, s ? s.ip : '?', s ? s.transport : '?',
             `reason=${reason}`);
-        logger.details('session',
-            ['userId', userId.substring(0, 20)],
-            ['alive', aliveMs + 'ms'],
-            ['actions', String(actionCount)],
-            ['verified', String(verified)],
-            ['reason', reason]
-        );
+
+        // ─── v5.0: FINAL SUMMARY ───
+        if (socketStats && socketStats.actionCount > 0) {
+            logger.summaryFinal(socketId, formatStats(socketStats, socketId));
+        }
 
         sessions.delete(socketId);
         actionCounters.delete(socketId);
+        socketStatsMap.delete(socketId);
     });
 
     // ─── Transport upgrade ───
@@ -677,12 +909,12 @@ io.on('connection', (socket) => {
 });
 
 // ═══════════════════════════════════════════════════════════════
-// SERVER STARTUP
+// SERVER STARTUP — v5.0 Table Flow format
 // ═══════════════════════════════════════════════════════════════
 
 logger.header('SUPER WARRIOR Z — MAIN SERVER');
 
-// ─── v4.0: Config Audit (Layer 3) — catch silent config mistakes ───
+// ─── Config Audit — catch silent config mistakes ───
 logger.configAudit(config);
 
 console.log('');
@@ -702,8 +934,8 @@ logger.table([
 
 logger.headerEnd();
 
-// Log resource status
-logger.log('INFO', 'CONFIG', chalk.bold('Resource JSON status:'));
+// ─── Resource status ───
+logger.headerThin('RESOURCE JSON STATUS');
 logger.table([
     ['constant.json', constantJson ? chalk.green(`${Object.keys(constantJson).length} entries`) : chalk.red('MISSING')],
     ['hero.json', heroJson ? chalk.green(`${Object.keys(heroJson).length} entries`) : chalk.red('MISSING')],
@@ -715,11 +947,8 @@ logger.table([
     ['heroPower.json', heroPowerJson ? chalk.green(`${Object.keys(heroPowerJson).length} entries`) : chalk.red('MISSING')]
 ]);
 
-logger.separator('═');
-
-// Log registered handlers
-console.log('');
-logger.log('INFO', 'HANDLER', chalk.bold('Registered action handlers:'));
+// ─── Registered handlers (v5.0 format under ═══ separators) ───
+logger.headerThin('REGISTERED HANDLERS');
 console.log('');
 let totalHandlers = 0;
 const types = Object.keys(ACTION_HANDLERS);
@@ -732,14 +961,12 @@ for (let t = 0; t < types.length; t++) {
         const isLastType = (t === types.length - 1);
         const isVeryLast = isLastAction && isLastType;
 
-        const connector = isVeryLast ? '└' : '├';
-        const branch = isLastAction && !isLastType ? '│ ' : '  ';
-        const icon = isVeryLast ? chalk.green('>>') : chalk.cyan('>>');
+        const connector = isVeryLast ? '\u2514\u2500' : '\u251C\u2500';
         const typeStr = chalk.magenta(type);
         const actionStr = chalk.white(actions[a]);
         const handlerPath = chalk.gray('handlers/' + type + '/' + actions[a] + '.js');
 
-        console.log(`  ${connector} ${icon} ${typeStr}::${actionStr}  ${handlerPath}`);
+        console.log(`  ${connector} ${chalk.cyan('>>')} ${typeStr}::${actionStr}  ${handlerPath}`);
     }
 }
 console.log('');
@@ -748,6 +975,6 @@ logger.details('handlers', ['total', String(totalHandlers)]);
 logger.headerEnd();
 
 console.log('');
-logger.log('INFO', 'SERVER', chalk.green.bold(`Ready — listening on http://127.0.0.1:${config.port}`));
+logger.log('INFO', 'SERVER', chalk.green.bold(`Ready \u2014 listening on http://127.0.0.1:${config.port}`));
 logger.log('INFO', 'SERVER', `Waiting for Socket.IO connections...`);
 console.log('');
