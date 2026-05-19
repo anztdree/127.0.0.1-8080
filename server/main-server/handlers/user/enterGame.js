@@ -170,6 +170,30 @@
  *   FIX: Load task.json, find first main task where levelNeeded <= user level,
  *     populate curMainTask with: { [taskId]: { _id, _curCount: 0, _targetCount: taskPara1, _state: 1 } }
  *     For new level-1 user → task 6001, _curCount=0, _targetCount=10102, _state=1
+ *
+ * [FIX-015] serverId deepTypeScan expected 'string' but official server sends NUMBER
+ *   TRACE: HAR enterGame response: "serverId": 2079 (number, no quotes)
+ *     Client L96431: setServerId(e) → this.serverId = e (stores whatever type received)
+ *     Client L114823: e.serverId && UserInfoSingleton.getInstance().setServerId(e.serverId)
+ *     config.js L68: serverId: 1 (integer)
+ *   CAUSE: Previous session incorrectly analyzed this as a "type mismatch bug".
+ *     The official server ALWAYS sends serverId as a number. Client never type-checks.
+ *   FIX: Changed deepTypeScan spec from 'string' to 'number'
+ *   EVIDENCE: deepTypeScan was reporting FALSE ERROR on every enterGame call
+ *
+ * [FIX-016] PLAYERVIPEXPALLID (107) included in attribute items — not sent by official server
+ *   TRACE: HAR enterGame response attribute._items has keys: 101,102,103,104,105,106,111,112,113,114
+ *     NO 107 key present in official server response
+ *   CAUSE: Extra field that official server doesn't include. Harmless but not "perfect".
+ *   FIX: Removed PLAYERVIPEXPALLID constant and its entry from attributeItems
+ *
+ * [FIX-017] _arenaTeam and _arenaSuper sent as null instead of {} and []
+ *   TRACE: HAR enterGame response: "_arenaTeam": {} (empty object), "_arenaSuper": [] (empty array)
+ *     Client L114823: setArenaTeamInfo(e._arenaTeam) — called regardless, but function has if(e) guard
+ *     With null: function receives null → skipped entirely
+ *     With {}/[]: function receives empty container → properly initializes arena state
+ *   CAUSE: null means client arena state never initialized for new users
+ *   FIX: _arenaTeam: {}, _arenaSuper: [] to match official server behavior
  */
 
 // ─── Currency/Attribute IDs — main.min.js L82352-82360 ───
@@ -179,7 +203,7 @@ const PLAYEREXPERIENCEID = 103;
 const PLAYERLEVELID = 104;
 const PLAYERVIPEXPERIENCEID = 105;
 const PLAYERVIPLEVELID = 106;
-const PLAYERVIPEXPALLID = 107;
+// NOTE: PLAYERVIPEXPALLID (107) NOT sent by official server — removed to match HAR response
 const SOULCOINID = 111;
 const ARENACOINID = 112;
 const SNAKECOINID = 113;
@@ -596,7 +620,7 @@ async function handleEnterGame(request, ctx) {
         'summon': 'object',
         'newUser': 'boolean',
         'serverVersion': 'string',
-        'serverId': 'string'
+        'serverId': 'number'
     };
 
     var enterScan = ctx.logger.deepTypeScan(userData, enterSpecs, 'userData');
@@ -699,7 +723,6 @@ function buildNewUserData(userId, request, ctx) {
         [PLAYERLEVELID]: { _id: PLAYERLEVELID, _num: startUserLevel },
         [PLAYERVIPEXPERIENCEID]: { _id: PLAYERVIPEXPERIENCEID, _num: 0 },
         [PLAYERVIPLEVELID]: { _id: PLAYERVIPLEVELID, _num: 0 },
-        [PLAYERVIPEXPALLID]: { _id: PLAYERVIPEXPALLID, _num: 0 },
         [SOULCOINID]: { _id: SOULCOINID, _num: 0 },
         [ARENACOINID]: { _id: ARENACOINID, _num: 0 },
         [SNAKECOINID]: { _id: SNAKECOINID, _num: 0 },
@@ -1594,11 +1617,12 @@ function buildNewUserData(userId, request, ctx) {
 
         // ═══ 98. _arenaTeam — AltarInfoManger.setArenaTeamInfo ═══
         // Traced: direct call, if(e) check inside setArenaTeamInfo
-        _arenaTeam: null,
+        _arenaTeam: {},
 
         // ═══ 99. _arenaSuper — AltarInfoManger.setArenaSuperInfo ═══
         // Traced: direct call, if(e) check inside setArenaSuperInfo
-        _arenaSuper: null,
+        // HAR verified: official server sends [] (empty array)
+        _arenaSuper: [],
 
         // ═══ Extra: mergedServers — seen in live server responses ═══
         mergedServers: []
