@@ -51,7 +51,6 @@ const buryPointGuideBattle = require('./handlers/buryPoint/guideBattle');
 const summonOneFree = require('./handlers/summon/summonOneFree');
 const activityGetActivityBrief = require('./handlers/activity/getActivityBrief');
 const hangupGain = require('./handlers/hangup/gain');
-const giftGetOnlineGift = require('./handlers/gift/getOnlineGift');
 
 // ─── Socket.IO 2.5.1 Setup ───
 const io = require('socket.io')(config.port, {
@@ -507,9 +506,6 @@ const ACTION_HANDLERS = {
     summon: {
         summonOneFree: summonOneFree
     },
-    gift: {
-        getOnlineGift: giftGetOnlineGift
-    }
 };
 
 // ═══════════════════════════════════════════════════════════════
