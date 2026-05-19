@@ -11,7 +11,7 @@
  * Handlers: user/enterGame, user/registChat, user/getBulletinBrief+readBulletin,
  *           friend/friendServerAction, heroImage/getAll, hero/getAttrs,
  *           userMsg/getMsgList, guide/saveGuide,
- *           hangup/saveGuideTeam, hangup/checkBattleResult
+ *           hangup/saveGuideTeam, hangup/startGeneral, hangup/checkBattleResult
  *
  * ═══════════════════════════════════════════════════════════════
  * BUG FIX LOG
@@ -51,6 +51,7 @@ const buryPointGuideBattle = require('./handlers/buryPoint/guideBattle');
 const summonOneFree = require('./handlers/summon/summonOneFree');
 const activityGetActivityBrief = require('./handlers/activity/getActivityBrief');
 const hangupGain = require('./handlers/hangup/gain');
+const hangupStartGeneral = require('./handlers/hangup/startGeneral');
 const equipWearAuto = require('./handlers/equip/wearAuto');
 
 // ─── Socket.IO 2.5.1 Setup ───
@@ -495,6 +496,7 @@ const ACTION_HANDLERS = {
     },
     hangup: {
         saveGuideTeam: hangupSaveGuideTeam,
+        startGeneral: hangupStartGeneral,
         checkBattleResult: hangupCheckBattleResult,
         gain: hangupGain
     },
