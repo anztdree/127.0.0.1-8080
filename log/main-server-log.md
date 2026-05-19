@@ -1,39 +1,38 @@
 ```
-
-[DB] No existing database file found — starting fresh
-🟢 00:47:05 INFO  📋 CONFIG   ▸ serverOpenDate auto-initialized: 1779151625673
+[DB] Loaded 1 records from /var/www/html/server/main-server/data/main_server.json (12367 bytes)
+🟢 02:52:10 INFO  📋 CONFIG   ▸ serverOpenDate auto-initialized: 1779159130952
 
   ──────────────────── LOADING RESOURCES ────────────────────
 
-🟢 00:47:05 INFO  📋 CONFIG   ▸ Resource loaded: constant.json
+🟢 02:52:10 INFO  📋 CONFIG   ▸ Resource loaded: constant.json
      ├─ entries: 1
      ├─ bytes: 17728
      └─ path: /var/www/html/resource/json/constant.json
-🟢 00:47:05 INFO  📋 CONFIG   ▸ Resource loaded: hero.json
+🟢 02:52:11 INFO  📋 CONFIG   ▸ Resource loaded: hero.json
      ├─ entries: 887
      ├─ bytes: 1467869
      └─ path: /var/www/html/resource/json/hero.json
-🟢 00:47:05 INFO  📋 CONFIG   ▸ Resource loaded: summon.json
+🟢 02:52:11 INFO  📋 CONFIG   ▸ Resource loaded: summon.json
      ├─ entries: 4
      ├─ bytes: 736
      └─ path: /var/www/html/resource/json/summon.json
-🟢 00:47:05 INFO  📋 CONFIG   ▸ Resource loaded: heroLevelAttr.json
+🟢 02:52:11 INFO  📋 CONFIG   ▸ Resource loaded: heroLevelAttr.json
      ├─ entries: 360
      ├─ bytes: 32275
      └─ path: /var/www/html/resource/json/heroLevelAttr.json
-🟢 00:47:05 INFO  📋 CONFIG   ▸ Resource loaded: heroTypeParam.json
+🟢 02:52:11 INFO  📋 CONFIG   ▸ Resource loaded: heroTypeParam.json
      ├─ entries: 13
      ├─ bytes: 2241
      └─ path: /var/www/html/resource/json/heroTypeParam.json
-🟢 00:47:05 INFO  📋 CONFIG   ▸ Resource loaded: heroQualityParam.json
+🟢 02:52:11 INFO  📋 CONFIG   ▸ Resource loaded: heroQualityParam.json
      ├─ entries: 7
      ├─ bytes: 746
      └─ path: /var/www/html/resource/json/heroQualityParam.json
-🟢 00:47:05 INFO  📋 CONFIG   ▸ Resource loaded: heroPower.json
+🟢 02:52:11 INFO  📋 CONFIG   ▸ Resource loaded: heroPower.json
      ├─ entries: 403
      ├─ bytes: 43864
      └─ path: /var/www/html/resource/json/heroPower.json
-🟢 00:47:05 INFO  📋 CONFIG   ▸ Resource loaded: zPowerQualityPara.json
+🟢 02:52:11 INFO  📋 CONFIG   ▸ Resource loaded: zPowerQualityPara.json
      ├─ entries: 7
      ├─ bytes: 484
      └─ path: /var/www/html/resource/json/zPowerQualityPara.json
@@ -66,7 +65,7 @@
   │  DB               : /var/www/html/server/main-server/data/main_server.json
   │  SDK API          : http://127.0.0.1:9999
   │  server0Time      : 25200000
-  │  serverOpenDate   : 1779151625673
+  │  serverOpenDate   : 1779159130952
   │  resourcePath     : /var/www/html/resource/json
   │  chatUrl          : http://127.0.0.1:8002
   │  dungeonUrl       : http://127.0.0.1:8003
@@ -115,21 +114,139 @@
 ══════════════════════════════════════════════════════════════════
 
 
-🟢 00:47:05 INFO  🚀 SERVER   ▸ Ready — listening on http://127.0.0.1:8001
-🟢 00:47:05 INFO  🚀 SERVER   ▸ Waiting for Socket.IO connections...
+🟢 02:52:11 INFO  🚀 SERVER   ▸ Ready — listening on http://127.0.0.1:8001
+🟢 02:52:11 INFO  🚀 SERVER   ▸ Waiting for Socket.IO connections...
+
+[DB] Loaded 1 records from /var/www/html/server/main-server/data/main_server.json (12367 bytes)
+🟢 02:56:48 INFO  📋 CONFIG   ▸ serverOpenDate auto-initialized: 1779159408741
+
+  ──────────────────── LOADING RESOURCES ────────────────────
+
+🟢 02:56:48 INFO  📋 CONFIG   ▸ Resource loaded: constant.json
+     ├─ entries: 1
+     ├─ bytes: 17728
+     └─ path: /var/www/html/resource/json/constant.json
+🟢 02:56:48 INFO  📋 CONFIG   ▸ Resource loaded: hero.json
+     ├─ entries: 887
+     ├─ bytes: 1467869
+     └─ path: /var/www/html/resource/json/hero.json
+🟢 02:56:48 INFO  📋 CONFIG   ▸ Resource loaded: summon.json
+     ├─ entries: 4
+     ├─ bytes: 736
+     └─ path: /var/www/html/resource/json/summon.json
+🟢 02:56:48 INFO  📋 CONFIG   ▸ Resource loaded: heroLevelAttr.json
+     ├─ entries: 360
+     ├─ bytes: 32275
+     └─ path: /var/www/html/resource/json/heroLevelAttr.json
+🟢 02:56:48 INFO  📋 CONFIG   ▸ Resource loaded: heroTypeParam.json
+     ├─ entries: 13
+     ├─ bytes: 2241
+     └─ path: /var/www/html/resource/json/heroTypeParam.json
+🟢 02:56:48 INFO  📋 CONFIG   ▸ Resource loaded: heroQualityParam.json
+     ├─ entries: 7
+     ├─ bytes: 746
+     └─ path: /var/www/html/resource/json/heroQualityParam.json
+🟢 02:56:48 INFO  📋 CONFIG   ▸ Resource loaded: heroPower.json
+     ├─ entries: 403
+     ├─ bytes: 43864
+     └─ path: /var/www/html/resource/json/heroPower.json
+🟢 02:56:48 INFO  📋 CONFIG   ▸ Resource loaded: zPowerQualityPara.json
+     ├─ entries: 7
+     ├─ bytes: 484
+     └─ path: /var/www/html/resource/json/zPowerQualityPara.json
 
 ══════════════════════════════════════════════════════════════════
-  🔗⚡ Client connected  86_UCyd0selF...  📍 ::ffff:127.0.0.1  📡 polling
-🟢 00:48:15 INFO  🔐 TEA      ▸ Sending verify challenge
-     ├─ challenge: 8b54a151-17a7-41e6-bf33-90580b58cefb
-     └─ socketId: 86_UCyd0selFJhnf...
+
+══════════════════════════════════════════════════════════════════
+  🎮 SUPER WARRIOR Z — MAIN SERVER
+══════════════════════════════════════════════════════════════════
+══════════════════════════════════════════════════════════════════
+  🛡️  CONFIG AUDIT  4 issues at startup
+══════════════════════════════════════════════════════════════════
+     ❌ serverVersion
+          📎 impact : Client displays no/wrong version info
+          🔧 fix    : config.serverVersion = "2026-05-15"
+     ⚠️ sdkUrl
+          📎 impact : SDK-Server authentication will fail
+          🔧 fix    : config.sdkUrl = "http://127.0.0.1:9999"
+     ⚠️ chatUrl
+          📎 impact : Chat won't work in production (hardcoded localhost)
+          🔧 fix    : Use process.env.CHAT_URL or env config
+     ⚠️ dungeonUrl
+          📎 impact : Dungeon won't work in production (hardcoded localhost)
+          🔧 fix    : Use process.env.DUNGEON_URL or env config
+══════════════════════════════════════════════════════════════════
+
+  │  Port             : 8001
+  │  Socket.IO        : 2.5.1
+  │  TEA              : ON (verification)
+  │  DB               : /var/www/html/server/main-server/data/main_server.json
+  │  SDK API          : http://127.0.0.1:9999
+  │  server0Time      : 25200000
+  │  serverOpenDate   : 1779159408741
+  │  resourcePath     : /var/www/html/resource/json
+  │  chatUrl          : http://127.0.0.1:8002
+  │  dungeonUrl       : http://127.0.0.1:8003
+  └─ LOG_LEVEL        : INFO
+
+══════════════════════════════════════════════════════════════════
+
+
+  ──────────────────── RESOURCE JSON STATUS ────────────────────
+
+  │  constant.json            : 1 entries
+  │  hero.json                : 887 entries
+  │  summon.json              : 4 entries
+  │  heroLevelAttr.json       : 360 entries
+  │  heroTypeParam.json       : 13 entries
+  │  heroQualityParam.json    : 7 entries
+  │  zPowerQualityPara.json   : 7 entries
+  └─ heroPower.json           : 403 entries
+
+  ──────────────────── REGISTERED HANDLERS ────────────────────
+
+
+  ├─ >> user::enterGame  handlers/user/enterGame.js
+  ├─ >> user::registChat  handlers/user/registChat.js
+  ├─ >> user::getBulletinBrief  handlers/user/getBulletinBrief.js
+  ├─ >> user::readBulletin  handlers/user/readBulletin.js
+  ├─ >> friend::friendServerAction  handlers/friend/friendServerAction.js
+  ├─ >> heroImage::getAll  handlers/heroImage/getAll.js
+  ├─ >> hero::getAttrs  handlers/hero/getAttrs.js
+  ├─ >> hero::autoLevelUp  handlers/hero/autoLevelUp.js
+  ├─ >> userMsg::getMsgList  handlers/userMsg/getMsgList.js
+  ├─ >> userMsg::getMsg  handlers/userMsg/getMsg.js
+  ├─ >> userMsg::sendMsg  handlers/userMsg/sendMsg.js
+  ├─ >> userMsg::readMsg  handlers/userMsg/readMsg.js
+  ├─ >> userMsg::delFriendMsg  handlers/userMsg/delFriendMsg.js
+  ├─ >> guide::saveGuide  handlers/guide/saveGuide.js
+  ├─ >> hangup::saveGuideTeam  handlers/hangup/saveGuideTeam.js
+  ├─ >> hangup::checkBattleResult  handlers/hangup/checkBattleResult.js
+  ├─ >> hangup::gain  handlers/hangup/gain.js
+  ├─ >> activity::getActivityBrief  handlers/activity/getActivityBrief.js
+  ├─ >> buryPoint::guideBattle  handlers/buryPoint/guideBattle.js
+  └─ >> summon::summonOneFree  handlers/summon/summonOneFree.js
+
+     └─ total: 20
+
+══════════════════════════════════════════════════════════════════
+
+
+🟢 02:56:48 INFO  🚀 SERVER   ▸ Ready — listening on http://127.0.0.1:8001
+🟢 02:56:48 INFO  🚀 SERVER   ▸ Waiting for Socket.IO connections...
+
+══════════════════════════════════════════════════════════════════
+  🔗⚡ Client connected  SczPAhtdh6pm...  📍 ::ffff:127.0.0.1  📡 polling
+🟢 02:56:59 INFO  🔐 TEA      ▸ Sending verify challenge
+     ├─ challenge: 99bfabb5-55bc-43aa-80a9-69e4abefacaf
+     └─ socketId: SczPAhtdh6pmjL6W...
      ├─ type: string
      └─ length: 48
-🟢 00:48:15 INFO  🔐 TEA      ▸ TEA verification SUCCESS
-     ├─ socketId: 86_UCyd0selFJhnf...
+🟢 02:56:59 INFO  🔐 TEA      ▸ TEA verification SUCCESS
+     ├─ socketId: SczPAhtdh6pmjL6W...
      ├─ duration: 1ms
      └─ transport: polling
-     ├─ socketId: 86_UCyd0selFJhnf...
+     ├─ socketId: SczPAhtdh6pmjL6W...
      ├─ from: polling
      └─ to: websocket
 ══════════════════════════════════════════════════════════════════
@@ -139,28 +256,28 @@
      📕 REQUEST
      ├─ type ..............: user
      ├─ action ............: enterGame
-     ├─ userId ............: guest_738888dbc447c890
+     ├─ userId ............: guest_fd2fc618048b4f7a
      └─ serverId ..........: 1
-🟢 00:48:15 INFO  ⚔️ ENTER    ▸ enterGame REQUEST RECEIVED
-     ├─ userId: guest_738888dbc447c890
+🟢 02:56:59 INFO  ⚔️ ENTER    ▸ enterGame REQUEST RECEIVED
+     ├─ userId: guest_fd2fc618048b4f7a
      ├─ serverId: 1
-     ├─ loginToken: 048df51fa412b25...
+     ├─ loginToken: 1d0c22af8e353a8...
      └─ gameVersion: 2026-03-02143147
      🔄 [1/10] Required fields check .
      ✅ [1/10] Required fields check .All present
      🔄 [2/10] Token auth via SDK-Server .
-🟢 00:48:15 INFO  📡 SDKAPI   ▸ User verified via SDK-Server
-     ├─ userId: guest_738888dbc447c890
+🟢 02:56:59 INFO  📡 SDKAPI   ▸ User verified via SDK-Server
+     ├─ userId: guest_fd2fc618048b4f7a
      ├─ httpStatus: 200
      ├─ bodySize: 268 bytes
-     └─ duration: 17ms
-     ✅ [2/10] Token auth via SDK-Server .21ms ✅
+     └─ duration: 19ms
+     ✅ [2/10] Token auth via SDK-Server .23ms ✅
      🔄 [3/10] ServerId validation .
      ✅ [3/10] ServerId validation .1 == 1 ✅
      🔄 [4/10] User existence check .
      🌟 [4/10] User existence check .NEW USER 🌟
      🔄 [5/10] Build user data ..
-🟢 00:48:15 INFO  📋 CONFIG   ▸ Resource loaded: task.json
+🟢 02:56:59 INFO  📋 CONFIG   ▸ Resource loaded: task.json
      ├─ entries: 44
      ├─ bytes: 22978
      └─ path: /var/www/html/resource/json/task.json
@@ -170,7 +287,7 @@
      └─ taskEntries: 44
      ├─ startHero: 1205
      ├─ startHeroLevel: 3
-     ├─ heroInstanceId: abd9d3f2-62c...
+     ├─ heroInstanceId: 5d0b3dc5-7c8...
      ├─ heroConfigFound: true
      └─ heroName: hero_name_15
      ├─ startDiamond: 0
@@ -179,15 +296,15 @@
      └─ startUserLevel: 1
      ├─ types: 1,2,4,5,6,7,8
      └─ values: 2,2,2,2,2,2,2
-🟢 00:48:15 INFO  📋 CONFIG   ▸ Resource loaded: thingsID.json
+🟢 02:56:59 INFO  📋 CONFIG   ▸ Resource loaded: thingsID.json
      ├─ entries: 1636
      ├─ bytes: 884038
      └─ path: /var/www/html/resource/json/thingsID.json
-     ├─ _heroId: abd9d3f2-62c...
+     ├─ _heroId: 5d0b3dc5-7c8...
      ├─ _heroDisplayId: 1205
      ├─ _level: 3
      └─ _heroStar: 0
-     ✅ [5/10] Build user data ..100 keys (44ms)
+     ✅ [5/10] Build user data ..100 keys (48ms)
      🔄 [6/10] Circular reference check .
      ✅ [6/10] Circular reference check .0 circular refs ✅
      🔄 [7/10] Structure validation .
@@ -202,25 +319,25 @@
      ✅ CRITICAL AUDIT: 6/6 PASSED
      ✅ [7/10] Structure validation .100 keys audited
      🔄 [8/10] JSON serialization test .
-     ✅ [8/10] JSON serialization test .OK (10,180 bytes)
+     ✅ [8/10] JSON serialization test .OK (10,122 bytes)
      🔄 [9/10] Database save ....
-[DB] saveUser("guest_738888..."): 100 keys, 10180 bytes
-     ✅ [9/10] Database save ....4ms 💾
+[DB] saveUser("guest_fd2fc6..."): 100 keys, 10122 bytes
+     ✅ [9/10] Database save ....3ms 💾
      🔄 [10/10] Response build ..
-     ├─ original: 10180 chars
-     ├─ compressed: 2415 chars
+     ├─ original: 10122 chars
+     ├─ compressed: 2400 chars
      ├─ reduction: 76%
      └─ threshold: 1024 chars
      ✅ [10/10] Response build ..OK 📤
 
      🏏️ SUMMARY
-     👤 User ......... guest_738888dbc447c890
+     👤 User ......... guest_fd2fc618048b4f7a
      🦸 Heroes ........ 1
      🏆 Level ......... 1
      💎 Diamond ....... 0
      📦 Fields ........ 100
-     ⏱️  Duration ..... 198ms
-     📦 Data .......... 2,415 chars (LZ)
+     ⏱️  Duration ..... 227ms
+     📦 Data .......... 2,400 chars (LZ)
 
 
      📸 ENTER GAME ret=0
@@ -238,7 +355,7 @@
      ├─   timesInfo                    Object{12}
      ├─   serverVersion                ""
      ├─   serverId                     1
-     ├─   serverOpenDate               1779151625673
+     ├─   serverOpenDate               1779159408741
      ├─   newUser                      true
      ├─   currency                     "USD"
      ├─   lastTeam                     Object{2}
@@ -321,30 +438,17 @@
      ├─   fastTeam                     Object{1}
      ├─   gravity                      Object{0}
      ├─   timeMachine                  Object{1}
-     ├─   _arenaTeam                   null ⚠️ NULL
-     ├─   _arenaSuper                  null ⚠️ NULL
+     ├─   _arenaTeam                   Object{0}
+     ├─   _arenaSuper                  Array[0] ⚠️ EMPTY
      └─   mergedServers                Array[0] ⚠️ EMPTY
-
-  ┌──────────────────────────────────────────────────────────┐
-  │  ❌ FATAL ERROR AT STEP RESPONSE TYPE SCAN              │
-  │                                                          │
-  │  STEP:   ENTER                                           │
-  │  REASON: userData.serverId expected string but got number│
-  │  DETAIL: UserDataParser reads these fields on client     │
-  │                                                          │
-  │  IMPACT:  Client crash or silent data loss                │
-  │  FIX:     Check buildNewUserData or updateExistingUser    │
-  │                                                          │
-  └──────────────────────────────────────────────────────────┘
-
 
      📤 RESPONSE
      ├─ ret ...............: 0
      ├─ fields ............: (raw string)
-     └─ size ..............: 2,415 chars (LZ)
+     └─ size ..............: 2,400 chars (LZ)
 
      ⏱️  TIMING
-     └─ Total .............: 208ms  ████████████████████
+     └─ Total .............: 234ms  ████████████████████
 ══════════════════════════════════════════════════════════════════
 ══════════════════════════════════════════════════════════════════
 ▼ [2] 👤 user::getBulletinBrief  —  ⚡—  📦—
@@ -353,10 +457,10 @@
      📕 REQUEST
      ├─ type ..............: user
      ├─ action ............: getBulletinBrief
-     ├─ userId ............: guest_738888dbc447c890
+     ├─ userId ............: guest_fd2fc618048b4f7a
      └─ serverId ..........: (missing)
      🔄 [1/2] Validate request fields .
-     └─ userId: guest_738888dbc447c8
+     └─ userId: guest_fd2fc618048b4f
      ✅ [1/2] Validate request fields .userId OK
      🔄 [1/1] Load global bulletin data .
      ├─ source: ctx.db.getGlobal("bulletinBrief")
@@ -385,7 +489,7 @@
      └─   _brief                       Object{0}
 
      🏏️ SUMMARY
-     👤 User ......... guest_738888dbc447c890
+     👤 User ......... guest_fd2fc618048b4f7a
      📦 Data .......... 0 chars (RAW)
 
 
@@ -404,10 +508,10 @@
      📕 REQUEST
      ├─ type ..............: friend
      ├─ action ............: friendServerAction
-     ├─ userId ............: guest_738888dbc447c890
+     ├─ userId ............: guest_fd2fc618048b4f7a
      └─ serverId ..........: (missing)
      🔄 [1/2] Route relay action .
-     ├─ userId: guest_738888dbc447c8
+     ├─ userId: guest_fd2fc618048b4f
      ├─ relayAction: queryFriends
      └─ extraFields: (none)
      ✅ [1/2] Route relay action .relayAction="${relayAction}"
@@ -420,7 +524,7 @@
      └─ size ..............: 12 chars (RAW)
 
      ⏱️  TIMING
-     └─ Total .............: 6ms  
+     └─ Total .............: 9ms  
 ══════════════════════════════════════════════════════════════════
 ══════════════════════════════════════════════════════════════════
 ▼ [4] 🤝 friend::friendServerAction  —  ⚡—  📦—
@@ -429,10 +533,10 @@
      📕 REQUEST
      ├─ type ..............: friend
      ├─ action ............: friendServerAction
-     ├─ userId ............: guest_738888dbc447c890
+     ├─ userId ............: guest_fd2fc618048b4f7a
      └─ serverId ..........: (missing)
      🔄 [1/2] Route relay action .
-     ├─ userId: guest_738888dbc447c8
+     ├─ userId: guest_fd2fc618048b4f
      ├─ relayAction: queryBlackList
      └─ extraFields: (none)
      ✅ [1/2] Route relay action .relayAction="${relayAction}"
@@ -445,7 +549,7 @@
      └─ size ..............: 12 chars (RAW)
 
      ⏱️  TIMING
-     └─ Total .............: 5ms  
+     └─ Total .............: 6ms  
 ══════════════════════════════════════════════════════════════════
 ══════════════════════════════════════════════════════════════════
 ▼ [5] 🖼️ heroImage::getAll  —  ⚡—  📦—
@@ -454,10 +558,10 @@
      📕 REQUEST
      ├─ type ..............: heroImage
      ├─ action ............: getAll
-     ├─ userId ............: guest_738888dbc447c890
+     ├─ userId ............: guest_fd2fc618048b4f7a
      └─ serverId ..........: (missing)
      🔄 [1/2] Validate request fields .
-     └─ userId: guest_738888dbc447c8
+     └─ userId: guest_fd2fc618048b4f
      ✅ [1/2] Validate request fields .userId OK
      🔄 [1/1] Load userData from DB .
      ├─ heros: exists
@@ -467,7 +571,7 @@
      ✅ [1/1] Type assert request fields .type verified
      🔄 [1/1] Snapshot hero collection state .
      ├─ heroCount: 1
-     └─ heroIds: abd9d3f2-62c0-43e8-b088-70be5c98fe26
+     └─ heroIds: 5d0b3dc5-7c83-4aab-81ee-23f24fefad9d
      ✅ [1/1] Snapshot hero collection state .1 heroes in collection
      🔄 [1/2] Validate business rules .
      ✅ [1/2] Validate business rules .invariants checked
@@ -486,7 +590,7 @@
      └─   _heros                       Object{1}
 
      🏏️ SUMMARY
-     👤 User ......... guest_738888dbc447c890
+     👤 User ......... guest_fd2fc618048b4f7a
      📦 Fields ........ 1
      📦 Data .......... 0 chars (RAW)
 
@@ -506,11 +610,11 @@
      📕 REQUEST
      ├─ type ..............: hero
      ├─ action ............: getAttrs
-     ├─ userId ............: guest_738888dbc447c890
+     ├─ userId ............: guest_fd2fc618048b4f7a
      └─ serverId ..........: (missing)
      🔄 [1/2] Validate request fields .
-     ├─ userId: guest_738888dbc447c8
-     └─ heros: abd9d3f2-62c0-43e8-b088-70be5c98fe26
+     ├─ userId: guest_fd2fc618048b4f
+     └─ heros: 5d0b3dc5-7c83-4aab-81ee-23f24fefad9d
      ✅ [1/2] Validate request fields .1 hero(es) requested
      🔄 [1/1] Load userData from DB .
      └─ heros._heros: 1 heroes
@@ -518,14 +622,14 @@
      🔄 [1/2] Type assert request fields .
      ✅ [1/2] Type assert request fields .types verified
      🔄 [1/1] Snapshot hero request vs found .
-     ├─ requested: 1 heroes: abd9d3f2-62c0-43e8-b088-70be5c98fe26
-     ├─ found: 1 heroes: abd9d3f2-62c0-43e8-b088-70be5c98fe26
+     ├─ requested: 1 heroes: 5d0b3dc5-7c83-4aab-81ee-23f24fefad9d
+     ├─ found: 1 heroes: 5d0b3dc5-7c83-4aab-81ee-23f24fefad9d
      └─ missing: 0 heroes: (none)
      ✅ [1/1] Snapshot hero request vs found .1/1 heroes found
      🔄 [1/1] Validate hero availability .
      ✅ [1/1] Validate hero availability .all heroes found
      🔄 [1/1] Calculate hero attributes .
-     ├─ heroId: abd9d3f2-62c0-43e8-b088-70be5c98fe26
+     ├─ heroId: 5d0b3dc5-7c83-4aab-81ee-23f24fefad9d
      ├─ displayId: 1205
      └─ level: 3
      ├─ heroType: critical
@@ -552,7 +656,7 @@
      └─   _baseAttrs                   Object{1}
 
      🏏️ SUMMARY
-     👤 User ......... guest_738888dbc447c890
+     👤 User ......... guest_fd2fc618048b4f7a
      📦 Fields ........ 2
      📦 Data .......... 0 chars (RAW)
 
@@ -563,7 +667,7 @@
      └─ size ..............: 394 chars (RAW)
 
      ⏱️  TIMING
-     └─ Total .............: 11ms  █
+     └─ Total .............: 8ms  
 ══════════════════════════════════════════════════════════════════
 ══════════════════════════════════════════════════════════════════
 ▼ [7] 💬 userMsg::getMsgList  —  ⚡—  📦—
@@ -572,10 +676,10 @@
      📕 REQUEST
      ├─ type ..............: userMsg
      ├─ action ............: getMsgList
-     ├─ userId ............: guest_738888dbc447c890
+     ├─ userId ............: guest_fd2fc618048b4f7a
      └─ serverId ..........: (missing)
      🔄 [1/2] Validate request fields .
-     └─ userId: guest_738888dbc447c8
+     └─ userId: guest_fd2fc618048b4f
      ✅ [1/2] Validate request fields .userId OK
      🔄 [1/1] Load userData from DB .
      └─ userMsgBrief: 0 entries
@@ -603,7 +707,7 @@
      └─   _brief                       Object{0}
 
      🏏️ SUMMARY
-     👤 User ......... guest_738888dbc447c890
+     👤 User ......... guest_fd2fc618048b4f7a
      📦 Fields ........ 1
      📦 Data .......... 0 chars (RAW)
 
@@ -614,7 +718,7 @@
      └─ size ..............: 13 chars (RAW)
 
      ⏱️  TIMING
-     └─ Total .............: 4ms  
+     └─ Total .............: 5ms  
 ══════════════════════════════════════════════════════════════════
 ══════════════════════════════════════════════════════════════════
 ▼ [8] 👤 user::registChat  —  ⚡—  📦—
@@ -623,22 +727,22 @@
      📕 REQUEST
      ├─ type ..............: user
      ├─ action ............: registChat
-     ├─ userId ............: guest_738888dbc447c890
+     ├─ userId ............: guest_fd2fc618048b4f7a
      └─ serverId ..........: (missing)
-🟢 00:48:20 INFO  ⚪ REGIST_CHAT ▸ registChat REQUEST RECEIVED
-     ├─ userId: guest_738888dbc447c8
+🟢 02:57:04 INFO  ⚪ REGIST_CHAT ▸ registChat REQUEST RECEIVED
+     ├─ userId: guest_fd2fc618048b4f
      └─ version: 1.0
-🟢 00:48:20 INFO  ⚪ REGIST_CHAT ▸ Entry check PASS — userId=guest_738888dbc4...
-🟢 00:48:20 INFO  ⚪ REGIST_CHAT ▸ Loading config for chat registration
+🟢 02:57:04 INFO  ⚪ REGIST_CHAT ▸ Entry check PASS — userId=guest_fd2fc61804...
+🟢 02:57:04 INFO  ⚪ REGIST_CHAT ▸ Loading config for chat registration
      ├─ chatUrl: http://127.0.0.1:8002
      ├─ serverId: 1
      └─ source: DEFAULT (chatUrl not set)
-🟢 00:48:20 INFO  ⚪ REGIST_CHAT ▸ Config loaded — chatUrl and serverId resolved
-🟢 00:48:20 INFO  ⚪ REGIST_CHAT ▸ Loading player state for guild/room context
+🟢 02:57:04 INFO  ⚪ REGIST_CHAT ▸ Config loaded — chatUrl and serverId resolved
+🟢 02:57:04 INFO  ⚪ REGIST_CHAT ▸ Loading player state for guild/room context
      ├─ userData: LOADED (100 top keys)
      ├─ guild: NO
      └─ guildRoomId: undefined (by design — updated dynamically by guild handler L114204)
-🟢 00:48:20 INFO  ⚪ REGIST_CHAT ▸ Building chat registration response (6 fields)
+🟢 02:57:04 INFO  ⚪ REGIST_CHAT ▸ Building chat registration response (6 fields)
      ├─ worldRoomId: world_1 (L114566 — ALWAYS joined)
      ├─ guildRoomId: undefined (L114568 — undefined = skip)
      ├─ teamDungeonChatRoom: undefined (L114579 — undefined = skip)
@@ -647,12 +751,12 @@
      ├─ next-step: L114480: io.connect(chatServerUrl) → TEA verify required
      ├─ post-login: L114550: chat::login → joinRoom(world, guild?, team?, dungeon?)
      └─ dynamic-update: guild L114207 | teamDungeon L136514 | team L136531
-🟢 00:48:20 INFO  ⚪ REGIST_CHAT ▸ Response fields built — 6 fields total
-🟢 00:48:20 INFO  ⚪ REGIST_CHAT ▸ No data mutations (configuration handler)
+🟢 02:57:04 INFO  ⚪ REGIST_CHAT ▸ Response fields built — 6 fields total
+🟢 02:57:04 INFO  ⚪ REGIST_CHAT ▸ No data mutations (configuration handler)
      ├─ type: NONE — registChat is a read-only configuration handler
      ├─ reason: Only returns chat URL and room IDs — no user data modified
      └─ trace: L114462-114470: client reads response fields, does not write back
-🟢 00:48:20 INFO  ⚪ REGIST_CHAT ▸ No DB save required (configuration handler)
+🟢 02:57:04 INFO  ⚪ REGIST_CHAT ▸ No DB save required (configuration handler)
      ├─ action: SKIP — no mutations to persist
      ├─ reason: registChat returns configuration data only — no user state changes
      └─ dbWrite: NONE
@@ -693,9 +797,9 @@
 
 
      🏏️ SUMMARY
-     👤 User ......... guest_738888dbc447c890
+     👤 User ......... guest_fd2fc618048b4f7a
      📦 Fields ........ 6
-     ⏱️  Duration ..... 6ms
+     ⏱️  Duration ..... 3ms
      📦 Data .......... 0 chars (RAW)
 
 
@@ -705,7 +809,7 @@
      └─ size ..............: 83 chars (RAW)
 
      ⏱️  TIMING
-     └─ Total .............: 12ms  █
+     └─ Total .............: 7ms  
 ══════════════════════════════════════════════════════════════════
 ══════════════════════════════════════════════════════════════════
 ▼ [9] 🎯 guide::saveGuide  —  ⚡—  📦—
@@ -714,10 +818,10 @@
      📕 REQUEST
      ├─ type ..............: guide
      ├─ action ............: saveGuide
-     ├─ userId ............: guest_738888dbc447c890
+     ├─ userId ............: guest_fd2fc618048b4f7a
      └─ serverId ..........: (missing)
      🔄 [1/3] Validate request fields .
-     ├─ userId: guest_738888dbc447c8
+     ├─ userId: guest_fd2fc618048b4f
      ├─ guideType: 2
      └─ step: 2102
      ✅ [1/3] Validate request fields .type=2 step=2102
@@ -735,12 +839,12 @@
      🔄 [1/1] Update guide._steps .
      ✅ [1/1] Update guide._steps .guide._steps[2] = 2102
      └─ guide._steps[2]: (none) step → 2102 step (NaN step) [SAVE-GUIDE]
-[DB] saveUser("guest_738888..."): 100 keys, 10188 bytes
+[DB] saveUser("guest_fd2fc6..."): 100 keys, 10130 bytes
 
      📸 saveGuide ret=0
 
      🏏️ SUMMARY
-     👤 User ......... guest_738888dbc447c890
+     👤 User ......... guest_fd2fc618048b4f7a
      📦 Data .......... 0 chars (RAW)
 
 
@@ -750,7 +854,7 @@
      └─ size ..............: 2 chars (RAW)
 
      ⏱️  TIMING
-     └─ Total .............: 11ms  █
+     └─ Total .............: 9ms  
 ══════════════════════════════════════════════════════════════════
 ══════════════════════════════════════════════════════════════════
 ▼ [10] 🎯 guide::saveGuide  —  ⚡—  📦—
@@ -759,10 +863,10 @@
      📕 REQUEST
      ├─ type ..............: guide
      ├─ action ............: saveGuide
-     ├─ userId ............: guest_738888dbc447c890
+     ├─ userId ............: guest_fd2fc618048b4f7a
      └─ serverId ..........: (missing)
      🔄 [1/3] Validate request fields .
-     ├─ userId: guest_738888dbc447c8
+     ├─ userId: guest_fd2fc618048b4f
      ├─ guideType: 2
      └─ step: 2107
      ✅ [1/3] Validate request fields .type=2 step=2107
@@ -780,12 +884,12 @@
      🔄 [1/1] Update guide._steps .
      ✅ [1/1] Update guide._steps .guide._steps[2] = 2107
      └─ guide._steps[2]: 2102 step → 2107 step (+5 step) [SAVE-GUIDE]
-[DB] saveUser("guest_738888..."): 100 keys, 10188 bytes
+[DB] saveUser("guest_fd2fc6..."): 100 keys, 10130 bytes
 
      📸 saveGuide ret=0
 
      🏏️ SUMMARY
-     👤 User ......... guest_738888dbc447c890
+     👤 User ......... guest_fd2fc618048b4f7a
      📦 Data .......... 0 chars (RAW)
 
 
@@ -795,7 +899,7 @@
      └─ size ..............: 2 chars (RAW)
 
      ⏱️  TIMING
-     └─ Total .............: 5ms  
+     └─ Total .............: 6ms  
 ══════════════════════════════════════════════════════════════════
 ══════════════════════════════════════════════════════════════════
 ▼ [11] ⏳ hangup::saveGuideTeam  —  ⚡—  📦—
@@ -804,15 +908,15 @@
      📕 REQUEST
      ├─ type ..............: hangup
      ├─ action ............: saveGuideTeam
-     ├─ userId ............: guest_738888dbc447c890
+     ├─ userId ............: guest_fd2fc618048b4f7a
      └─ serverId ..........: (missing)
      🔄 [1/2] Save guide team ...
-     ├─ userId: guest_738888dbc447c8
+     ├─ userId: guest_fd2fc618048b4f
      ├─ team: 5 hero(es)
      └─ supers: 1120561
      ✅ [1/2] Save guide team ...team=5 heroes
      🔄 [2/2] Persist team data .
-[DB] saveUser("guest_738888..."): 101 keys, 10303 bytes
+[DB] saveUser("guest_fd2fc6..."): 101 keys, 10245 bytes
      ✅ [2/2] Persist team data .saved to DB
 
      📤 RESPONSE
@@ -830,10 +934,10 @@
      📕 REQUEST
      ├─ type ..............: hangup
      ├─ action ............: checkBattleResult
-     ├─ userId ............: guest_738888dbc447c890
+     ├─ userId ............: guest_fd2fc618048b4f7a
      └─ serverId ..........: (missing)
      🔄 [1/10] Validate request .
-     ├─ userId: guest_738888dbc447c8
+     ├─ userId: guest_fd2fc618048b4f
      ├─ isGuide: true
      ├─ battleId: (none)
      ├─ checkResult: (none)
@@ -841,7 +945,7 @@
      └─ super: (none)
      ✅ [1/10] Validate request .
      🔄 [2/10] Load data ........
-🟢 00:48:25 INFO  📋 CONFIG   ▸ Resource loaded: lesson.json
+🟢 02:57:13 INFO  📋 CONFIG   ▸ Resource loaded: lesson.json
      ├─ entries: 611
      ├─ bytes: 833203
      └─ path: /var/www/html/resource/json/lesson.json
@@ -879,7 +983,7 @@
      └─ hangup._curLess: 10101 → 10102 (+1) [BATTLE-PROGRESSION]
      └─ hangup._maxPassLesson: 0 → 10101 (+10101) [BATTLE-PROGRESSION]
      └─ hangup._maxPassChapter: 0 → 801 (+801) [BATTLE-PROGRESSION]
-[DB] saveUser("guest_738888..."): 101 keys, 10377 bytes
+[DB] saveUser("guest_fd2fc6..."): 101 keys, 10319 bytes
 
      🔒 CRITICAL FIELDS AUDIT — game will crash/stuck if wrong
      ├─ 🔒 _battleResult            = 0  L104882: 0 == e._battleResult -> true (tutorial forced win)
@@ -889,7 +993,7 @@
      ✅ CRITICAL AUDIT: 4/4 PASSED
 
      🏏️ SUMMARY
-     👤 User ......... guest_738888dbc447c890
+     👤 User ......... guest_fd2fc618048b4f7a
      📦 Fields ........ 4
      📦 Data .......... 0 chars (RAW)
 
@@ -906,7 +1010,7 @@
      └─ size ..............: 218 chars (RAW)
 
      ⏱️  TIMING
-     └─ Total .............: 26ms  ██
+     └─ Total .............: 27ms  ██
 ══════════════════════════════════════════════════════════════════
 ══════════════════════════════════════════════════════════════════
 ▼ [13] 📋 buryPoint::guideBattle  —  ⚡—  📦—
@@ -915,14 +1019,14 @@
      📕 REQUEST
      ├─ type ..............: buryPoint
      ├─ action ............: guideBattle
-     ├─ userId ............: guest_738888dbc447c890
+     ├─ userId ............: guest_fd2fc618048b4f7a
      └─ serverId ..........: (missing)
-🟢 00:48:26 INFO  ⚪ BURYPOINT ▸ Guide battle analytics received
-     ├─ userId: guest_738888dbc447c8
+🟢 02:57:15 INFO  ⚪ BURYPOINT ▸ Guide battle analytics received
+     ├─ userId: guest_fd2fc618048b4f
      ├─ point: load
      ├─ passLesson: 10101
      └─ version: 1.0
-[DB] saveUser("guest_738888..."): 102 keys, 10485 bytes
+[DB] saveUser("guest_fd2fc6..."): 102 keys, 10427 bytes
 
      📤 RESPONSE
      ├─ ret ...............: 0
@@ -930,12 +1034,12 @@
      └─ size ..............: 2 chars (RAW)
 
      ⏱️  TIMING
-     └─ Total .............: 8ms  
+     └─ Total .............: 7ms  
 ══════════════════════════════════════════════════════════════════
 ══════════════════════════════════════════════════════════════════
-  📊 IDLE SUMMARY — 10s no activity — 86_UCyd0selF
+  📊 IDLE SUMMARY — 10s no activity — SczPAhtdh6pm
 ══════════════════════════════════════════════════════════════════
-  📊 Calls: 13  ✅ 13 OK  ⚡ 23.6ms avg  📦 3,265 chars
+  📊 Calls: 13  ✅ 13 OK  ⚡ 25.3ms avg  📦 3,250 chars
 ══════════════════════════════════════════════════════════════════
 ══════════════════════════════════════════════════════════════════
 ▼ [14] 📋 buryPoint::guideBattle  —  ⚡—  📦—
@@ -944,14 +1048,14 @@
      📕 REQUEST
      ├─ type ..............: buryPoint
      ├─ action ............: guideBattle
-     ├─ userId ............: guest_738888dbc447c890
+     ├─ userId ............: guest_fd2fc618048b4f7a
      └─ serverId ..........: (missing)
-🟢 00:48:37 INFO  ⚪ BURYPOINT ▸ Guide battle analytics received
-     ├─ userId: guest_738888dbc447c8
+🟢 02:57:26 INFO  ⚪ BURYPOINT ▸ Guide battle analytics received
+     ├─ userId: guest_fd2fc618048b4f
      ├─ point: battle
      ├─ passLesson: 10101
      └─ version: 1.0
-[DB] saveUser("guest_738888..."): 102 keys, 10564 bytes
+[DB] saveUser("guest_fd2fc6..."): 102 keys, 10506 bytes
 
      📤 RESPONSE
      ├─ ret ...............: 0
@@ -968,14 +1072,14 @@
      📕 REQUEST
      ├─ type ..............: buryPoint
      ├─ action ............: guideBattle
-     ├─ userId ............: guest_738888dbc447c890
+     ├─ userId ............: guest_fd2fc618048b4f7a
      └─ serverId ..........: (missing)
-🟢 00:48:38 INFO  ⚪ BURYPOINT ▸ Guide battle analytics received
-     ├─ userId: guest_738888dbc447c8
+🟢 02:57:30 INFO  ⚪ BURYPOINT ▸ Guide battle analytics received
+     ├─ userId: guest_fd2fc618048b4f
      ├─ point: home
      ├─ passLesson: 10101
      └─ version: 1.0
-[DB] saveUser("guest_738888..."): 102 keys, 10641 bytes
+[DB] saveUser("guest_fd2fc6..."): 102 keys, 10583 bytes
 
      📤 RESPONSE
      ├─ ret ...............: 0
@@ -983,7 +1087,7 @@
      └─ size ..............: 2 chars (RAW)
 
      ⏱️  TIMING
-     └─ Total .............: 5ms  
+     └─ Total .............: 3ms  
 ══════════════════════════════════════════════════════════════════
 ══════════════════════════════════════════════════════════════════
 ▼ [16] 🏆 activity::getActivityBrief  —  ⚡—  📦—
@@ -992,17 +1096,17 @@
      📕 REQUEST
      ├─ type ..............: activity
      ├─ action ............: getActivityBrief
-     ├─ userId ............: guest_738888dbc447c890
+     ├─ userId ............: guest_fd2fc618048b4f7a
      └─ serverId ..........: (missing)
      🔄 [1/3] Validate request ..
-     └─ userId: guest_738888dbc447c8...
+     └─ userId: guest_fd2fc618048b4f...
      ✅ [1/3] Validate request ..
      🔄 [2/3] Load user data ....
      ✅ [2/3] Load user data ....
      ├─ userLevel: 1
-     ├─ userCreateTime: 2026-05-19T00:48:15.361Z
+     ├─ userCreateTime: 2026-05-19T02:56:59.745Z
      ├─ userAgeDays: 0.0 days
-     ├─ serverOpenDate: 2026-05-19T00:47:05.673Z
+     ├─ serverOpenDate: 2026-05-19T02:56:48.741Z
      ├─ serverAgeDays: 0.0 days
      └─ dayOfWeek(UTC+7): 2 (Weekday)
      🔄 [3/3] Generate activity list .
@@ -1086,7 +1190,7 @@
      📸 ACTIVITY BRIEF ret=0
      ├─   type                         "activity"
      ├─   action                       "getActivityBrief"
-     ├─   userId                       "guest_738888dbc447c890"
+     ├─   userId                       "guest_fd2fc618048b4f7a"
      ├─   version                      "1.0"
      └─   _acts                        Object{12}
      ├─ original: 2576 chars
@@ -1100,7 +1204,7 @@
      └─ size ..............: 775 chars (LZ)
 
      ⏱️  TIMING
-     └─ Total .............: 12ms  █
+     └─ Total .............: 11ms  █
 ══════════════════════════════════════════════════════════════════
 ══════════════════════════════════════════════════════════════════
 ▼ [17] 🎯 guide::saveGuide  —  ⚡—  📦—
@@ -1109,10 +1213,10 @@
      📕 REQUEST
      ├─ type ..............: guide
      ├─ action ............: saveGuide
-     ├─ userId ............: guest_738888dbc447c890
+     ├─ userId ............: guest_fd2fc618048b4f7a
      └─ serverId ..........: (missing)
      🔄 [1/3] Validate request fields .
-     ├─ userId: guest_738888dbc447c8
+     ├─ userId: guest_fd2fc618048b4f
      ├─ guideType: 2
      └─ step: 2206
      ✅ [1/3] Validate request fields .type=2 step=2206
@@ -1130,12 +1234,12 @@
      🔄 [1/1] Update guide._steps .
      ✅ [1/1] Update guide._steps .guide._steps[2] = 2206
      └─ guide._steps[2]: 2107 step → 2206 step (+99 step) [SAVE-GUIDE]
-[DB] saveUser("guest_738888..."): 102 keys, 10641 bytes
+[DB] saveUser("guest_fd2fc6..."): 102 keys, 10583 bytes
 
      📸 saveGuide ret=0
 
      🏏️ SUMMARY
-     👤 User ......... guest_738888dbc447c890
+     👤 User ......... guest_fd2fc618048b4f7a
      📦 Data .......... 0 chars (RAW)
 
 
@@ -1154,17 +1258,17 @@
      📕 REQUEST
      ├─ type ..............: summon
      ├─ action ............: summonOneFree
-     ├─ userId ............: guest_738888dbc447c890
+     ├─ userId ............: guest_fd2fc618048b4f7a
      └─ serverId ..........: (missing)
-🟢 00:48:43 INFO  ⚪ SUMMON-FREE ▸ summonOneFree REQUEST RECEIVED
-     ├─ userId: guest_738888dbc447c890
+🟢 02:57:39 INFO  ⚪ SUMMON-FREE ▸ summonOneFree REQUEST RECEIVED
+     ├─ userId: guest_fd2fc618048b4f7a
      ├─ sType: 3
      └─ isGuide: true
-🟢 00:48:43 INFO  📋 CONFIG   ▸ Resource loaded: summonPool.json
+🟢 02:57:39 INFO  📋 CONFIG   ▸ Resource loaded: summonPool.json
      ├─ entries: 200
      ├─ bytes: 75170
      └─ path: /var/www/html/resource/json/summonPool.json
-🟢 00:48:43 INFO  📋 CONFIG   ▸ Resource loaded: summonRandom.json
+🟢 02:57:39 INFO  📋 CONFIG   ▸ Resource loaded: summonRandom.json
      ├─ entries: 10
      ├─ bytes: 2157
      └─ path: /var/www/html/resource/json/summonRandom.json
@@ -1172,9 +1276,9 @@
      ├─ poolType: summonSuper
      ├─ freeTimer: 86400s
      └─ summonEnergyGain: 10
-🟢 00:48:43 INFO  ⚪ SUMMON-FREE ▸ Free timer OK — proceeding with summon
-🟢 00:48:43 INFO  ⚪ SUMMON-FREE ▸ [GUIDE] Predetermined hero: displayId=1309 quality=purple
-     ├─ heroInstanceId: 075d4d20-01c...
+🟢 02:57:39 INFO  ⚪ SUMMON-FREE ▸ Free timer OK — proceeding with summon
+🟢 02:57:39 INFO  ⚪ SUMMON-FREE ▸ [GUIDE] Predetermined hero: displayId=1309 quality=purple
+     ├─ heroInstanceId: 416b71a3-bcc...
      ├─ displayId: 1309
      ├─ heroName: hero_name_31
      ├─ quality: purple
@@ -1184,15 +1288,15 @@
      ├─ newEnergy: 10
      ├─ energyGained: 10
      ├─ freeTimeField: _canSuperFreeTime
-     ├─ newFreeTime: 2026-05-20T00:48:43.599Z
+     ├─ newFreeTime: 2026-05-20T02:57:39.202Z
      ├─ summonTimes[1]: 1
      └─ totalHeroes: 2
-[DB] saveUser("guest_738888..."): 102 keys, 11332 bytes
-🟢 00:48:43 INFO  ⚪ SUMMON-FREE ▸ User data SAVED
-🟢 00:48:43 INFO  ⚪ SUMMON-FREE ▸ summonOneFree SUCCESS
+[DB] saveUser("guest_fd2fc6..."): 102 keys, 11274 bytes
+🟢 02:57:39 INFO  ⚪ SUMMON-FREE ▸ User data SAVED
+🟢 02:57:39 INFO  ⚪ SUMMON-FREE ▸ summonOneFree SUCCESS
 
      🏏️ SUMMARY
-     👤 User ......... guest_738888dbc447c890
+     👤 User ......... guest_fd2fc618048b4f7a
      📦 Fields ........ [object Object]
      📦 Data .......... 0 chars (RAW)
 
@@ -1212,11 +1316,11 @@
      📕 REQUEST
      ├─ type ..............: hero
      ├─ action ............: getAttrs
-     ├─ userId ............: guest_738888dbc447c890
+     ├─ userId ............: guest_fd2fc618048b4f7a
      └─ serverId ..........: (missing)
      🔄 [1/2] Validate request fields .
-     ├─ userId: guest_738888dbc447c8
-     └─ heros: 075d4d20-01cf-47c3-80f5-cc04f06a2a26
+     ├─ userId: guest_fd2fc618048b4f
+     └─ heros: 416b71a3-bccb-450d-a402-75b630aa4791
      ✅ [1/2] Validate request fields .1 hero(es) requested
      🔄 [1/1] Load userData from DB .
      └─ heros._heros: 2 heroes
@@ -1224,14 +1328,14 @@
      🔄 [1/2] Type assert request fields .
      ✅ [1/2] Type assert request fields .types verified
      🔄 [1/1] Snapshot hero request vs found .
-     ├─ requested: 1 heroes: 075d4d20-01cf-47c3-80f5-cc04f06a2a26
-     ├─ found: 1 heroes: 075d4d20-01cf-47c3-80f5-cc04f06a2a26
+     ├─ requested: 1 heroes: 416b71a3-bccb-450d-a402-75b630aa4791
+     ├─ found: 1 heroes: 416b71a3-bccb-450d-a402-75b630aa4791
      └─ missing: 0 heroes: (none)
      ✅ [1/1] Snapshot hero request vs found .1/1 heroes found
      🔄 [1/1] Validate hero availability .
      ✅ [1/1] Validate hero availability .all heroes found
      🔄 [1/1] Calculate hero attributes .
-     ├─ heroId: 075d4d20-01cf-47c3-80f5-cc04f06a2a26
+     ├─ heroId: 416b71a3-bccb-450d-a402-75b630aa4791
      ├─ displayId: 1309
      └─ level: 1
      ├─ heroType: body
@@ -1258,7 +1362,7 @@
      └─   _baseAttrs                   Object{1}
 
      🏏️ SUMMARY
-     👤 User ......... guest_738888dbc447c890
+     👤 User ......... guest_fd2fc618048b4f7a
      📦 Fields ........ 2
      📦 Data .......... 0 chars (RAW)
 
@@ -1278,10 +1382,10 @@
      📕 REQUEST
      ├─ type ..............: guide
      ├─ action ............: saveGuide
-     ├─ userId ............: guest_738888dbc447c890
+     ├─ userId ............: guest_fd2fc618048b4f7a
      └─ serverId ..........: (missing)
      🔄 [1/3] Validate request fields .
-     ├─ userId: guest_738888dbc447c8
+     ├─ userId: guest_fd2fc618048b4f
      ├─ guideType: 2
      └─ step: 2210
      ✅ [1/3] Validate request fields .type=2 step=2210
@@ -1299,12 +1403,12 @@
      🔄 [1/1] Update guide._steps .
      ✅ [1/1] Update guide._steps .guide._steps[2] = 2210
      └─ guide._steps[2]: 2206 step → 2210 step (+4 step) [SAVE-GUIDE]
-[DB] saveUser("guest_738888..."): 102 keys, 11332 bytes
+[DB] saveUser("guest_fd2fc6..."): 102 keys, 11274 bytes
 
      📸 saveGuide ret=0
 
      🏏️ SUMMARY
-     👤 User ......... guest_738888dbc447c890
+     👤 User ......... guest_fd2fc618048b4f7a
      📦 Data .......... 0 chars (RAW)
 
 
@@ -1314,7 +1418,7 @@
      └─ size ..............: 2 chars (RAW)
 
      ⏱️  TIMING
-     └─ Total .............: 6ms  
+     └─ Total .............: 9ms  
 ══════════════════════════════════════════════════════════════════
 ══════════════════════════════════════════════════════════════════
 ▼ [21] ✨ summon::summonOneFree  —  ⚡—  📦—
@@ -1323,19 +1427,19 @@
      📕 REQUEST
      ├─ type ..............: summon
      ├─ action ............: summonOneFree
-     ├─ userId ............: guest_738888dbc447c890
+     ├─ userId ............: guest_fd2fc618048b4f7a
      └─ serverId ..........: (missing)
-🟢 00:48:50 INFO  ⚪ SUMMON-FREE ▸ summonOneFree REQUEST RECEIVED
-     ├─ userId: guest_738888dbc447c890
+🟢 02:57:43 INFO  ⚪ SUMMON-FREE ▸ summonOneFree REQUEST RECEIVED
+     ├─ userId: guest_fd2fc618048b4f7a
      ├─ sType: 1
      └─ isGuide: true
      ├─ poolId: 3
      ├─ poolType: summonNormal
      ├─ freeTimer: 21600s
      └─ summonEnergyGain: 0
-🟢 00:48:50 INFO  ⚪ SUMMON-FREE ▸ Free timer OK — proceeding with summon
-🟢 00:48:50 INFO  ⚪ SUMMON-FREE ▸ [GUIDE] Predetermined hero: displayId=1206 quality=blue
-     ├─ heroInstanceId: 5228a814-a07...
+🟢 02:57:43 INFO  ⚪ SUMMON-FREE ▸ Free timer OK — proceeding with summon
+🟢 02:57:43 INFO  ⚪ SUMMON-FREE ▸ [GUIDE] Predetermined hero: displayId=1206 quality=blue
+     ├─ heroInstanceId: fa9456e1-c06...
      ├─ displayId: 1206
      ├─ heroName: hero_name_17
      ├─ quality: blue
@@ -1345,15 +1449,15 @@
      ├─ newEnergy: 10
      ├─ energyGained: 0
      ├─ freeTimeField: _canCommonFreeTime
-     ├─ newFreeTime: 2026-05-19T06:48:50.125Z
+     ├─ newFreeTime: 2026-05-19T08:57:43.314Z
      ├─ summonTimes[3]: 1
      └─ totalHeroes: 3
-[DB] saveUser("guest_738888..."): 102 keys, 12022 bytes
-🟢 00:48:50 INFO  ⚪ SUMMON-FREE ▸ User data SAVED
-🟢 00:48:50 INFO  ⚪ SUMMON-FREE ▸ summonOneFree SUCCESS
+[DB] saveUser("guest_fd2fc6..."): 102 keys, 11964 bytes
+🟢 02:57:43 INFO  ⚪ SUMMON-FREE ▸ User data SAVED
+🟢 02:57:43 INFO  ⚪ SUMMON-FREE ▸ summonOneFree SUCCESS
 
      🏏️ SUMMARY
-     👤 User ......... guest_738888dbc447c890
+     👤 User ......... guest_fd2fc618048b4f7a
      📦 Fields ........ [object Object]
      📦 Data .......... 0 chars (RAW)
 
@@ -1364,7 +1468,7 @@
      └─ size ..............: 767 chars (RAW)
 
      ⏱️  TIMING
-     └─ Total .............: 5ms  
+     └─ Total .............: 6ms  
 ══════════════════════════════════════════════════════════════════
 ══════════════════════════════════════════════════════════════════
 ▼ [22] 🦸 hero::getAttrs  —  ⚡—  📦—
@@ -1373,11 +1477,11 @@
      📕 REQUEST
      ├─ type ..............: hero
      ├─ action ............: getAttrs
-     ├─ userId ............: guest_738888dbc447c890
+     ├─ userId ............: guest_fd2fc618048b4f7a
      └─ serverId ..........: (missing)
      🔄 [1/2] Validate request fields .
-     ├─ userId: guest_738888dbc447c8
-     └─ heros: 5228a814-a071-4629-a8e2-c6ba44438028
+     ├─ userId: guest_fd2fc618048b4f
+     └─ heros: fa9456e1-c068-48d7-9b2a-81747b0a3af3
      ✅ [1/2] Validate request fields .1 hero(es) requested
      🔄 [1/1] Load userData from DB .
      └─ heros._heros: 3 heroes
@@ -1385,14 +1489,14 @@
      🔄 [1/2] Type assert request fields .
      ✅ [1/2] Type assert request fields .types verified
      🔄 [1/1] Snapshot hero request vs found .
-     ├─ requested: 1 heroes: 5228a814-a071-4629-a8e2-c6ba44438028
-     ├─ found: 1 heroes: 5228a814-a071-4629-a8e2-c6ba44438028
+     ├─ requested: 1 heroes: fa9456e1-c068-48d7-9b2a-81747b0a3af3
+     ├─ found: 1 heroes: fa9456e1-c068-48d7-9b2a-81747b0a3af3
      └─ missing: 0 heroes: (none)
      ✅ [1/1] Snapshot hero request vs found .1/1 heroes found
      🔄 [1/1] Validate hero availability .
      ✅ [1/1] Validate hero availability .all heroes found
      🔄 [1/1] Calculate hero attributes .
-     ├─ heroId: 5228a814-a071-4629-a8e2-c6ba44438028
+     ├─ heroId: fa9456e1-c068-48d7-9b2a-81747b0a3af3
      ├─ displayId: 1206
      └─ level: 1
      ├─ heroType: skill
@@ -1419,7 +1523,7 @@
      └─   _baseAttrs                   Object{1}
 
      🏏️ SUMMARY
-     👤 User ......... guest_738888dbc447c890
+     👤 User ......... guest_fd2fc618048b4f7a
      📦 Fields ........ 2
      📦 Data .......... 0 chars (RAW)
 
@@ -1430,7 +1534,7 @@
      └─ size ..............: 396 chars (RAW)
 
      ⏱️  TIMING
-     └─ Total .............: 3ms  
+     └─ Total .............: 4ms  
 ══════════════════════════════════════════════════════════════════
 ══════════════════════════════════════════════════════════════════
 ▼ [23] 🏆 activity::getActivityBrief  —  ⚡—  📦—
@@ -1439,17 +1543,17 @@
      📕 REQUEST
      ├─ type ..............: activity
      ├─ action ............: getActivityBrief
-     ├─ userId ............: guest_738888dbc447c890
+     ├─ userId ............: guest_fd2fc618048b4f7a
      └─ serverId ..........: (missing)
      🔄 [1/3] Validate request ..
-     └─ userId: guest_738888dbc447c8...
+     └─ userId: guest_fd2fc618048b4f...
      ✅ [1/3] Validate request ..
      🔄 [2/3] Load user data ....
      ✅ [2/3] Load user data ....
      ├─ userLevel: 1
-     ├─ userCreateTime: 2026-05-19T00:48:15.361Z
+     ├─ userCreateTime: 2026-05-19T02:56:59.745Z
      ├─ userAgeDays: 0.0 days
-     ├─ serverOpenDate: 2026-05-19T00:47:05.673Z
+     ├─ serverOpenDate: 2026-05-19T02:56:48.741Z
      ├─ serverAgeDays: 0.0 days
      └─ dayOfWeek(UTC+7): 2 (Weekday)
      🔄 [3/3] Generate activity list .
@@ -1533,7 +1637,7 @@
      📸 ACTIVITY BRIEF ret=0
      ├─   type                         "activity"
      ├─   action                       "getActivityBrief"
-     ├─   userId                       "guest_738888dbc447c890"
+     ├─   userId                       "guest_fd2fc618048b4f7a"
      ├─   version                      "1.0"
      └─   _acts                        Object{12}
      ├─ original: 2576 chars
@@ -1547,7 +1651,7 @@
      └─ size ..............: 775 chars (LZ)
 
      ⏱️  TIMING
-     └─ Total .............: 8ms  
+     └─ Total .............: 13ms  █
 ══════════════════════════════════════════════════════════════════
 ══════════════════════════════════════════════════════════════════
 ▼ [24] 🎯 guide::saveGuide  —  ⚡—  📦—
@@ -1556,10 +1660,10 @@
      📕 REQUEST
      ├─ type ..............: guide
      ├─ action ............: saveGuide
-     ├─ userId ............: guest_738888dbc447c890
+     ├─ userId ............: guest_fd2fc618048b4f7a
      └─ serverId ..........: (missing)
      🔄 [1/3] Validate request fields .
-     ├─ userId: guest_738888dbc447c8
+     ├─ userId: guest_fd2fc618048b4f
      ├─ guideType: 2
      └─ step: 2304
      ✅ [1/3] Validate request fields .type=2 step=2304
@@ -1577,12 +1681,12 @@
      🔄 [1/1] Update guide._steps .
      ✅ [1/1] Update guide._steps .guide._steps[2] = 2304
      └─ guide._steps[2]: 2210 step → 2304 step (+94 step) [SAVE-GUIDE]
-[DB] saveUser("guest_738888..."): 102 keys, 12022 bytes
+[DB] saveUser("guest_fd2fc6..."): 102 keys, 11964 bytes
 
      📸 saveGuide ret=0
 
      🏏️ SUMMARY
-     👤 User ......... guest_738888dbc447c890
+     👤 User ......... guest_fd2fc618048b4f7a
      📦 Data .......... 0 chars (RAW)
 
 
@@ -1592,7 +1696,7 @@
      └─ size ..............: 2 chars (RAW)
 
      ⏱️  TIMING
-     └─ Total .............: 6ms  
+     └─ Total .............: 10ms  █
 ══════════════════════════════════════════════════════════════════
 ══════════════════════════════════════════════════════════════════
 ▼ [25] 🦸 hero::autoLevelUp  —  ⚡—  📦—
@@ -1601,17 +1705,17 @@
      📕 REQUEST
      ├─ type ..............: hero
      ├─ action ............: autoLevelUp
-     ├─ userId ............: guest_738888dbc447c890
+     ├─ userId ............: guest_fd2fc618048b4f7a
      └─ serverId ..........: (missing)
      🔄 [1/4] Auto Level Up .....
-     ├─ userId: guest_738888dbc447c8
-     ├─ heroId: 075d4d20-01cf-47c3-80f5-cc04f06a2a26
+     ├─ userId: guest_fd2fc618048b4f
+     ├─ heroId: 416b71a3-bccb-450d-a402-75b630aa4791
      └─ times: 1
      ├─ maxTimes: 1
-     └─ heroId: 075d4d20-01cf-47c3-80f5-cc04f06a2a26
-     ✅ [1/4] Auto Level Up .....heroId=075d4d20-01cf-47c3-80f5-cc04f06a2a26, times=1
+     └─ heroId: 416b71a3-bccb-450d-a402-75b630aa4791
+     ✅ [1/4] Auto Level Up .....heroId=416b71a3-bccb-450d-a402-75b630aa4791, times=1
      🔄 [2/4] Load hero data ....
-     ├─ heroId: 075d4d20-01cf-47c3-80f5-cc04f06a2a26
+     ├─ heroId: 416b71a3-bccb-450d-a402-75b630aa4791
      ├─ displayId: 1309
      └─ currentLevel: 1
      🔄 [3/4] Calculate level up .
@@ -1620,7 +1724,7 @@
      └─ configTable: heroLevelUpPurple
      ├─ expCapsule (131): 1000
      └─ gold (102): 1000
-🟢 00:48:57 INFO  📋 CONFIG   ▸ Resource loaded: heroLevelUpPurple.json
+🟢 02:57:51 INFO  📋 CONFIG   ▸ Resource loaded: heroLevelUpPurple.json
      ├─ entries: 220
      ├─ bytes: 23450
      └─ path: /var/www/html/resource/json/heroLevelUpPurple.json
@@ -1633,7 +1737,7 @@
      └─ remainingGold: 919
      ✅ [3/4] Calculate level up .1 levels (1 → 2)
      🔄 [4/4] Save data & build response .
-[DB] saveUser("guest_738888..."): 102 keys, 12020 bytes
+[DB] saveUser("guest_fd2fc6..."): 102 keys, 11962 bytes
      ├─ heroLevel: 2
      ├─ expCapsule: 982
      └─ gold: 919
@@ -1641,10 +1745,10 @@
      ├─ attack: 105
      ├─ armor: 192
      └─ power: 4046
-     ✅ [4/4] Save data & build response .ret=0, heroId=075d4d20-01cf-47c3-80f5-cc04f06a2a26, lvl 1→2
+     ✅ [4/4] Save data & build response .ret=0, heroId=416b71a3-bccb-450d-a402-75b630aa4791, lvl 1→2
 
      🔒 CRITICAL FIELDS AUDIT — game will crash/stuck if wrong
-     ├─ 🔒 heroId                   = 075d4d20-01cf-47c3-80f5-cc04f06a2a26  L133741: getHero(e.heroId) — REQUIRED
+     ├─ 🔒 heroId                   = 416b71a3-bccb-450d-a402-75b630aa4791  L133741: getHero(e.heroId) — REQUIRED
      ├─ 🔒 _heroLevel               = 2  L133751: heroBaseAttr.level = e._heroLevel
      ├─ 🔒 _baseAttr                = Object{6}  L133805: setBaseAttr(e._baseAttr, hero)
      ├─ 🔒 _totalAttr               = Object{7}  L133805: totalAttr loop _totalAttr._items
@@ -1667,17 +1771,17 @@
      📕 REQUEST
      ├─ type ..............: hero
      ├─ action ............: autoLevelUp
-     ├─ userId ............: guest_738888dbc447c890
+     ├─ userId ............: guest_fd2fc618048b4f7a
      └─ serverId ..........: (missing)
      🔄 [1/4] Auto Level Up .....
-     ├─ userId: guest_738888dbc447c8
-     ├─ heroId: 075d4d20-01cf-47c3-80f5-cc04f06a2a26
+     ├─ userId: guest_fd2fc618048b4f
+     ├─ heroId: 416b71a3-bccb-450d-a402-75b630aa4791
      └─ times: 1
      ├─ maxTimes: 1
-     └─ heroId: 075d4d20-01cf-47c3-80f5-cc04f06a2a26
-     ✅ [1/4] Auto Level Up .....heroId=075d4d20-01cf-47c3-80f5-cc04f06a2a26, times=1
+     └─ heroId: 416b71a3-bccb-450d-a402-75b630aa4791
+     ✅ [1/4] Auto Level Up .....heroId=416b71a3-bccb-450d-a402-75b630aa4791, times=1
      🔄 [2/4] Load hero data ....
-     ├─ heroId: 075d4d20-01cf-47c3-80f5-cc04f06a2a26
+     ├─ heroId: 416b71a3-bccb-450d-a402-75b630aa4791
      ├─ displayId: 1309
      └─ currentLevel: 2
      🔄 [3/4] Calculate level up .
@@ -1695,7 +1799,7 @@
      └─ remainingGold: 784
      ✅ [3/4] Calculate level up .1 levels (2 → 3)
      🔄 [4/4] Save data & build response .
-[DB] saveUser("guest_738888..."): 102 keys, 12020 bytes
+[DB] saveUser("guest_fd2fc6..."): 102 keys, 11962 bytes
      ├─ heroLevel: 3
      ├─ expCapsule: 946
      └─ gold: 784
@@ -1703,10 +1807,10 @@
      ├─ attack: 118
      ├─ armor: 230
      └─ power: 4332
-     ✅ [4/4] Save data & build response .ret=0, heroId=075d4d20-01cf-47c3-80f5-cc04f06a2a26, lvl 2→3
+     ✅ [4/4] Save data & build response .ret=0, heroId=416b71a3-bccb-450d-a402-75b630aa4791, lvl 2→3
 
      🔒 CRITICAL FIELDS AUDIT — game will crash/stuck if wrong
-     ├─ 🔒 heroId                   = 075d4d20-01cf-47c3-80f5-cc04f06a2a26  L133741: getHero(e.heroId) — REQUIRED
+     ├─ 🔒 heroId                   = 416b71a3-bccb-450d-a402-75b630aa4791  L133741: getHero(e.heroId) — REQUIRED
      ├─ 🔒 _heroLevel               = 3  L133751: heroBaseAttr.level = e._heroLevel
      ├─ 🔒 _baseAttr                = Object{6}  L133805: setBaseAttr(e._baseAttr, hero)
      ├─ 🔒 _totalAttr               = Object{7}  L133805: totalAttr loop _totalAttr._items
@@ -1729,10 +1833,10 @@
      📕 REQUEST
      ├─ type ..............: guide
      ├─ action ............: saveGuide
-     ├─ userId ............: guest_738888dbc447c890
+     ├─ userId ............: guest_fd2fc618048b4f7a
      └─ serverId ..........: (missing)
      🔄 [1/3] Validate request fields .
-     ├─ userId: guest_738888dbc447c8
+     ├─ userId: guest_fd2fc618048b4f
      ├─ guideType: 2
      └─ step: 2308
      ✅ [1/3] Validate request fields .type=2 step=2308
@@ -1750,12 +1854,12 @@
      🔄 [1/1] Update guide._steps .
      ✅ [1/1] Update guide._steps .guide._steps[2] = 2308
      └─ guide._steps[2]: 2304 step → 2308 step (+4 step) [SAVE-GUIDE]
-[DB] saveUser("guest_738888..."): 102 keys, 12020 bytes
+[DB] saveUser("guest_fd2fc6..."): 102 keys, 11962 bytes
 
      📸 saveGuide ret=0
 
      🏏️ SUMMARY
-     👤 User ......... guest_738888dbc447c890
+     👤 User ......... guest_fd2fc618048b4f7a
      📦 Data .......... 0 chars (RAW)
 
 
@@ -1774,17 +1878,17 @@
      📕 REQUEST
      ├─ type ..............: hero
      ├─ action ............: autoLevelUp
-     ├─ userId ............: guest_738888dbc447c890
+     ├─ userId ............: guest_fd2fc618048b4f7a
      └─ serverId ..........: (missing)
      🔄 [1/4] Auto Level Up .....
-     ├─ userId: guest_738888dbc447c8
-     ├─ heroId: 5228a814-a071-4629-a8e2-c6ba44438028
+     ├─ userId: guest_fd2fc618048b4f
+     ├─ heroId: fa9456e1-c068-48d7-9b2a-81747b0a3af3
      └─ times: 1
      ├─ maxTimes: 1
-     └─ heroId: 5228a814-a071-4629-a8e2-c6ba44438028
-     ✅ [1/4] Auto Level Up .....heroId=5228a814-a071-4629-a8e2-c6ba44438028, times=1
+     └─ heroId: fa9456e1-c068-48d7-9b2a-81747b0a3af3
+     ✅ [1/4] Auto Level Up .....heroId=fa9456e1-c068-48d7-9b2a-81747b0a3af3, times=1
      🔄 [2/4] Load hero data ....
-     ├─ heroId: 5228a814-a071-4629-a8e2-c6ba44438028
+     ├─ heroId: fa9456e1-c068-48d7-9b2a-81747b0a3af3
      ├─ displayId: 1206
      └─ currentLevel: 1
      🔄 [3/4] Calculate level up .
@@ -1793,7 +1897,7 @@
      └─ configTable: heroLevelUpBlue
      ├─ expCapsule (131): 946
      └─ gold (102): 784
-🟢 00:48:59 INFO  📋 CONFIG   ▸ Resource loaded: heroLevelUpBlue.json
+🟢 02:57:55 INFO  📋 CONFIG   ▸ Resource loaded: heroLevelUpBlue.json
      ├─ entries: 220
      ├─ bytes: 23431
      └─ path: /var/www/html/resource/json/heroLevelUpBlue.json
@@ -1806,7 +1910,7 @@
      └─ remainingGold: 712
      ✅ [3/4] Calculate level up .1 levels (1 → 2)
      🔄 [4/4] Save data & build response .
-[DB] saveUser("guest_738888..."): 102 keys, 12020 bytes
+[DB] saveUser("guest_fd2fc6..."): 102 keys, 11962 bytes
      ├─ heroLevel: 2
      ├─ expCapsule: 930
      └─ gold: 712
@@ -1814,10 +1918,10 @@
      ├─ attack: 291
      ├─ armor: 256
      └─ power: 2315
-     ✅ [4/4] Save data & build response .ret=0, heroId=5228a814-a071-4629-a8e2-c6ba44438028, lvl 1→2
+     ✅ [4/4] Save data & build response .ret=0, heroId=fa9456e1-c068-48d7-9b2a-81747b0a3af3, lvl 1→2
 
      🔒 CRITICAL FIELDS AUDIT — game will crash/stuck if wrong
-     ├─ 🔒 heroId                   = 5228a814-a071-4629-a8e2-c6ba44438028  L133741: getHero(e.heroId) — REQUIRED
+     ├─ 🔒 heroId                   = fa9456e1-c068-48d7-9b2a-81747b0a3af3  L133741: getHero(e.heroId) — REQUIRED
      ├─ 🔒 _heroLevel               = 2  L133751: heroBaseAttr.level = e._heroLevel
      ├─ 🔒 _baseAttr                = Object{6}  L133805: setBaseAttr(e._baseAttr, hero)
      ├─ 🔒 _totalAttr               = Object{7}  L133805: totalAttr loop _totalAttr._items
@@ -1831,7 +1935,7 @@
      └─ size ..............: 622 chars (RAW)
 
      ⏱️  TIMING
-     └─ Total .............: 7ms  
+     └─ Total .............: 14ms  █
 ══════════════════════════════════════════════════════════════════
 ══════════════════════════════════════════════════════════════════
 ▼ [29] 🦸 hero::autoLevelUp  —  ⚡—  📦—
@@ -1840,17 +1944,17 @@
      📕 REQUEST
      ├─ type ..............: hero
      ├─ action ............: autoLevelUp
-     ├─ userId ............: guest_738888dbc447c890
+     ├─ userId ............: guest_fd2fc618048b4f7a
      └─ serverId ..........: (missing)
      🔄 [1/4] Auto Level Up .....
-     ├─ userId: guest_738888dbc447c8
-     ├─ heroId: 5228a814-a071-4629-a8e2-c6ba44438028
+     ├─ userId: guest_fd2fc618048b4f
+     ├─ heroId: fa9456e1-c068-48d7-9b2a-81747b0a3af3
      └─ times: 1
      ├─ maxTimes: 1
-     └─ heroId: 5228a814-a071-4629-a8e2-c6ba44438028
-     ✅ [1/4] Auto Level Up .....heroId=5228a814-a071-4629-a8e2-c6ba44438028, times=1
+     └─ heroId: fa9456e1-c068-48d7-9b2a-81747b0a3af3
+     ✅ [1/4] Auto Level Up .....heroId=fa9456e1-c068-48d7-9b2a-81747b0a3af3, times=1
      🔄 [2/4] Load hero data ....
-     ├─ heroId: 5228a814-a071-4629-a8e2-c6ba44438028
+     ├─ heroId: fa9456e1-c068-48d7-9b2a-81747b0a3af3
      ├─ displayId: 1206
      └─ currentLevel: 2
      🔄 [3/4] Calculate level up .
@@ -1868,7 +1972,7 @@
      └─ remainingGold: 592
      ✅ [3/4] Calculate level up .1 levels (2 → 3)
      🔄 [4/4] Save data & build response .
-[DB] saveUser("guest_738888..."): 102 keys, 12020 bytes
+[DB] saveUser("guest_fd2fc6..."): 102 keys, 11962 bytes
      ├─ heroLevel: 3
      ├─ expCapsule: 898
      └─ gold: 592
@@ -1876,10 +1980,10 @@
      ├─ attack: 308
      ├─ armor: 307
      └─ power: 2551
-     ✅ [4/4] Save data & build response .ret=0, heroId=5228a814-a071-4629-a8e2-c6ba44438028, lvl 2→3
+     ✅ [4/4] Save data & build response .ret=0, heroId=fa9456e1-c068-48d7-9b2a-81747b0a3af3, lvl 2→3
 
      🔒 CRITICAL FIELDS AUDIT — game will crash/stuck if wrong
-     ├─ 🔒 heroId                   = 5228a814-a071-4629-a8e2-c6ba44438028  L133741: getHero(e.heroId) — REQUIRED
+     ├─ 🔒 heroId                   = fa9456e1-c068-48d7-9b2a-81747b0a3af3  L133741: getHero(e.heroId) — REQUIRED
      ├─ 🔒 _heroLevel               = 3  L133751: heroBaseAttr.level = e._heroLevel
      ├─ 🔒 _baseAttr                = Object{6}  L133805: setBaseAttr(e._baseAttr, hero)
      ├─ 🔒 _totalAttr               = Object{7}  L133805: totalAttr loop _totalAttr._items
@@ -1893,7 +1997,7 @@
      └─ size ..............: 623 chars (RAW)
 
      ⏱️  TIMING
-     └─ Total .............: 6ms  
+     └─ Total .............: 4ms  
 ══════════════════════════════════════════════════════════════════
 ══════════════════════════════════════════════════════════════════
 ▼ [30] 🏆 activity::getActivityBrief  —  ⚡—  📦—
@@ -1902,17 +2006,17 @@
      📕 REQUEST
      ├─ type ..............: activity
      ├─ action ............: getActivityBrief
-     ├─ userId ............: guest_738888dbc447c890
+     ├─ userId ............: guest_fd2fc618048b4f7a
      └─ serverId ..........: (missing)
      🔄 [1/3] Validate request ..
-     └─ userId: guest_738888dbc447c8...
+     └─ userId: guest_fd2fc618048b4f...
      ✅ [1/3] Validate request ..
      🔄 [2/3] Load user data ....
      ✅ [2/3] Load user data ....
      ├─ userLevel: 1
-     ├─ userCreateTime: 2026-05-19T00:48:15.361Z
+     ├─ userCreateTime: 2026-05-19T02:56:59.745Z
      ├─ userAgeDays: 0.0 days
-     ├─ serverOpenDate: 2026-05-19T00:47:05.673Z
+     ├─ serverOpenDate: 2026-05-19T02:56:48.741Z
      ├─ serverAgeDays: 0.0 days
      └─ dayOfWeek(UTC+7): 2 (Weekday)
      🔄 [3/3] Generate activity list .
@@ -1996,7 +2100,7 @@
      📸 ACTIVITY BRIEF ret=0
      ├─   type                         "activity"
      ├─   action                       "getActivityBrief"
-     ├─   userId                       "guest_738888dbc447c890"
+     ├─   userId                       "guest_fd2fc618048b4f7a"
      ├─   version                      "1.0"
      └─   _acts                        Object{12}
      ├─ original: 2576 chars
@@ -2010,7 +2114,7 @@
      └─ size ..............: 775 chars (LZ)
 
      ⏱️  TIMING
-     └─ Total .............: 7ms  
+     └─ Total .............: 6ms  
 ══════════════════════════════════════════════════════════════════
 ══════════════════════════════════════════════════════════════════
 ▼ [31] 🎯 guide::saveGuide  —  ⚡—  📦—
@@ -2019,10 +2123,10 @@
      📕 REQUEST
      ├─ type ..............: guide
      ├─ action ............: saveGuide
-     ├─ userId ............: guest_738888dbc447c890
+     ├─ userId ............: guest_fd2fc618048b4f7a
      └─ serverId ..........: (missing)
      🔄 [1/3] Validate request fields .
-     ├─ userId: guest_738888dbc447c8
+     ├─ userId: guest_fd2fc618048b4f
      ├─ guideType: 2
      └─ step: 2508
      ✅ [1/3] Validate request fields .type=2 step=2508
@@ -2040,12 +2144,12 @@
      🔄 [1/1] Update guide._steps .
      ✅ [1/1] Update guide._steps .guide._steps[2] = 2508
      └─ guide._steps[2]: 2308 step → 2508 step (+200 step) [SAVE-GUIDE]
-[DB] saveUser("guest_738888..."): 102 keys, 12020 bytes
+[DB] saveUser("guest_fd2fc6..."): 102 keys, 11962 bytes
 
      📸 saveGuide ret=0
 
      🏏️ SUMMARY
-     👤 User ......... guest_738888dbc447c890
+     👤 User ......... guest_fd2fc618048b4f7a
      📦 Data .......... 0 chars (RAW)
 
 
@@ -2055,7 +2159,7 @@
      └─ size ..............: 2 chars (RAW)
 
      ⏱️  TIMING
-     └─ Total .............: 5ms  
+     └─ Total .............: 6ms  
 ══════════════════════════════════════════════════════════════════
 ══════════════════════════════════════════════════════════════════
 ▼ [32] ⏳ hangup::saveGuideTeam  —  ⚡—  📦—
@@ -2064,15 +2168,15 @@
      📕 REQUEST
      ├─ type ..............: hangup
      ├─ action ............: saveGuideTeam
-     ├─ userId ............: guest_738888dbc447c890
+     ├─ userId ............: guest_fd2fc618048b4f7a
      └─ serverId ..........: (missing)
      🔄 [1/2] Save guide team ...
-     ├─ userId: guest_738888dbc447c8
+     ├─ userId: guest_fd2fc618048b4f
      ├─ team: 5 hero(es)
      └─ supers: 
      ✅ [1/2] Save guide team ...team=5 heroes
      🔄 [2/2] Persist team data .
-[DB] saveUser("guest_738888..."): 102 keys, 12101 bytes
+[DB] saveUser("guest_fd2fc6..."): 102 keys, 12043 bytes
      ✅ [2/2] Persist team data .saved to DB
 
      📤 RESPONSE
@@ -2090,10 +2194,10 @@
      📕 REQUEST
      ├─ type ..............: hangup
      ├─ action ............: checkBattleResult
-     ├─ userId ............: guest_738888dbc447c890
+     ├─ userId ............: guest_fd2fc618048b4f7a
      └─ serverId ..........: (missing)
      🔄 [1/10] Validate request .
-     ├─ userId: guest_738888dbc447c8
+     ├─ userId: guest_fd2fc618048b4f
      ├─ isGuide: true
      ├─ battleId: (none)
      ├─ checkResult: (none)
@@ -2132,7 +2236,7 @@
      ├─ nextLessonId: 10102
      └─ source: lesson.json nextID/thisChapter
      ✅ [5/10] Build response ...WIN rewards=5 lesson=10102
-[DB] saveUser("guest_738888..."): 102 keys, 12102 bytes
+[DB] saveUser("guest_fd2fc6..."): 102 keys, 12044 bytes
 
      🔒 CRITICAL FIELDS AUDIT — game will crash/stuck if wrong
      ├─ 🔒 _battleResult            = 0  L104882: 0 == e._battleResult -> true (tutorial forced win)
@@ -2142,7 +2246,7 @@
      ✅ CRITICAL AUDIT: 4/4 PASSED
 
      🏏️ SUMMARY
-     👤 User ......... guest_738888dbc447c890
+     👤 User ......... guest_fd2fc618048b4f7a
      📦 Fields ........ 4
      📦 Data .......... 0 chars (RAW)
 
@@ -2159,7 +2263,7 @@
      └─ size ..............: 218 chars (RAW)
 
      ⏱️  TIMING
-     └─ Total .............: 8ms  
+     └─ Total .............: 7ms  
 ══════════════════════════════════════════════════════════════════
 ══════════════════════════════════════════════════════════════════
 ▼ [34] 📋 buryPoint::guideBattle  —  ⚡—  📦—
@@ -2168,14 +2272,14 @@
      📕 REQUEST
      ├─ type ..............: buryPoint
      ├─ action ............: guideBattle
-     ├─ userId ............: guest_738888dbc447c890
+     ├─ userId ............: guest_fd2fc618048b4f7a
      └─ serverId ..........: (missing)
-🟢 00:49:10 INFO  ⚪ BURYPOINT ▸ Guide battle analytics received
-     ├─ userId: guest_738888dbc447c8
+🟢 02:58:03 INFO  ⚪ BURYPOINT ▸ Guide battle analytics received
+     ├─ userId: guest_fd2fc618048b4f
      ├─ point: load
      ├─ passLesson: 10102
      └─ version: 1.0
-[DB] saveUser("guest_738888..."): 102 keys, 12179 bytes
+[DB] saveUser("guest_fd2fc6..."): 102 keys, 12121 bytes
 
      📤 RESPONSE
      ├─ ret ...............: 0
@@ -2186,9 +2290,9 @@
      └─ Total .............: 5ms  
 ══════════════════════════════════════════════════════════════════
 ══════════════════════════════════════════════════════════════════
-  📊 IDLE SUMMARY — 10s no activity — 86_UCyd0selF
+  📊 IDLE SUMMARY — 10s no activity — SczPAhtdh6pm
 ══════════════════════════════════════════════════════════════════
-  📊 Calls: 34  ✅ 34 OK  ⚡ 12.9ms avg  📦 10,634 chars
+  📊 Calls: 34  ✅ 34 OK  ⚡ 14.0ms avg  📦 10,619 chars
 ══════════════════════════════════════════════════════════════════
 ══════════════════════════════════════════════════════════════════
 ▼ [35] 📋 buryPoint::guideBattle  —  ⚡—  📦—
@@ -2197,14 +2301,14 @@
      📕 REQUEST
      ├─ type ..............: buryPoint
      ├─ action ............: guideBattle
-     ├─ userId ............: guest_738888dbc447c890
+     ├─ userId ............: guest_fd2fc618048b4f7a
      └─ serverId ..........: (missing)
-🟢 00:49:31 INFO  ⚪ BURYPOINT ▸ Guide battle analytics received
-     ├─ userId: guest_738888dbc447c8
+🟢 02:58:24 INFO  ⚪ BURYPOINT ▸ Guide battle analytics received
+     ├─ userId: guest_fd2fc618048b4f
      ├─ point: battle
      ├─ passLesson: 10102
      └─ version: 1.0
-[DB] saveUser("guest_738888..."): 102 keys, 12258 bytes
+[DB] saveUser("guest_fd2fc6..."): 102 keys, 12200 bytes
 
      📤 RESPONSE
      ├─ ret ...............: 0
@@ -2212,7 +2316,7 @@
      └─ size ..............: 2 chars (RAW)
 
      ⏱️  TIMING
-     └─ Total .............: 4ms  
+     └─ Total .............: 5ms  
 ══════════════════════════════════════════════════════════════════
 ══════════════════════════════════════════════════════════════════
 ▼ [36] 📋 buryPoint::guideBattle  —  ⚡—  📦—
@@ -2221,14 +2325,14 @@
      📕 REQUEST
      ├─ type ..............: buryPoint
      ├─ action ............: guideBattle
-     ├─ userId ............: guest_738888dbc447c890
+     ├─ userId ............: guest_fd2fc618048b4f7a
      └─ serverId ..........: (missing)
-🟢 00:49:32 INFO  ⚪ BURYPOINT ▸ Guide battle analytics received
-     ├─ userId: guest_738888dbc447c8
+🟢 02:58:25 INFO  ⚪ BURYPOINT ▸ Guide battle analytics received
+     ├─ userId: guest_fd2fc618048b4f
      ├─ point: home
      ├─ passLesson: 10102
      └─ version: 1.0
-[DB] saveUser("guest_738888..."): 102 keys, 12335 bytes
+[DB] saveUser("guest_fd2fc6..."): 102 keys, 12277 bytes
 
      📤 RESPONSE
      ├─ ret ...............: 0
@@ -2236,7 +2340,7 @@
      └─ size ..............: 2 chars (RAW)
 
      ⏱️  TIMING
-     └─ Total .............: 6ms  
+     └─ Total .............: 3ms  
 ══════════════════════════════════════════════════════════════════
 ══════════════════════════════════════════════════════════════════
 ▼ [37] 🏆 activity::getActivityBrief  —  ⚡—  📦—
@@ -2245,17 +2349,17 @@
      📕 REQUEST
      ├─ type ..............: activity
      ├─ action ............: getActivityBrief
-     ├─ userId ............: guest_738888dbc447c890
+     ├─ userId ............: guest_fd2fc618048b4f7a
      └─ serverId ..........: (missing)
      🔄 [1/3] Validate request ..
-     └─ userId: guest_738888dbc447c8...
+     └─ userId: guest_fd2fc618048b4f...
      ✅ [1/3] Validate request ..
      🔄 [2/3] Load user data ....
      ✅ [2/3] Load user data ....
      ├─ userLevel: 1
-     ├─ userCreateTime: 2026-05-19T00:48:15.361Z
+     ├─ userCreateTime: 2026-05-19T02:56:59.745Z
      ├─ userAgeDays: 0.0 days
-     ├─ serverOpenDate: 2026-05-19T00:47:05.673Z
+     ├─ serverOpenDate: 2026-05-19T02:56:48.741Z
      ├─ serverAgeDays: 0.0 days
      └─ dayOfWeek(UTC+7): 2 (Weekday)
      🔄 [3/3] Generate activity list .
@@ -2339,7 +2443,7 @@
      📸 ACTIVITY BRIEF ret=0
      ├─   type                         "activity"
      ├─   action                       "getActivityBrief"
-     ├─   userId                       "guest_738888dbc447c890"
+     ├─   userId                       "guest_fd2fc618048b4f7a"
      ├─   version                      "1.0"
      └─   _acts                        Object{12}
      ├─ original: 2576 chars
@@ -2353,7 +2457,7 @@
      └─ size ..............: 775 chars (LZ)
 
      ⏱️  TIMING
-     └─ Total .............: 18ms  █
+     └─ Total .............: 22ms  ██
 ══════════════════════════════════════════════════════════════════
 ══════════════════════════════════════════════════════════════════
 ▼ [38] 🎯 guide::saveGuide  —  ⚡—  📦—
@@ -2362,10 +2466,10 @@
      📕 REQUEST
      ├─ type ..............: guide
      ├─ action ............: saveGuide
-     ├─ userId ............: guest_738888dbc447c890
+     ├─ userId ............: guest_fd2fc618048b4f7a
      └─ serverId ..........: (missing)
      🔄 [1/3] Validate request fields .
-     ├─ userId: guest_738888dbc447c8
+     ├─ userId: guest_fd2fc618048b4f
      ├─ guideType: 2
      └─ step: 2601
      ✅ [1/3] Validate request fields .type=2 step=2601
@@ -2383,12 +2487,12 @@
      🔄 [1/1] Update guide._steps .
      ✅ [1/1] Update guide._steps .guide._steps[2] = 2601
      └─ guide._steps[2]: 2508 step → 2601 step (+93 step) [SAVE-GUIDE]
-[DB] saveUser("guest_738888..."): 102 keys, 12335 bytes
+[DB] saveUser("guest_fd2fc6..."): 102 keys, 12277 bytes
 
      📸 saveGuide ret=0
 
      🏏️ SUMMARY
-     👤 User ......... guest_738888dbc447c890
+     👤 User ......... guest_fd2fc618048b4f7a
      📦 Data .......... 0 chars (RAW)
 
 
@@ -2407,10 +2511,10 @@
      📕 REQUEST
      ├─ type ..............: guide
      ├─ action ............: saveGuide
-     ├─ userId ............: guest_738888dbc447c890
+     ├─ userId ............: guest_fd2fc618048b4f7a
      └─ serverId ..........: (missing)
      🔄 [1/3] Validate request fields .
-     ├─ userId: guest_738888dbc447c8
+     ├─ userId: guest_fd2fc618048b4f
      ├─ guideType: 2
      └─ step: 2603
      ✅ [1/3] Validate request fields .type=2 step=2603
@@ -2428,12 +2532,12 @@
      🔄 [1/1] Update guide._steps .
      ✅ [1/1] Update guide._steps .guide._steps[2] = 2603
      └─ guide._steps[2]: 2601 step → 2603 step (+2 step) [SAVE-GUIDE]
-[DB] saveUser("guest_738888..."): 102 keys, 12335 bytes
+[DB] saveUser("guest_fd2fc6..."): 102 keys, 12277 bytes
 
      📸 saveGuide ret=0
 
      🏏️ SUMMARY
-     👤 User ......... guest_738888dbc447c890
+     👤 User ......... guest_fd2fc618048b4f7a
      📦 Data .......... 0 chars (RAW)
 
 
@@ -2443,7 +2547,7 @@
      └─ size ..............: 2 chars (RAW)
 
      ⏱️  TIMING
-     └─ Total .............: 7ms  
+     └─ Total .............: 13ms  █
 ══════════════════════════════════════════════════════════════════
 ══════════════════════════════════════════════════════════════════
 ▼ [40] ⏳ hangup::gain  —  ⚡—  📦—
@@ -2452,38 +2556,38 @@
      📕 REQUEST
      ├─ type ..............: hangup
      ├─ action ............: gain
-     ├─ userId ............: guest_738888dbc447c890
+     ├─ userId ............: guest_fd2fc618048b4f7a
      └─ serverId ..........: (missing)
      🔄 [1/8] Validate request ..
-     ├─ userId: guest_738888dbc447c8
+     ├─ userId: guest_fd2fc618048b4f
      └─ version: 1.0
      ✅ [1/8] Validate request ..
      🔄 [2/8] Load data .........
-🟢 00:49:34 INFO  📋 CONFIG   ▸ Resource loaded: idleVipPlus.json
+🟢 02:58:28 INFO  📋 CONFIG   ▸ Resource loaded: idleVipPlus.json
      ├─ entries: 18
      ├─ bytes: 1418
      └─ path: /var/www/html/resource/json/idleVipPlus.json
-🟢 00:49:34 INFO  📋 CONFIG   ▸ Resource loaded: idleAwardFirst.json
+🟢 02:58:28 INFO  📋 CONFIG   ▸ Resource loaded: idleAwardFirst.json
      ├─ entries: 3
      ├─ bytes: 182
      └─ path: /var/www/html/resource/json/idleAwardFirst.json
-🟢 00:49:34 INFO  📋 CONFIG   ▸ Resource loaded: lessonIdleAward.json
+🟢 02:58:28 INFO  📋 CONFIG   ▸ Resource loaded: lessonIdleAward.json
      ├─ entries: 611
      ├─ bytes: 1143151
      └─ path: /var/www/html/resource/json/lessonIdleAward.json
-🟢 00:49:34 INFO  📋 CONFIG   ▸ Resource loaded: userUpgrade.json
+🟢 02:58:28 INFO  📋 CONFIG   ▸ Resource loaded: userUpgrade.json
      ├─ entries: 299
      ├─ bytes: 16357
      └─ path: /var/www/html/resource/json/userUpgrade.json
      ✅ [2/8] Load data .........lesson=611, everyTime=300s, maxIdle=28800s, maxLevel=300, firstBonus=3, idleAwardKeys=611, upgradeLevels=299
      🔄 [3/8] Calculate idle time .
-     ├─ lastGainTime: 1779151695361
-     ├─ now: 1779151774634
-     ├─ elapsedRaw: 79s
-     ├─ elapsedCapped: 79s (max 28800s)
+     ├─ lastGainTime: 1779159419745
+     ├─ now: 1779159508413
+     ├─ elapsedRaw: 88s
+     ├─ elapsedCapped: 88s (max 28800s)
      ├─ exCount: 0 ticks (300s each)
      └─ vipLevel: 0
-     ✅ [3/8] Calculate idle time .79s, 0 ticks
+     ✅ [3/8] Calculate idle time .88s, 0 ticks
      🔄 [4/8] Lesson config & bonus .
      ├─ curLess: 10102
      ├─ lessonName: 2
@@ -2492,9 +2596,9 @@
      └─ bonusMultiplier: 1
      ✅ [4/8] Lesson config & bonus .lesson=10102, mult=1
      🔄 [5/8] Calculate rewards .
-     └─ id=102 +226 (2.8625/s x 79s x 1): undefined
-     └─ id=103 +26 (0.337777777777778/s x 79s x 1): undefined
-     └─ id=131 +62 (0.789166666666667/s x 79s x 1): undefined
+     └─ id=102 +251 (2.8625/s x 88s x 1): undefined
+     └─ id=103 +29 (0.337777777777778/s x 88s x 1): undefined
+     └─ id=131 +69 (0.789166666666667/s x 88s x 1): undefined
      └─ id=102 +1000: undefined
      └─ id=103 +20: undefined
      └─ id=131 +500: undefined
@@ -2503,27 +2607,27 @@
      ├─ oldLevel: 1
      ├─ newLevel: 2
      ├─ levelsGained: 1
-     └─ expTotal: 86
+     └─ expTotal: 89
      ✅ [6/8] Level-up cascade ..LEVELED UP 1 -> 2
      🔄 [7/8] Save & respond ....
-[DB] saveUser("guest_738888..."): 102 keys, 12335 bytes
+[DB] saveUser("guest_fd2fc6..."): 102 keys, 12277 bytes
      ✅ [7/8] Save & respond ....
      🔄 [8/8] Build response ....
-     └─ totalProps._items[102] (GOLD): 1592 gold → 2818 gold (+1226 gold) [IDLE-GAIN]
-     └─ totalProps._items[103] (EXP): 40 exp → 86 exp (+46 exp) [IDLE-GAIN]
+     └─ totalProps._items[102] (GOLD): 1592 gold → 2843 gold (+1251 gold) [IDLE-GAIN]
+     └─ totalProps._items[103] (EXP): 40 exp → 89 exp (+49 exp) [IDLE-GAIN]
      ✅ [8/8] Build response ....4 items, LEVEL UP 1->2
 
      📸 HANGUP GAIN ret=0
      ├─   type                         "hangup"
      ├─   action                       "gain"
-     ├─   userId                       "guest_738888dbc447c890"
+     ├─   userId                       "guest_fd2fc618048b4f7a"
      ├─   version                      "1.0"
      ├─   _changeInfo                  Object{1}
-     ├─   _lastGainTime                1779151695361
+     ├─   _lastGainTime                1779159419745
      └─   _clickGlobalWarBuffTag       ""
 
      🏏️ SUMMARY
-     👤 User ......... guest_738888dbc447c890
+     👤 User ......... guest_fd2fc618048b4f7a
      📦 Data .......... 0 chars (RAW)
 
 
@@ -2533,7 +2637,7 @@
      └─ size ..............: 283 chars (RAW)
 
      ⏱️  TIMING
-     └─ Total .............: 73ms  ███████
+     └─ Total .............: 75ms  ███████
 ══════════════════════════════════════════════════════════════════
 ══════════════════════════════════════════════════════════════════
 ▼ [41] 🎯 guide::saveGuide  —  ⚡—  📦—
@@ -2542,10 +2646,10 @@
      📕 REQUEST
      ├─ type ..............: guide
      ├─ action ............: saveGuide
-     ├─ userId ............: guest_738888dbc447c890
+     ├─ userId ............: guest_fd2fc618048b4f7a
      └─ serverId ..........: (missing)
      🔄 [1/3] Validate request fields .
-     ├─ userId: guest_738888dbc447c8
+     ├─ userId: guest_fd2fc618048b4f
      ├─ guideType: 2
      └─ step: 2708
      ✅ [1/3] Validate request fields .type=2 step=2708
@@ -2563,12 +2667,12 @@
      🔄 [1/1] Update guide._steps .
      ✅ [1/1] Update guide._steps .guide._steps[2] = 2708
      └─ guide._steps[2]: 2603 step → 2708 step (+105 step) [SAVE-GUIDE]
-[DB] saveUser("guest_738888..."): 102 keys, 12335 bytes
+[DB] saveUser("guest_fd2fc6..."): 102 keys, 12277 bytes
 
      📸 saveGuide ret=0
 
      🏏️ SUMMARY
-     👤 User ......... guest_738888dbc447c890
+     👤 User ......... guest_fd2fc618048b4f7a
      📦 Data .......... 0 chars (RAW)
 
 
@@ -2578,7 +2682,7 @@
      └─ size ..............: 2 chars (RAW)
 
      ⏱️  TIMING
-     └─ Total .............: 4ms  
+     └─ Total .............: 5ms  
 ══════════════════════════════════════════════════════════════════
 ══════════════════════════════════════════════════════════════════
 ▼ [42] 🛠️ equip::wearAuto  —  ⚡—  📦—
@@ -2587,7 +2691,7 @@
      📕 REQUEST
      ├─ type ..............: equip
      ├─ action ............: wearAuto
-     ├─ userId ............: guest_738888dbc447c890
+     ├─ userId ............: guest_fd2fc618048b4f7a
      └─ serverId ..........: (missing)
      ❌ NOT_FOUND: Unknown type "equip" ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─
      ├─ registeredTypes: user, friend, heroImage, hero, userMsg, guide, hangup, activity, buryPoint, summon
@@ -2608,10 +2712,10 @@
      📕 REQUEST
      ├─ type ..............: guide
      ├─ action ............: saveGuide
-     ├─ userId ............: guest_738888dbc447c890
+     ├─ userId ............: guest_fd2fc618048b4f7a
      └─ serverId ..........: (missing)
      🔄 [1/3] Validate request fields .
-     ├─ userId: guest_738888dbc447c8
+     ├─ userId: guest_fd2fc618048b4f
      ├─ guideType: 2
      └─ step: 2717
      ✅ [1/3] Validate request fields .type=2 step=2717
@@ -2629,12 +2733,12 @@
      🔄 [1/1] Update guide._steps .
      ✅ [1/1] Update guide._steps .guide._steps[2] = 2717
      └─ guide._steps[2]: 2708 step → 2717 step (+9 step) [SAVE-GUIDE]
-[DB] saveUser("guest_738888..."): 102 keys, 12335 bytes
+[DB] saveUser("guest_fd2fc6..."): 102 keys, 12277 bytes
 
      📸 saveGuide ret=0
 
      🏏️ SUMMARY
-     👤 User ......... guest_738888dbc447c890
+     👤 User ......... guest_fd2fc618048b4f7a
      📦 Data .......... 0 chars (RAW)
 
 
@@ -2644,31 +2748,11 @@
      └─ size ..............: 2 chars (RAW)
 
      ⏱️  TIMING
-     └─ Total .............: 8ms  
+     └─ Total .............: 5ms  
 ══════════════════════════════════════════════════════════════════
 ══════════════════════════════════════════════════════════════════
-  📊 IDLE SUMMARY — 10s no activity — 86_UCyd0selF
+  📊 IDLE SUMMARY — 10s no activity — SczPAhtdh6pm
 ══════════════════════════════════════════════════════════════════
-  📊 Calls: 43  ✅ 42 OK  ❌ 1 (equip::wearAuto)  ⚡ 13.2ms avg  📦 11,704 chars
+  📊 Calls: 43  ✅ 42 OK  ❌ 1 (equip::wearAuto)  ⚡ 14.2ms avg  📦 11,689 chars
 ══════════════════════════════════════════════════════════════════
-
-  ➖ Disconnected  86_UCyd0selF...  reason: reason=ping timeout
-══════════════════════════════════════════════════════════════════
-  📊 FINAL SUMMARY — 86_UCyd0selF  ⏱️ alive 2m 11s
-══════════════════════════════════════════════════════════════════
-  👤 User ........... guest_738888dbc447c8...88dbc447c890
-  📊 Calls: 43  ✅ 42 OK  ❌ 1 (equip::wearAuto)  ⚡ 13.2ms avg  📦 11,704 chars
-  📋 Handlers ........ 20 registered, 1 missing
-══════════════════════════════════════════════════════════════════
-══════════════════════════════════════════════════════════════════
-  🔗⚡ Client connected  w_ZyS-DT1-tv...  📍 ::ffff:127.0.0.1  📡 polling
-🟢 00:50:26 INFO  🔐 TEA      ▸ Sending verify challenge
-     ├─ challenge: 6f12a7c9-388c-47e8-844e-133d71008172
-     └─ socketId: w_ZyS-DT1-tvDjsx...
-     ├─ type: string
-     └─ length: 48
-🟢 00:50:26 INFO  🔐 TEA      ▸ TEA verification SUCCESS
-     ├─ socketId: w_ZyS-DT1-tvDjsx...
-     ├─ duration: 1ms
-     └─ transport: polling
 ```
