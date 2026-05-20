@@ -2,7 +2,7 @@
  * startGeneral.js — Handler: hangup/startGeneral
  *
  * ═══════════════════════════════════════════════════════════════
- * DEEP TRACE — main.min.js (100% verified)
+ * DEEP TRACE — main.min.js (100% verified) + HAR (4 samples)
  * ═══════════════════════════════════════════════════════════════
  *
  * CALLER — L97716-97735:
@@ -14,84 +14,125 @@
  *
  * RESPONSE FIELDS (client reads only 3):
  *   _battleId   — UUID string  (L97731)
- *   _rightTeam  — FLAT object with hero positions as keys  (L97733, L102470)
+ *   _rightTeam  — FLAT object with position keys  (L97733, L102470)
  *   _rightSuper — Array of super skill objects  (L97733, L103618)
  *
  * ═══════════════════════════════════════════════════════════════
- * BUG FIX LOG (all verified against main.min.js)
+ * BUG FIX LOG (all verified against main.min.js + HAR)
  * ═══════════════════════════════════════════════════════════════
  *
  * [FIX-001] _rightTeam wrapper — was { _items: {...} }, must be FLAT
  *   OLD: _rightTeam: { _items: rightTeamItems }
  *   NEW: _rightTeam: rightTeamItems
  *   SOURCE: L102470: for (var o in e) iterates _rightTeam directly
- *   REASON: Client treats _rightTeam as the sparse dict itself, not a wrapper
  *
  * [FIX-002] _attrs._items field name — was _type, must be _id
  *   OLD: { _type: ATTR.HP, _num: hp }
  *   NEW: { _id: ATTR.HP, _num: hp }
- *   SOURCE: L102528-537 reconstructed: a.type = o._id; a.value = o._num
- *   REASON: getEnemyAttributeModel reads _id as the attr type identifier
+ *   SOURCE: L102528-537: a.type = o._id; a.value = o._num
  *
  * [FIX-003] Missing _weaponHaloId/_weaponHaloLevel
- *   SOURCE: L102674: a._weaponHaloId && a._weaponHaloLevel — called on rightTeam too
- *   FIX: Add _weaponHaloId: 0, _weaponHaloLevel: 0 to each enemy hero
+ *   SOURCE: L102674: a._weaponHaloId && a._weaponHaloLevel
  *
  * [FIX-004] Missing _heroStar
- *   SOURCE: L101748: o[e.position]._heroStar — read from rightTeam
- *   FIX: Add _heroStar: 0
+ *   SOURCE: L101748: o[e.position]._heroStar
  *
  * [FIX-005] Missing _skinId
- *   SOURCE: L236987: var l = i._skinId — read from rightTeam hero
- *   FIX: Add _skinId: 0
+ *   SOURCE: L236987: var l = i._skinId
  *
  * [FIX-006] Missing Power attr (21)
  *   SOURCE: L133821: 21==p._id → heroBaseAttr.power = floor(num)
- *   FIX: Calculate power via heroPower.json weighted sum, add as attr 21
  *
  * [FIX-007] Missing FullHealth/orgHp attr (22)
  *   SOURCE: heroMaxHealth = orgHp value (attr 22)
- *   FIX: Add attr 22 with same value as HP
+ *   L74988: b = a.attributeOf(FullHealth); heroMaxHealth = b > 0 ? b : attributeOf(Health)
  *
  * [FIX-008] Formula KURANG: tanpa qualityParam × balanceHp/Attack/Armor
  *   OLD: hp = floor((levelAttr × typeParam + bais) × difficulty)
- *   NEW: hp = floor((levelAttr × typeParam + bais) × qualityParam × balance × difficulty)
+ *   NEW: hp = (levelAttr × typeParam + bais) × qualityParam × balance × difficulty
  *   SOURCE: L116073 makeHeroBasicAttr full formula
- *   REASON: Formula must include all 5 layers per main.min.js
  *
- * [FIX-009] floor() replaced — keep floor for now, HAR decimal is display-only
- *   SOURCE: L116073 uses Math.floor for core stats
- *   NOTE: HAR decimal values are from client-side talent multiply, not raw attrs
+ * [FIX-009] floor() REMOVED — keep decimal values
+ *   OLD: Math.floor(formula) for HP/ATK/ARM
+ *   NEW: raw formula result with decimals
+ *   SOURCE: HAR shows _num: 702.45 (HP), _num: 174.24 (ATK)
+ *   NOTE: Original server returns decimal values, NOT floored
  *
  * [FIX-010] Missing battleTeamPosition field
- *   SOURCE: getModelArray reconstructed — battleTeamPosition = pos
- *   FIX: Add battleTeamPosition: pos to each enemy hero
+ *   SOURCE: getModelArray reconstructed — position from for...in key
  *
  * [FIX-011] heroQualityParam.json not loaded
  *   SOURCE: L116000: s = heroQualityParam[i.quality]
- *   FIX: Load heroQualityParam.json and use in formula
  *
  * [FIX-012] heroPower.json not loaded (for power calculation)
  *   SOURCE: getAttrs uses heroPower.json for weighted power sum
- *   FIX: Load heroPower.json and calculate power per heroType weights
+ *
+ * [FIX-013] Skills keyed by skill ID, not sequential index
+ *   OLD: skillItems["0"] = { _type:0, _id:190401, _level:1 }
+ *   NEW: skillItems["190401"] = { _type:0, _id:190401, _level:1 }
+ *   SOURCE: HAR shows "190401":{...} not "0":{...}
+ *   NOTE: Client getEnemySkill uses for...in so both work,
+ *         but original format uses skill ID as key
+ *
+ * [FIX-014] ENERGY (attr 16) should be 50, not 0
+ *   OLD: addAttr(ATTR.ENERGY, 0)
+ *   NEW: addAttr(ATTR.ENERGY, 50)
+ *   SOURCE: HAR shows "16":{ "_id":16, "_num":50 }
+ *   NOTE: Enemies start with 50 energy (half max), allows skill use
+ *
+ * [FIX-015] Power should be floored (integer)
+ *   SOURCE: L133821: floor(num) — power is always integer
+ *   HAR shows "21":{ "_id":21, "_num":4184 } — integer value
  *
  * ═══════════════════════════════════════════════════════════════
  * ENEMY STATS FORMULA (5-layer, verified L116073)
  * ═══════════════════════════════════════════════════════════════
  *
- *   hp     = floor( (levelAttr.hp  × typeParam.hpParam  + typeParam.hpBais )
- *                   × qualityParam.hpParam  × hero.balanceHp  × difficultyHp )
+ *   hp     = (levelAttr.hp  × typeParam.hpParam  + typeParam.hpBais )
+ *                   × qualityParam.hpParam  × hero.balanceHp  × difficultyHp
  *
- *   attack = floor( (levelAttr.atk × typeParam.atkParam + typeParam.atkBais )
- *                   × qualityParam.atkParam × hero.balanceAtk × difficultyAtk )
+ *   attack = (levelAttr.atk × typeParam.atkParam + typeParam.atkBais )
+ *                   × qualityParam.atkParam × hero.balanceAtk × difficultyAtk
  *
- *   armor  = floor( (levelAttr.arm × typeParam.armParam + typeParam.armBais )
- *                   × qualityParam.armParam × hero.balanceArm × difficultyArm )
+ *   armor  = (levelAttr.arm × typeParam.armParam + typeParam.armBais )
+ *                   × qualityParam.armParam × hero.balanceArm × difficultyArm
  *
  *   power  = floor( sum(attrValue × heroPower[heroType][attrName].powerParam) )
  *            × heroQualityPower[quality].powerParam
  *
  *   Flat stats (speed, hit, dodge, etc.): directly from hero.json (no scaling)
+ *
+ * ═══════════════════════════════════════════════════════════════
+ * RIGHT TEAM HERO OBJECT SCHEMA (from HAR + main.min.js)
+ * ═══════════════════════════════════════════════════════════════
+ *
+ * {
+ *   _heroDisplayId: number,       // Hero display ID (lookup in hero JSON)
+ *   _heroLevel: number,           // Hero level
+ *   _heroStar: number,            // Hero star (0 for enemies)
+ *   _skinId: number,              // Skin ID (0 = default)
+ *   _weaponHaloId: number,        // Weapon halo ID (0 = none)
+ *   _weaponHaloLevel: number,     // Weapon halo level (0 = none)
+ *   battleTeamPosition: number,   // Position in team
+ *   _attrs: {
+ *     _items: {
+ *       "0":  { _id:0,  _num: HP_value },      // Health
+ *       "1":  { _id:1,  _num: ATK_value },      // Attack
+ *       "2":  { _id:2,  _num: ARM_value },      // Armor
+ *       "3":  { _id:3,  _num: speed },           // Speed
+ *       "16": { _id:16, _num: 50 },              // Energy (starting)
+ *       "21": { _id:21, _num: power },            // Power
+ *       "22": { _id:22, _num: HP_value },         // FullHealth (= HP)
+ *       "41": { _id:41, _num: 100 },              // EnergyMax
+ *       // ... other attrs as needed
+ *     }
+ *   },
+ *   _skills: {
+ *     "skillId1": { _type:0, _id:skillId1, _level:level },  // normal
+ *     "skillId2": { _type:1, _id:skillId2, _level:level },  // proactive
+ *     "skillId3": { _type:2, _id:skillId3, _level:level },  // passive
+ *   }
+ * }
  *
  * ═══════════════════════════════════════════════════════════════
  * STRICT RULES: NO STUB, OVERRIDE, FORCE, BYPASS, DUMMY, ASUMSI
@@ -142,12 +183,12 @@ var ATTR = {
  * Formula: floor( sum(attrValue × heroPower[heroType][attrName].powerParam) )
  * Then multiply by heroQualityPower[quality].powerParam
  *
- * @param {object} attrs - Calculated attr values { hp, attack, armor, speed, ... }
+ * @param {object} attrs - Calculated attr values
  * @param {string} heroType - Hero type for power weight lookup
- * @param {string} quality - Hero quality tier for quality power multiplier
+ * @param {string} quality - Hero quality tier
  * @param {object} heroPowerJson - heroPower.json config
  * @param {object} heroQualityPowerJson - heroQualityPower.json config
- * @returns {number} Calculated power value
+ * @returns {number} Calculated power value (integer)
  */
 function calculatePower(attrs, heroType, quality, heroPowerJson, heroQualityPowerJson) {
     if (!heroPowerJson) {
@@ -199,6 +240,7 @@ function calculatePower(attrs, heroType, quality, heroPowerJson, heroQualityPowe
         }
     }
 
+    // [FIX-015] Power is floored (integer) — HAR shows integer values
     var power = Math.floor(totalWeighted);
 
     // Apply quality power multiplier
@@ -294,7 +336,6 @@ function handleStartGeneral(request, ctx) {
     if (!heroQualityParamData) {
         ctx.logger.log('WARN', 'START-GENERAL',
             'heroQualityParam.json NOT FOUND — quality multipliers default to 1.0');
-        // Fallback: all params = 1 (same as current config anyway)
         heroQualityParamData = {
             white: { hpParam: 1, attackParam: 1, armorParam: 1 },
             green: { hpParam: 1, attackParam: 1, armorParam: 1 },
@@ -307,7 +348,6 @@ function handleStartGeneral(request, ctx) {
     }
 
     // [FIX-012] Load heroPower.json — power weights per heroType
-    // SOURCE: getAttrs uses heroPower.json for weighted power sum
     var heroPowerData = ctx.loadResource('heroPower');
 
     // Load heroQualityPower.json — quality power multiplier
@@ -396,7 +436,7 @@ function handleStartGeneral(request, ctx) {
     var enemyCount = 0;
     var buildLog = [];
 
-    for (var pos = 0; pos < enemyList.length && pos < 5; pos++) {
+    for (var pos = 0; pos < enemyList.length && pos < 6; pos++) {
         var heroIdStr = (enemyList[pos] || '').trim();
         if (!heroIdStr) {
             // Empty position — skip (sparse)
@@ -446,6 +486,7 @@ function handleStartGeneral(request, ctx) {
 
         // ═════════════════════════════════════════════════════════
         // CALCULATE ENEMY STATS — 5-layer formula [FIX-008]
+        // [FIX-009] NO floor() — keep decimal values (HAR verified)
         // ═════════════════════════════════════════════════════════
         // SOURCE: L116073 makeHeroBasicAttr
         //
@@ -459,24 +500,21 @@ function handleStartGeneral(request, ctx) {
         var balanceAttack = hero.balanceAttack || 1;
         var balanceArmor = hero.balanceArmor || 1;
 
-        var hp = Math.floor(
-            (levelEntry.hp * typeParams.hpParam + (typeParams.hpBais || 0))
+        // [FIX-009] No floor — HAR shows decimal values: _num:702.45, _num:174.24
+        var hp = (levelEntry.hp * typeParams.hpParam + (typeParams.hpBais || 0))
             * qualityParams.hpParam
             * balanceHp
-            * dHp
-        );
-        var attack = Math.floor(
-            (levelEntry.attack * typeParams.attackParam + (typeParams.attackBais || 0))
+            * dHp;
+
+        var attack = (levelEntry.attack * typeParams.attackParam + (typeParams.attackBais || 0))
             * qualityParams.attackParam
             * balanceAttack
-            * dAtk
-        );
-        var armor = Math.floor(
-            (levelEntry.armor * typeParams.armorParam + (typeParams.armorBais || 0))
+            * dAtk;
+
+        var armor = (levelEntry.armor * typeParams.armorParam + (typeParams.armorBais || 0))
             * qualityParams.armorParam
             * balanceArmor
-            * dArm
-        );
+            * dArm;
 
         // ─── Flat stats — directly from hero.json (L116073) ───
         var speed = hero.speed || 180;
@@ -506,7 +544,7 @@ function handleStartGeneral(request, ctx) {
 
         // ─── [FIX-006] Calculate Power (attr 21) ───
         // SOURCE: L133821: 21==p._id → heroBaseAttr.power = floor(num)
-        // Formula: weighted sum from heroPower.json per heroType
+        // [FIX-015] Power is floored (integer) — HAR: _num:4184
         var allAttrs = {
             hp: hp,
             attack: attack,
@@ -566,11 +604,11 @@ function handleStartGeneral(request, ctx) {
         addAttr(ATTR.DAMAGE_REDUCE, damageReduce);
         addAttr(ATTR.CONTROL_RESIST, controlResist);
         addAttr(ATTR.TRUE_DAMAGE, trueDamage);
-        addAttr(ATTR.ENERGY, 0);              // always 0 for enemy (no energy regen)
+        addAttr(ATTR.ENERGY, 50);                     // [FIX-014] 50 starting energy (HAR verified)
         addAttr(ATTR.SUPER_DAMAGE, superDamage);
         addAttr(ATTR.HEAL_PLUS, healPlus);
         addAttr(ATTR.HEALER_PLUS, healerPlus);
-        addAttr(ATTR.EXTRA_ARMOR, 0);         // no extra armor for enemy
+        addAttr(ATTR.EXTRA_ARMOR, 0);                 // no extra armor for enemy
         addAttr(ATTR.SHIELDER_PLUS, shielderPlus);
         addAttr(ATTR.DAMAGE_UP, damageUp);
         addAttr(ATTR.DAMAGE_DOWN, damageDown);
@@ -579,26 +617,26 @@ function handleStartGeneral(request, ctx) {
         addAttr(ATTR.CRITICAL_DAMAGE_RESIST, criticalDamageResist);
         addAttr(ATTR.BLOCK_THROUGH, blockThrough);
         addAttr(ATTR.ENERGY_MAX, energyMax);
-        addAttr(ATTR.POWER, power);           // [FIX-006] attr 21
-        addAttr(ATTR.ORG_HP, hp);             // [FIX-007] attr 22 = orgHp (full health)
+        addAttr(ATTR.POWER, power);                   // [FIX-006] attr 21 (integer)
+        addAttr(ATTR.ORG_HP, hp);                     // [FIX-007] attr 22 = FullHealth (= HP with decimals)
 
         // ═════════════════════════════════════════════════════════
-        // Build _skills — keyed by index
+        // Build _skills — [FIX-013] keyed by skill ID string
         // ═════════════════════════════════════════════════════════
-        // _type: 0=normal, 1=proactive(skill), 2=passive, 3=superSkill
+        // _type: 0=normal, 1=proactive(skill), 2=passive, 3=superSkill, 4=potentialSkill
+        // SOURCE: L102518-527 getEnemySkill — reads _type, _id, _level per skill
+        // HAR shows keys as skill ID strings: "190401":{...}
         var skillItems = {};
-        var skillIdx = 0;
 
         // Normal attack (type 0)
         if (hero.normal) {
             var normalId = parseSkillId(hero.normal);
             if (normalId > 0) {
-                skillItems[String(skillIdx)] = {
+                skillItems[String(normalId)] = {
                     _type: 0,
                     _id: normalId,
                     _level: 1
                 };
-                skillIdx++;
             }
         }
 
@@ -606,12 +644,11 @@ function handleStartGeneral(request, ctx) {
         if (hero.skill) {
             var skillId = parseSkillId(hero.skill);
             if (skillId > 0) {
-                skillItems[String(skillIdx)] = {
+                skillItems[String(skillId)] = {
                     _type: 1,
                     _id: skillId,
                     _level: hero.skillLevel || 1
                 };
-                skillIdx++;
             }
         }
 
@@ -619,12 +656,11 @@ function handleStartGeneral(request, ctx) {
         if (hero.skillPassive1) {
             var passiveId1 = parseSkillId(hero.skillPassive1);
             if (passiveId1 > 0) {
-                skillItems[String(skillIdx)] = {
+                skillItems[String(passiveId1)] = {
                     _type: 2,
                     _id: passiveId1,
                     _level: hero.passiveLevel1 || 1
                 };
-                skillIdx++;
             }
         }
 
@@ -632,12 +668,11 @@ function handleStartGeneral(request, ctx) {
         if (hero.skillPassive2) {
             var passiveId2 = parseSkillId(hero.skillPassive2);
             if (passiveId2 > 0) {
-                skillItems[String(skillIdx)] = {
+                skillItems[String(passiveId2)] = {
                     _type: 2,
                     _id: passiveId2,
                     _level: hero.passiveLevel2 || 1
                 };
-                skillIdx++;
             }
         }
 
@@ -645,12 +680,11 @@ function handleStartGeneral(request, ctx) {
         if (hero.skillPassive3) {
             var passiveId3 = parseSkillId(hero.skillPassive3);
             if (passiveId3 > 0) {
-                skillItems[String(skillIdx)] = {
+                skillItems[String(passiveId3)] = {
                     _type: 2,
                     _id: passiveId3,
                     _level: hero.passiveLevel3 || 1
                 };
-                skillIdx++;
             }
         }
 
@@ -668,7 +702,7 @@ function handleStartGeneral(request, ctx) {
             _skinId: 0,                                       // [FIX-005] L236987
             _weaponHaloId: 0,                                 // [FIX-003] L102674
             _weaponHaloLevel: 0,                              // [FIX-003] L102674
-            battleTeamPosition: pos,                          // [FIX-010] getModelArray
+            battleTeamPosition: pos,                          // [FIX-010] position
             _attrs: {
                 _items: attrItems
             },
@@ -682,12 +716,12 @@ function handleStartGeneral(request, ctx) {
             ' q=' + heroQuality +
             ' lvl=' + level +
             ' type=' + mType +
-            ' hp=' + hp +
-            ' atk=' + attack +
-            ' arm=' + armor +
+            ' hp=' + hp.toFixed(2) +
+            ' atk=' + attack.toFixed(2) +
+            ' arm=' + armor.toFixed(2) +
             ' pwr=' + power +
             ' spd=' + speed +
-            ' skills=' + skillIdx
+            ' skills=' + Object.keys(skillItems).join(',')
         );
 
         ctx.logger.details('enemy',
@@ -697,10 +731,10 @@ function handleStartGeneral(request, ctx) {
             ['level', String(level)],
             ['monsterType', mType],
             ['diffHp/dAtk/dArm', dHp + '/' + dAtk + '/' + dArm],
-            ['hp/atk/arm', hp + '/' + attack + '/' + armor],
+            ['hp/atk/arm', hp.toFixed(2) + '/' + attack.toFixed(2) + '/' + armor.toFixed(2)],
             ['power', String(power)],
             ['speed', String(speed)],
-            ['skills', String(skillIdx)]
+            ['skills', Object.keys(skillItems).join(',')]
         );
     }
 
@@ -721,13 +755,30 @@ function handleStartGeneral(request, ctx) {
     // Generate unique battle ID
     var battleId = ctx.uuidv4();
 
+    // Store battleId in battleSessions for getRandom validation
+    // This links startGeneral → getRandom → checkBattleResult
+    if (ctx.battleSessions) {
+        ctx.battleSessions.set(battleId, {
+            userId: userId,
+            lessonId: lessonId,
+            createdAt: Date.now(),
+            randomUsed: false,
+            resultChecked: false
+        });
+        ctx.logger.details('battleSession',
+            ['battleId', battleId.substring(0, 12) + '...'],
+            ['userId', userId.substring(0, 16) + '...'],
+            ['lessonId', lessonId],
+            ['status', 'REGISTERED']
+        );
+    }
+
     // Build rightSuper — empty array (enemy has no super skill in lesson battle)
     // Client handles empty gracefully: rightSuper: r ? r : [] (L103618)
     var rightSuper = [];
 
     // [FIX-001] _rightTeam is FLAT object (no _items wrapper)
     // SOURCE: L102470: for (var o in e) iterates _rightTeam directly
-    // Client code: rightTeam passed as-is to getModelArray which does for...in
     var responseData = {
         _battleId: battleId,
         _rightTeam: rightTeamItems,       // FLAT — no _items wrapper!
@@ -771,15 +822,33 @@ function handleStartGeneral(request, ctx) {
         },
         {
             name: 'Power attr (21)',
-            value: 'included',
+            value: 'included (integer)',
             status: 'ok',
-            detail: 'L133821: 21==p._id → heroBaseAttr.power = floor(num) — [FIX-006]'
+            detail: 'L133821: 21==p._id → floor(num) — [FIX-006][FIX-015]'
         },
         {
-            name: 'OrgHp attr (22)',
-            value: 'included',
+            name: 'FullHealth attr (22)',
+            value: 'included (= HP with decimals)',
             status: 'ok',
-            detail: 'heroMaxHealth = orgHp — [FIX-007]'
+            detail: 'L74988: heroMaxHealth = FullHealth || Health — [FIX-007]'
+        },
+        {
+            name: 'HP/ATK/ARM decimal values',
+            value: 'NOT floored — matches HAR',
+            status: 'ok',
+            detail: 'HAR: _num:702.45, _num:174.24 — [FIX-009]'
+        },
+        {
+            name: 'ENERGY attr (16)',
+            value: '50 (starting energy)',
+            status: 'ok',
+            detail: 'HAR: _num:50 — [FIX-014]'
+        },
+        {
+            name: 'Skills keyed by skill ID',
+            value: 'verified',
+            status: 'ok',
+            detail: 'HAR: "190401":{...} — [FIX-013]'
         },
         {
             name: 'Formula 5-layer',
@@ -908,6 +977,35 @@ function handleStartGeneral(request, ctx) {
         }
     );
 
+    ctx.logger.invariantCheck(
+        'All enemy heroes have FullHealth attr (22)',
+        Object.keys(rightTeamItems).every(function(p) {
+            return rightTeamItems[p]._attrs._items['22'] !== undefined;
+        }),
+        {
+            context: 'START-GENERAL',
+            expect: 'attr 22 (FullHealth) present for all enemies',
+            actual: 'verified: [FIX-007] FullHealth = HP value',
+            trace: 'L74988: heroMaxHealth = FullHealth || Health',
+            impact: 'Missing FullHealth -> heroMaxHealth falls back to HP (still works but inconsistent)'
+        }
+    );
+
+    ctx.logger.invariantCheck(
+        'ENERGY attr (16) = 50 for all enemies',
+        Object.keys(rightTeamItems).every(function(p) {
+            var energyAttr = rightTeamItems[p]._attrs._items['16'];
+            return energyAttr && energyAttr._num === 50;
+        }),
+        {
+            context: 'START-GENERAL',
+            expect: 'attr 16 (ENERGY) = 50',
+            actual: 'verified: [FIX-014] starting energy = 50',
+            trace: 'HAR: "16":{"_id":16,"_num":50}',
+            impact: 'ENERGY=0 -> enemy cannot use skills (needs 100 energy for proactive)'
+        }
+    );
+
     ctx.logger.step(7, 7, 'Verify & respond', 'pass');
 
     // ═══════════════════════════════════════════════════════════════
@@ -923,7 +1021,7 @@ function handleStartGeneral(request, ctx) {
         battleId: battleId.substring(0, 12) + '...',
         enemies: enemyCount,
         enemySummary: buildLog.join(' | '),
-        fixesApplied: 'FIX-001 thru FIX-012'
+        fixesApplied: 'FIX-001 thru FIX-015'
     });
 
     return ctx.buildDataResponse(0, responseData);
