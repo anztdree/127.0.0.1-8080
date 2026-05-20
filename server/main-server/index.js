@@ -52,6 +52,7 @@ const summonOneFree = require('./handlers/summon/summonOneFree');
 const activityGetActivityBrief = require('./handlers/activity/getActivityBrief');
 const hangupGain = require('./handlers/hangup/gain');
 const hangupStartGeneral = require('./handlers/hangup/startGeneral');
+const battleGetRandom = require('./handlers/battle/getRandom');
 const equipWearAuto = require('./handlers/equip/wearAuto');
 
 // ─── Socket.IO 2.5.1 Setup ───
@@ -66,6 +67,27 @@ const io = require('socket.io')(config.port, {
 // ─── Session Tracking ───
 const sessions = new Map();
 const actionCounters = new Map();
+
+// ─── Battle Session Tracking ───
+// Links startGeneral → getRandom → checkBattleResult via battleId
+// Key: battleId (UUID), Value: { userId, lessonId, createdAt, randomUsed, resultChecked }
+const battleSessions = new Map();
+
+// Cleanup: remove battle sessions older than 30 minutes every 5 minutes
+setInterval(function() {
+    const now = Date.now();
+    const maxAge = 30 * 60 * 1000; // 30 minutes
+    let cleaned = 0;
+    for (const [id, session] of battleSessions) {
+        if (now - session.createdAt > maxAge) {
+            battleSessions.delete(id);
+            cleaned++;
+        }
+    }
+    if (cleaned > 0) {
+        logger.log('DEBUG', 'BATTLE-SESSION', `Cleaned ${cleaned} expired battle sessions (remaining: ${battleSessions.size})`);
+    }
+}, 5 * 60 * 1000);
 
 // ─── v5.0: Per-socket stats + idle timer ───
 const socketStatsMap = new Map();  // socketId → { actionCount, successCount, errorCount, errorDetails[], totalTime, totalData, lastActivityAt, userId, registeredHandlers, missingHandlers }
@@ -512,6 +534,9 @@ const ACTION_HANDLERS = {
     equip: {
         wearAuto: equipWearAuto
     },
+    battle: {
+        getRandom: battleGetRandom
+    },
 };
 
 // ═══════════════════════════════════════════════════════════════
@@ -791,7 +816,8 @@ io.on('connection', (socket) => {
                 heroJson,
                 summonJson,
                 buildDataResponse,
-                buildErrorResponse
+                buildErrorResponse,
+                battleSessions
             };
 
             const response = await handler(request, ctx);
