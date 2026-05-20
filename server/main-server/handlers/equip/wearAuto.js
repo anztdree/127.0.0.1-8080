@@ -527,6 +527,12 @@ async function handle(msg, ctx) {
         return ctx.buildErrorResponse(1);
     }
 
+    // [FIX-008] Apply talent multiply to base HP/ATK BEFORE adding equipment
+    // Formula verified via HAR: totalHP = baseHP × talent + equipHP = 1240 × 0.6 + 4906 = 5650
+    const talent = heroConfig.talent || 0;
+    baseAttrs[ATTR.HP] = Math.floor(baseAttrs[ATTR.HP] * talent);
+    baseAttrs[ATTR.ATTACK] = Math.floor(baseAttrs[ATTR.ATTACK] * talent);
+
     // Add equipment attributes
     for (const ea of finalEquipAttrs) {
         baseAttrs[ea._id] = (baseAttrs[ea._id] || 0) + ea._num;
@@ -537,12 +543,47 @@ async function handle(msg, ctx) {
         baseAttrs[sa._id] = (baseAttrs[sa._id] || 0) + sa._num;
     }
 
+    // [FIX-009] Recalculate power based on TOTAL attrs (after talent + equipment + suit)
+    // Power was calculated from base-only stats in calculateBaseAttrs — must be recalculated
+    baseAttrs[ATTR.POWER] = 0;
+    if (_heroPower) {
+        const attrNameMap = {
+            hp: baseAttrs[ATTR.HP], attack: baseAttrs[ATTR.ATTACK],
+            armor: baseAttrs[ATTR.ARMOR], speed: baseAttrs[ATTR.SPEED],
+            extraArmor: baseAttrs[ATTR.EXTRA_ARMOR], hit: baseAttrs[ATTR.HIT],
+            dodge: baseAttrs[ATTR.DODGE], block: baseAttrs[ATTR.BLOCK],
+            blockEffect: baseAttrs[ATTR.BLOCK_EFFECT], skillDamage: baseAttrs[ATTR.SKILL_DAMAGE],
+            superDamage: baseAttrs[ATTR.SUPER_DAMAGE], critical: baseAttrs[ATTR.CRITICAL],
+            criticalResist: baseAttrs[ATTR.CRITICAL_RESIST],
+            criticalDamage: baseAttrs[ATTR.CRITICAL_DAMAGE],
+            armorBreak: baseAttrs[ATTR.ARMOR_BREAK], damageReduce: baseAttrs[ATTR.DAMAGE_REDUCE],
+            controlResist: baseAttrs[ATTR.CONTROL_RESIST], trueDamage: baseAttrs[ATTR.TRUE_DAMAGE],
+            healPlus: baseAttrs[ATTR.HEAL_PLUS], healerPlus: baseAttrs[ATTR.HEALER_PLUS],
+            shielderPlus: baseAttrs[ATTR.SHIELDER_PLUS], damageUp: baseAttrs[ATTR.DAMAGE_UP],
+            damageDown: baseAttrs[ATTR.DAMAGE_DOWN], superDamageResist: baseAttrs[ATTR.SUPER_DAMAGE_RESIST],
+            hpPercent: baseAttrs[ATTR.HP_PERCENT], attackPercent: baseAttrs[ATTR.ATTACK_PERCENT],
+            armorPercent: baseAttrs[ATTR.ARMOR_PERCENT],
+        };
+        let newPower = 0;
+        for (const key in _heroPower) {
+            const entry = _heroPower[key];
+            if (entry.heroType === heroConfig.heroType) {
+                newPower += (attrNameMap[entry.attName] || 0) * entry.powerParam;
+            }
+        }
+        baseAttrs[ATTR.POWER] = Math.floor(newPower);
+    }
+
+    // [FIX-009] Update ORG_HP to match total HP (after talent + equipment)
+    baseAttrs[ATTR.ORG_HP] = baseAttrs[ATTR.HP];
+
     const totalAttr = buildTotalAttrItems(baseAttrs);
 
     ctx.logger.details('totalAttr',
         ['hp', String(baseAttrs[ATTR.HP])],
         ['attack', String(baseAttrs[ATTR.ATTACK])],
         ['armor', String(baseAttrs[ATTR.ARMOR])],
+        ['extraArmor', String(baseAttrs[ATTR.EXTRA_ARMOR])],
         ['power', String(baseAttrs[ATTR.POWER])]
     );
     ctx.logger.step(8, 8, 'Calculate total attributes', 'pass', 'power=' + baseAttrs[ATTR.POWER]);
